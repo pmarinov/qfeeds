@@ -1,0 +1,7 @@
+CONTRIBUTORS.txt,  RRSS - R is a reader of RSS feeds
+----------------------------------------------------
+
+Thanks to the following people for their contributions:
+
+Tzvetan Mikov
+

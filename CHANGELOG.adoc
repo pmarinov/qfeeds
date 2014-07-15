@@ -1,0 +1,13 @@
+CHANGELOG.txt, RRSS - R is a reader of RSS feeds
+------------------------------------------------
+
+
+=== 2014-07-12, v0.2.0.0, pmarinov
+
+* Main features of a standalone RSS reader are functional: subscribe,
+  unsubscribe, folders, feed settings
+* Published on github
+
+=== 2013-07-01, v0.0.1.0, pmarinov
+
+* First primitively usable version

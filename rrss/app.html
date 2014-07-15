@@ -1,0 +1,542 @@
+<!doctype html>
+<!-- app.html -->
+<!-- This software is distributed under terms of the BSD License.  -->
+<!-- Copyright (c) 2014, Peter Marinov and Contributors            -->
+<!-- see LICENSE.txt, CONTRIBUTORS.txt                             -->
+
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="author" content="">
+  <title>[rrss]</title>
+
+  <script src="../lib/jquery-2.0.2.js" type="text/javascript"></script>
+
+  <link href="../lib/bootstrap-3.2.0-dist/css/bootstrap.css" rel="stylesheet">
+  <script src="../lib/bootstrap-3.2.0-dist/js/bootstrap.js" type="text/javascript"></script>
+
+  <script src="../lib/loglevel.js" type="text/javascript"></script>
+  <script src="../lib/dropbox-0.10.1-116.js"></script>
+  <script src="../lib/components/core.js"></script>
+  <script src="../lib/components/sha1.js"></script>
+
+  <!-- app's css and js -->
+  <link href="style.css" rel="stylesheet" type="text/css">
+  <script src="utils.js" type="text/javascript"></script>
+  <script src="rtable_dbox.js" type="text/javascript"></script>
+  <script src="rss_parser.js" type="text/javascript"></script>
+  <script src="feeds.js" type="text/javascript"></script>
+  <script src="feeds_dir.js" type="text/javascript"></script>
+  <script src="feed_disp.js" type="text/javascript"></script>
+  <script src="app.js" type="text/javascript"></script>
+</head>
+<body>
+  <div class="container-fluid">
+  <div class="row">
+  <div class="col-sm-3 col-md-3 left_pane" id="xleft_pane">
+    <!--Sidebar content-->
+    <!-- Section: Feeds -->
+    <div id="xcmd_pane_feeds_dir" style="width: 100%; float:left;">
+    <div class="submenu_title_holder">
+        <span class="indent1"></span>
+        <span class="submenu_title" style="cursor: pointer;">Feeds</span>
+        <span class="add_btn_holder">
+          <button class="btn btn-primary btn-xs" title="Subscribe to a new RSS feed" id="xadd_rss">Add</button>
+        </span>
+    </div>
+    <!-- container for left-pane rss/folder entries (feeds directory navigation) -->
+    <div id='xfeeds_list'>
+      <!-- xentry is replicated as needs dictate -->
+      <div class='xentry list_entry hide'>
+        <!-- indent entries that are inside a folder -->
+        <span class='xfolder_indent indent_inside_folder'>&nbsp;</span>
+        <!-- icon (folder or feed) -->
+        <span class='xdir_icon_holder icon_holder'>
+          <img src='icon_folder_open.svg' alt='fo'
+               title="Click to close folder" class='ximg_folder_open hide icon unselected'>
+          <img src='icon_folder_closed.svg' alt='fo'
+               title="Click to open folder" class='ximg_folder_closed hide icon unselected'>
+          <img src='icon_rss.svg' alt='rss'
+               title="Click to display feed" class='ximg_rss hide icon unselected'>
+        </span>
+        <!-- RSS feed title -->
+        <span class='xentry_text entry_text'>
+          (empty)
+        </span>
+        <span class='xentry_unread unread'>000</span>
+      </div> <!-- xentry -->
+    </div>  <!-- .view #xfeeds_list -->
+    </div>  <!-- #xcmd_pane_feeds_dir -->
+
+    <!-- Section: Persistency -->
+    <div class="submenu_title_holder submenu_title_top_sep">
+      <span class="indent1"></span>
+      <span class="submenu_title">Persistency</span>
+    </div>
+    <div class="submenu_entry_holder">
+      <span class="indent1"></span>
+      <span class="submenu_entry" id="xdropbox">Logon</span>
+      <div><i id="xdropbox_user"></i></div>
+    </div>
+
+    <!-- Section: Settings -->
+    <div class="submenu_title_holder submenu_title_top_sep">
+      <span class="indent1"></span>
+      <span class="submenu_title">Settings</span>
+    </div>
+    <div id="xcmd_pane_settings" class="submenu_entry_holder">
+      <span class="indent1"></span>
+      <span class="submenu_entry" style="color: gray" title="Disabled">Settings</span>
+    </div>  <!-- #xcmd_pane_settings -->
+    <div id="xcmd_pane_about" class="submenu_entry_holder">
+      <span class="indent1"></span>
+      <span class="submenu_entry">About</span>
+    </div>  <!-- #xcmd_pane_about -->
+  </div> <!-- left_pane -->
+
+  <!-- right pane -->
+  <div class='col-sm-9 col-md-9'>
+    <!-- The main content of the right pane is to show feeds, but also shows stuff -->
+    <!-- About, Settings, etc.                                                     -->
+
+    <!-- RSS feeds display  -->
+    <div id='xdisp_pane_feeds' class='hide'>
+
+    <!-- When no feeds are subscribed point at the Add button -->
+    <div id='xloading_msg_area' class='clickadd_area hide'>
+       Loading...
+    </div>  <!-- #xloading_area -->
+
+    <div id='xclick_add_first_time_area' class='clickadd_area hide'>
+      <img src="icon_arrow_left.svg" alt="fo" width="22px" title='Click "Add" button'>
+      Click the <b>"Add"</b> button to begin adding feeds to your list<br/>
+      <br/>
+      <br/>
+      Or, as a quick way to start, click to
+      <button type="button" id="xadd_books" class="btn btn-sm" style="margin-top: -5px;">add feed "Books"</button>
+      from <i>The Guardian</i>.
+    </div>  <!-- #xclick_add_first_time_area -->
+
+    <div id='xclick_add_area' class='clickadd_area hide'>
+      <img src="icon_arrow_left.svg" alt="fo" width="22px" title='Click "Add" button'>
+      Your list is empty, click the <b>"Add"</b> button<br/>
+    </div>  <!-- #xclick_add_area -->
+
+    <div id='xadd_feed_area' class='add_feed_area hide'>
+      <div style='font-weight: bold; font-size: 120%; margin-bottom: 12px;'>Add new:</div>
+      <div class='col-lg-6'>
+      <div style='margin-top: 5px; margin-right: 6px; font-size: 85%;'>URL of an RSS feed:</div>
+      <form id='xform_new_rss' class='pull-left' style="width: 100%; margin-bottom: 20px;">
+        <input id='xfield_input_url' type='text' class='form-control pull-left' style='width: 60%; margin-right: 7px;'>
+        <button type='submit' class='btn btn-sm add_btn_pos'>View</button>
+        <button type='button' id='xform_cancel' class='btn btn-sm add_btn_pos'>Cancel</button>
+      </form>
+      </div>
+      <div class="clearfix">
+      </div>
+
+      <!-- List of RECENTLY VIEWED -->
+      <div id='xrecent_container' class='recent_container'>
+      <div class='title'>
+        Recently viewed RSS feeds:
+      </div>
+      <div id='xrecent_empty' class='empty hide'>
+        (none)
+      </div>
+      <div class='xrecent_entry recentvw_bar hide'>
+        <!-- First the fixed width stuff on the right-hand edge of the bar -->
+        <span class='pull-left' style='width: 100%'>  <!-- The remaining space is for this -->
+          <!-- Title source is fixed width -->
+          <span class='xrecent_title_source title_source bar_elem pull-left'>
+            <span>
+            FT.com - Martin Wolf (top columnist)
+            </span>
+          </span>
+          <!-- The remaining space is for title:snippet -->
+          <span class='xrecent_url title_url bar_elem pull-left'>
+            http://www.ft.com/rss/comment/columnist/martinwolf
+          </span>
+          <span class='bar_elem pull-right'>
+            <span class='xrecent_view icon' title='View'>
+            <img src='icon_view.svg' alt='An awesome image' style='width: 20px'/>
+            </span>
+          </span>
+          <span class='xrecent_subscribed subscribed_label bar_elem pull-right'>
+            [subscribed]
+          </span>
+        </span>
+      </div>  <!-- .xrecent_entry -->
+      </div>  <!-- #xrecent_container-->
+
+    </div>  <!-- #xadd_feed_area -->
+
+    <!-- Everything above #xdisplay_feed_container are activities that take place -->
+    <!-- on the right side pane with the feed contents entirely hidden            -->
+
+    <div id="xdisplay_feed_container" class="hide">
+    <div class="rss_title_area">
+        <span class="icon_holder_folder">
+          <img src="icon_folder.svg" alt="fo" id="ximg_folder" title="A folder this is."
+               class="hide icon unselected">
+        </span>
+        <span class="icon_holder_rss">
+          <img src="icon_rss.svg" alt="rss" id="ximg_rss" title="Drag to move this feed into a folder"
+               style="cursor: move;" class="icon unselected">
+        </span>
+        <span id="xtitle_top" title="zzz" class="title">Feeds</span>
+        <span id="xtitle_settings" class="icon_settings">
+        <img id="xsettings_icon" src="icon_gear.svg" class="icon" title="Open settings for this RSS feed"/>
+        </span>
+        <span id="xtitle_info" class="icon_settings">
+        <img id="xfeed_icon" src="icon_info.svg" class="icon" title="Info"/>
+        </span>
+        <span class="icon_link_holder">
+        <a id="xtitle_link" class="icon_link"
+           href="http://www.ft.com/rss/comment/columnist/martinwolf"
+           target="_blank">
+        <img src="icon_arrow_goto.svg" class="icon icon_link_pos" alt="An awesome image"/>
+        </a>
+        </span>
+    </div>  <!-- .rss_title_area -->
+
+    <div id='xrename_folder_area' class='rename_folder_area hide'>
+      <form id='xform_rename_folder' class='pull-left' style='width: 80%'>
+        <span style='float: left; margin-top: 4px; margin-right: 5px; font-size: 85%;'>New folder name:</span>
+        <input id='xfield_input_folder_name' type='text' class='' style='width: 45%; margin-right: 10px;'>
+        <button type='submit' class='btn btn-sm ren_btn_pos'>Rename</button>
+        <button type='button' id='xform_cancel_folder_name' class='btn btn-sm ren_btn_pos'>
+          Cancel
+        </button>
+        <div style="margin-top: 8px">
+          <i>note: The feature 'Folder rename' is not yet ready, we apologize for that.</i>
+        </div>
+      </form>
+    </div>  <!-- #xrename_folder_area -->
+
+    <div id="xselect_folder_area" class="select_folder_area">
+      <span class="label_folder">
+      Folder:
+      </span>
+      <span class="folder_dropdown_holder">
+      <select id="xfolder_select_menu" class="folder_dropdown">
+        <option value="xnone">None</option>
+        <option value="xnew">Create new...</option>
+      </select>
+      </span>
+      <span id="xsubscribe_btns_area" class="subscribe_btns_area">
+        <button type="button" id="xfeed_subscribe" class="btn btn-sm">Subscribe</button>
+        <button type="button" id="xfeed_cancel" class="btn btn-sm">Cancel</button>
+      </span>
+      <span id="xset_btn_area" class="set_btn_area">
+        <button type="button" id="xfeed_setfolder" class="btn btn-sm">Set</button>
+      </span>
+      <div class="clearfix">
+      </div>
+    </div>  <!-- #xselect_folder_area -->
+
+    <div id="xunsubscribe_btn_area" class="unsubscribe_btn_area">
+      <span class="label_folder" style="padding-right: 16px;">
+      Feed:
+      </span>
+      <button type="button" id="xfeed_unsubscribe" class="btn btn-sm">Unsubscribe</button>
+      <div class="clearfix">
+      </div>
+    </div>
+
+    <div id="xfeed_unsub_undo_area" class="unsubscribe_undo_btn_area hide">
+      <span>
+      Unsubscribed!
+      </span>
+      <span>
+        <button type="button" id="xfeed_unsub_undo" class="btn btn-sm">Undo</button>
+      </span>
+      <div class="clearfix">
+      </div>
+    </div>
+
+    <div id="xfeed_info_area" class="feed_info_area">
+      <div>
+        <span>URL: </span><span id="xfeed_info_url"></span>
+      </div>
+      <div class="clearfix">
+      </div>
+    </div>
+
+    <div id="xfolder_info_area" class="feed_info_area">
+      <div>
+        <span>Feeds: </span><span>2 (Demo)</span>
+      </div>
+      <div class="clearfix">
+      </div>
+    </div>
+
+    <!-- Everything above #xrss_container are activities that take place -->
+    <!-- on the right side pane with the feed contents presnet           -->
+
+    <div id="xrss_container" class="rss_container">
+    <div class="rss_entry hide">
+      <div class="xbar bar">
+        <!-- First the fixed width stuff on the right-hand edge of the bar -->
+        <span class="bar_elem pull-right">
+          <a class="xurl url icon"
+             href="http://www.ft.com/rss/comment/columnist/martinwolf"
+             target="_blank">
+          <img src="icon_arrow_goto.svg" alt="An awesome image" style="width: 25px"/>
+        </a>
+        </span>
+        <span class="xmarked_read read_unread icon bar_elem pull-right hide">
+          <img src="icon_read.svg" class="icon_read" alt="marked read" title="Click to mark as unread"/>
+        </span>
+        <span class="xmarked_unread icon bar_elem pull-right">
+          <img src="icon_unread.svg" class="icon_unread" alt="marked unread" title="Click to mark as read"/>
+        </span>
+        <span class="xdate date bar_elem pull-right">
+          12d
+        </span>
+        <div>  <!-- The remaining space in this fix -->
+          <!-- Title source is fixed width -->
+          <div class="xtitle_source title_source bar_elem pull-left">  <!-- overflow: hidden -->
+            <span>
+            FT.com - Martin Wolf (top columnist)
+            </span>
+          </div>
+          <!-- The remaining space is for title:snippet -->
+          <span class="xtitle title bar_elem">
+            Thatcher: the great reformer
+          </span>
+          <span class="xsnippet snippet">
+            The influence of the former UK prime minister on the world stage
+            rested on her outspoken defence of free markets and close
+            relationship with the US
+          </span>
+        </div>
+      </div>  <!-- .bar -->
+      <div class="clearfix">
+      </div>
+
+      <div class="xbody body hide">
+        <div class="head">
+        <div>
+        <span class='body_title'>
+        <a class='xbody_title'
+           href="http://www.ft.com/cms/s/0/e0c032dc-a066-11e2-88b6-00144feabdc0.html"
+           target="_blank">
+        Thatcher: the great reformer
+        </a>
+        </span>
+        <span>
+        <a class="xbody_url url icon"
+           href="http://www.ft.com/rss/comment/columnist/martinwolf"
+           target="_blank">
+        <img src="icon_arrow_goto.svg" alt="An awesome image" style="width: 24px"/>
+        </a>
+        </span>
+        </div>
+        <span>
+        from
+        </span>
+        <span class="body_title_source">
+        <a class='xbody_feed_url'
+           href="http://www.ft.com/rss/comment/columnist/martinwolf"
+           target="_blank">
+        FT.com - Martin Wolf
+        </a>
+        <a class='xbody_feed_source_url hide'
+           href="http://www.ft.com/rss/comment/columnist/martinwolf"
+           target="_blank">
+        (reserved: feed source backref)
+        </a>
+        </span>
+        </div> <!-- .head -->
+        <div class="xbody_entry body_entry_text">
+        The influence of the former UK prime minister on the world stage
+        rested on her outspoken defence of free markets and close
+        relationship with the US
+        </div>
+        </span>
+      </div>  <!-- .body -->
+    </div>  <!-- .rss_entry -->
+    </div>  <!-- #xrss_container -->
+    </div> <!-- #xdisplay_feed_container -->
+    <div class='clearfix'>
+    </div>
+    </div> <!-- #xdisp_pane_feeds -->
+
+    <!-- About screen display -->
+    <div id='xdisp_pane_about' class='hide'>
+      <div style="text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+color: #999999; font-weight: bold; padding-top: 10px; padding-bottom: 8px;">About RRSS</div>
+      <span style="float: left; border-radius: 10px; border: 2px solid #e6e6e6; background: #eeeeee; width: 56px; padding: 4px 4px 4px 4px;">
+      <img src='icon_rss.svg' title='rrss' style='width: 45px;'/>
+      </span>
+      <span style="float: left;">
+      <pre style="font-size: 12px; line-height: 14px; font-family: monospace; font-weight: bold; white-space: pre; padding: 0; margin-top: -6px; border: 0px; background: white;">
+  _ __ _ __ ___ ___ 
+ | '__| '__/ __/ __|
+ | |  | |  \__ \__ \
+ |_|  |_|  |___/___/
+      </pre>
+      </span>
+    <div class='clearfix'>
+    </div>
+      <div><i>"R is a reader of RSS feeds"</i></div>
+      <br/>
+      <div>version 0.2.0</div>
+      <div>Copyright (c) 2014, Peter Marinov and Contributors. All rights reserved.</div>
+      <div>
+        <span>Distributed under the terms of the BSD License.<span>
+        <span>
+          <button type="button" id="xsee_license" class="btn btn-sm">See license</button>
+          <button type="button" id="xclose_license" class="btn btn-sm hide">Close license</button>
+        </span>
+      </div>
+      <div id="xarea_license" class="hide" style="padding-top: 10px">
+      <pre>
+The BSD License
+...............
+
+Copyright (c) 2014, Peter Marinov (Petar Marinov) and Contributors;
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+* Redistributions of source code must retain the above copyright
+  notice, this list of conditions and the following disclaimer.
+
+* Redistributions in binary form must reproduce the above copyright
+  notice, this list of conditions and the following disclaimer in the
+  documentation and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+      </pre>
+      </div>
+      <div id="xarea_about_extra">
+      <br/>
+      <hr/>
+      <div style="font-size:95%">
+      <div>Contributors</div>
+      <div>Tzvetan Mikov</div>
+      <hr/>
+      <div>Credits</div>
+      <div>
+        from The Noun Project:
+        <a href="http://thenounproject.com" target="_blank">http://thenounproject.com</a>
+      </div>
+      <div>RSS logo [
+        <a href="http://thenounproject.com/term/rss/14199" target="_blank">
+          <img src='icon_rss.svg' title='rrss' style='width: 12px;'/>
+        </a>]: <a href="http://thenounproject.com/onmercury" target="_blank">Vladimir Dubinin</a>, CC0
+      </div>
+      <div>Arrow "goto" [
+        <a href="http://thenounproject.com/term/arrow/5447" target="_blank">
+          <img src='icon_arrow_goto.svg' title='goto' style='width: 16px;'/>
+        </a>]: <a href="http://thenounproject.com/jamison" target="_blank">Jamison Wieser</a>, CC BY 3.0
+      </div>
+      <div>Arrow "left" [
+        <a href="http://thenounproject.com/term/arrow/6398" target="_blank">
+          <img src='icon_arrow_left.svg' title='left' style='width: 11px;'/>
+        </a>]: <a href="http://thenounproject.com/jacobtoye" target="_blank">Jacob Toye</a>, CC0
+      </div>
+      <div>Gear "settings" [
+        <a href="http://thenounproject.com/term/gear/1329" target="_blank">
+          <img src='icon_gear.svg' title='settings' style='width: 12px;'/>
+        </a>]: <a href="http://thenounproject.com/r0" target="_blank">Ryan Oksenhorn</a>, CC0
+      </div>
+      <div>Info logo [
+        <a href="http://thenounproject.com/term/information/15358" target="_blank">
+          <img src='icon_info.svg' title='info' style='width: 12px;'/>
+        </a>]: <a href="http://thenounproject.com/SuperAtic" target="_blank">SuperAtic LABS</a>, CC BY 3.0
+      </div>
+      <div>Read/Unread [
+        <a href="http://thenounproject.com/term/switch/29574" target="_blank">
+          <img src='icon_unread.svg' title='read/unread' style='width: 12px; zoom: 1.9;'/>
+        </a>]: <a href="http://www.thenounproject.com/sokolovds" target="_blank">Dimitry Sunseifer</a>, CC BY 3.0
+      </div>
+      <div>Folder [
+        <a href="http://thenounproject.com/term/folder/1251" target="_blank">
+          <img src='icon_folder.svg' title='folder' style='width: 12px;'/>
+        </a>]: <a href="http://www.thenounproject.com/riley" target="_blank">Riley Shaw</a>, CC BY 3.0
+      </div>
+      <div>Folder state [
+        <a href="http://www.thenounproject.com/term/right-arrow/11587" target="_blank">
+          <img src='icon_folder_closed.svg' title='open/closed' style='width: 12px;'/>
+        </a>]: <a href="http://thenounproject.com/informationarchitect" target="_blank">CD</a>, CC BY 3.0
+      </div>
+      <br/>
+      <div>ASCII Art [
+        <a href="http://patorjk.com/software/taag/#p=display&f=Big&t=rrss" target="_blank">
+          rrss
+        </a> ]: via <a href="http://patorjk.com/blog/about" target="_blank">patorjk</a>
+      </div>
+      <br/>
+      <div>
+        Libraries:
+      </div>
+      <div>
+        <span>
+          <a href="https://jquery.com" target="_blank" class="pull-left">jQuery</a>
+        </span>
+        <span class="pull-left" style="margin-right: 5px; margin-left: 2px;"> MIT,</span>
+        <span>
+          <a href="https://github.com/twbs/bootstrap" target="_blank" class="pull-left">Bootstrap</a>
+        </span>
+        <span class="pull-left" style="margin-right: 5px; margin-left: 2px;"> MIT,</span>
+        <span>
+          <a href="https://code.google.com/p/crypto-js" target="_blank" class="pull-left">CryptoJS</a>
+        </span>
+        <span class="pull-left" style="margin-right: 5px; margin-left: 2px;"> BSD,</span>
+        <span>
+          <a href="https://github.com/pimterry/loglevel" target="_blank" class="pull-left">loglevel</a>
+        </span>
+        <span class="pull-left" style="margin-right: 5px; margin-left: 2px;"> MIT</span>
+      </div>
+
+      </div>  <!-- font-size: 95% -->
+      </div>  <!-- #xarea_about_extra -->
+      <div class='clearfix'>
+      </div>
+    </div>  <!-- #xdisp_pane_about -->
+
+  </div>  <!-- .span9 -->
+  </div>  <!-- .raw-fluid -->
+  </div>  <!-- .container-fluid -->
+
+  <!-- Folder name pop-up -->
+  <div id='xnew_folder' class='modal'>
+    <div class='modal-dialog'>
+    <div class='modal-content'>
+
+      <div class='modal-header'>
+        <button type='button' class='close' data-dismiss='modal' aria-hidden='true'>
+          <span aria-hidden="true">&times;</span><span class="sr-only">Close</span>
+        </button>
+        <h3 id='myModalLabel'>Create new folder</h3>
+      </div>
+      <div class='modal-body'>
+        <input id='xinput_new_folder' type='text' style='width: 60%;'>
+      </div>
+      <div class='modal-footer'>
+        <button class='btn' data-dismiss='modal' aria-hidden='true'>Cancel</button>
+        <button id='xbtn_new_folder_submit' class='btn btn-primary'>Create</button>
+      </div>
+
+    </div> <!-- .modal-content -->
+    </div> <!-- .modal-dialog -->
+  </div>  <!-- #xnew_folder -->
+
+</body>
+</html>

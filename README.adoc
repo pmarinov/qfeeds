@@ -1,0 +1,44 @@
+= RRSS
+:freesoftware: http://www.gnu.org/philosophy/free-sw.html
+:screenshot1: https://dl.dropboxusercontent.com/s/tmzbqb97atmcjst/rrss_feed1.png
+
+== RRSS
+
+_R is a reader of RSS feeds_
+
+Screenshots::
+
+* Individual feed: {screenshot1}[screenshot 1]
+
+Features::
+
+* RRSS is an RSS reader
+* It operates in a standalone mode as a web browser extension (Google
+  Chrome)
+* Local storage is used to keep feed subscriptions and metadata
+  (IndexedDB)
+* It displays feeds alone or grouped into folders
+* [Planned] It uses Dropbox, optionally, for synchronization between
+  computers (list of subscriptions and what was marked as read)
+
+
+== License
+
+RRSS is {freesoftware}[free software], it is distributed under the
+terms of the BSD License.
+
+Copyright (c) 2014, Peter Marinov and Contributors. All rights reserved.
+see LICENSE.txt, see CONTRIBUTORS.txt
+
+
+== Install for development
+
+. Download the libraries: go to "lib/", if empty run "./get_libs.sh"
+. Start Google Chrome browser
+. Invoke Menu | Tools | Extensions (or enter URL: chrome://extensions)
+. From Extensions page enable "Developer mode"
+. Click "Load unpacked extension"
+. Navigate to the directory where you put "rrss",
+  select the directory by name (contents of the extension is inside it)
+. Open "New tab", go to "Apps" section (or enter URL: chrome://apps)
+. Click "rrss" to start it

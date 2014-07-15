@@ -1,0 +1,25 @@
+{
+"manifest_version": 2,
+
+"name": "rrss",
+"description": "R is a reader of RSS feeds",
+"version": "0.0.1",
+
+"icons": { "128": "chrome/icon_rss.png" },
+
+"permissions": [ "tabs", "storage", "http://*/" ],
+
+"app":
+{
+  "launch":
+  {
+    "local_path": "rrss/app.html"
+  }
+},
+
+"background":
+{
+  "page": "chrome/background.html"
+}
+
+}

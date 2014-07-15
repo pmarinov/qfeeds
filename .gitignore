@@ -1,0 +1,5 @@
+# Only get_libs.sh from 'lib/', the rest is downloaded
+lib/
+
+# emacs backup files
+*~
