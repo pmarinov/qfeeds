@@ -9,6 +9,8 @@
 
 "permissions": [ "tabs", "storage", "http://*/" ],
 
+"web_accessible_resources": ["rrss/chrome_oauth_receiver.js", "rrss/chrome_oauth_receiver.html"],
+
 "app":
 {
   "launch":

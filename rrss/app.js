@@ -76,10 +76,10 @@ function App()
 
   // TODO: move all dropbox stuff into a devoted handler object
   // and a separate file
-  self.m_dropBoxClient = new Dropbox.Client({key: "2h6sz18x46w03jv"});
+  self.m_dropBoxClient = new Dropbox.Client({key: 'w1ghid3yiohsa69'});
   self.m_dropBoxClient.authDriver(new Dropbox.AuthDriver.ChromeExtension(
     {
-      receiverPath: 'ownrss/chrome_oauth_receiver.html'
+      receiverPath: 'rrss/chrome_oauth_receiver.html'
     }));
 
   self.$d.btnDropbox = utils_ns.domFind('#xdropbox');
