@@ -108,6 +108,21 @@ function FeedsDir($dirPanel, feedDisp)
   return this;
 }
 
+// object FeedsDir.remoteStoreConnected
+function remoteStoreConnected()
+{
+  var self = this;
+  self.m_feedsDB.rtableConnect();
+}
+FeedsDir.prototype.remoteStoreConnected = remoteStoreConnected;
+
+// object FeedsDir.remoteStoreDisconnected
+function remoteStoreDisconnected()
+{
+  var self = this;
+}
+FeedsDir.prototype.remoteStoreDisconnected = remoteStoreDisconnected;
+
 // object FeedsDir.p_setFeedsDomHandlers
 // Attach handlers to various DOM events related to FeedsDir screen area
 function p_setFeedsDomHandlers()
@@ -272,7 +287,7 @@ function p_getFeedsCBHandlers()
 
     onRssUpdated: function(updates)
         {
-          log.info("CB: onRssUpdated...");
+          log.trace("CB: onRssUpdated...");
 
           self.p_findUpdatedFolders();  // User added new folders?
           self.p_updateFeeds(updates);  // Updated/added feeds?
@@ -310,16 +325,23 @@ function p_getDispCBHandlers()
           else
           {
             self.m_feedsDB.feedUpdateEntry(entryHash,
-                function(dbEntry)
+                function(state, dbEntry)
                 {
-                  utils_ns.assert(dbEntry.m_hash == entryHash, 'markAsRead: bad data');
-
-                  if (dbEntry.m_is_read == isRead)
-                    return 1;
-                  else
+                  if (state == 0)
                   {
-                    dbEntry.m_is_read = isRead;
-                    return 0;
+                    utils_ns.assert(dbEntry.m_hash == entryHash, 'markAsRead: bad data');
+
+                    if (dbEntry.m_is_read == isRead)  // Already in the state it needs to be?
+                      return 1;  // Don't record in the DB
+                    else
+                    {
+                      dbEntry.m_is_read = isRead;
+                      return 0;  // Record in the DB
+                    }
+                  }
+                  else if (state == 1)
+                  {
+                    log.error('db update entry (' + s + '): [' + entryHash + '], error not found');
                   }
                 });
           }

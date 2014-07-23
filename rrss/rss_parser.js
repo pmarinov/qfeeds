@@ -21,6 +21,13 @@ if (typeof feeds_ns === 'undefined')
 {
 "use strict";
 
+var RssSyncState =
+{
+  IS_SYNCED: 0,
+  IS_REMOTE_ONLY: 1,
+  IS_LOCAL_ONLY: 2
+}
+
 // object RssEntry [constructor]
 function RssEntry(title, link, description, updated, id)
 {
@@ -29,14 +36,24 @@ function RssEntry(title, link, description, updated, id)
   this.m_description = description;
   this.m_date = updated;
   this.m_id = id;
+
+  // meta (stored in db)
   // m_hash: key in database
   this.m_hash = this.p_calcHash();
   // m_rssurl_date: compounded index in database = hash or RSSHeader url + m_date
   this.m_rssurl_date = '';  // computed before recorded in database
   this.m_is_read = false;
-  // meta
+  this.m_dropbox_state = RssSyncState.IS_LOCAL_ONLY;
+
+  // meta (stored in db)
   this.x_header = null; // back-ref to header
   return this;
+}
+
+// Object RssEntry.emptyRssEntry [factory]
+function emptyRssEntry()
+{
+  return new RssEntry(null, null, null, null, null);
 }
 
 // object RssEntry.copyRssEntry [constructor]
@@ -46,6 +63,7 @@ function copyRssEntry(from)
   x.m_hash = from.m_hash;
   x.m_rssurl_date = from.m_rssurl_date;
   x.m_is_read = from.m_is_read;
+  x.m_dropbox_state = from.m_dropbox_state;
   return x;
 }
 
@@ -67,6 +85,7 @@ function RssHeader(url, title, link, description, language, updated)
   this.m_rss_type = '';  // RSS or Atom
   this.m_rss_version = '';
 
+  // meta (stored in db)
   var sha1 = CryptoJS.SHA1(url);
   this.m_hash = sha1.toString();
 
@@ -78,7 +97,7 @@ function RssHeader(url, title, link, description, language, updated)
   return this;
 }
 
-// object RssHeader.emptyRssHeader [constructor]
+// object RssHeader.emptyRssHeader [factory]
 function emptyRssHeader()
 {
   return new RssHeader(null /*url*/, null /*title*/,
@@ -390,7 +409,9 @@ function fetchRss(urlRss, cb)
 }
 
 // export to feeds_ns namespace
+feeds_ns.RssSyncState = RssSyncState;
 feeds_ns.RssEntry = RssEntry;
+feeds_ns.emptyRssEntry = emptyRssEntry;
 feeds_ns.copyRssEntry = copyRssEntry;
 feeds_ns.RssHeader = RssHeader;
 feeds_ns.emptyRssHeader = emptyRssHeader;

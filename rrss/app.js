@@ -168,6 +168,14 @@ function p_dboxSetLoginButton()
 
   if (self.m_authenticated)
   {
+    if (false)
+    {
+      // TODO: remove, quick demo, file access
+      self.m_dropBoxClient.writeFile('hello.txt', 'Hello, World!', function () {
+          alert('File written!');
+      });
+    }
+
     self.$d.btnDropbox.text('Logout \u2192');
     if (self.m_user_email != '')
       self.$d.userDropbox.text('(' + self.m_user_email + ')');
@@ -229,6 +237,7 @@ function p_dboxConnectCB(error, client)
             console.log("RTable init OK");
             self.p_dboxSetLoginButton();
             self.p_dboxGetAccountInfo();
+            self.m_feedsDir.remoteStoreConnected();
           }
           else
           {

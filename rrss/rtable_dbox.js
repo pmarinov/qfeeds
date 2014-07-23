@@ -5,7 +5,6 @@
 // see LICENSE.txt, CONTRIBUTORS.txt
 
 //
-// Remotely synced hash table
 // Use Dropbox as a cloud store
 //
 
@@ -23,50 +22,72 @@ if (typeof feeds_ns === 'undefined')
 // Handle to Dropbox's datastore
 var g_datastore = null;
 
-// List of all the RTables created. It is used for when connection to
-// Dropbox is restored, or established. At that point the bulk of
-// uncommitted data is sent.
-var allTables = [];
+var g_cbRecordsChanged = null;
+
+// Listg of all remote tables, of type:
+// { table: string (name), id: integer }
+var g_tables = [];
 
 // object RTableDBox.RTableDBox [constructor]
-function RTableDBox()
+// Object for access of remote table stored in Dropbox
+function RTableDBox(name, fields)
 {
   var self = this;
 
-  self.m_table = new Object;
+  utils_ns.assert(g_datastore != null, 'RTableDBox: g_datastore is null');
+  self.m_table = g_datastore.getTable(name);
+  self.m_tableId = self.m_table.getId();
+  self.m_fields = fields;
 
-  allTables.push(self);
+  g_tables.push(
+      {
+        table: name,
+        id: self.m_tableId
+      });
+
   return self;
 }
 
-function hasKey(k)
+// object RTableDBox.insert
+// Records an entry into the remote table
+function insert(entry)
 {
-  if (this.m_table[k] === undefined)
-    return false;
-  else
-    return true;
-}
-RTableDBox.prototype.hasKey = hasKey;
+  var self = this;
 
-function add(k, v)
+  self.m_table.insert(entry);
+}
+RTableDBox.prototype.insert = insert;
+
+// object RTableDBox.readAll
+function readAll()
 {
-  // marshal all fields of v into a temp object
+  var self = this;
+
+  return self.m_table.query();
+}
+RTableDBox.prototype.readAll = readAll;
+
+// Invoke registered listeners once per remote table to notify of changed records
+function recordsChanged(dstoreEvent)
+{
   var i = 0;
-  var fields = Object.keys(v);
-  for (i = 0; i < fields.length; ++i)
+  var records = null;
+  // For each table call to notify for changed records
+  for (i = 0; i < g_tables.length; ++i)
   {
-    console.log(fields[i] + ":");
+    records = dstoreEvent.affectedRecordsForTable(g_tables[i].id);
+    g_cbRecordsChanged(g_tables[i].name, records);
   }
-  this.m_table[k] = v;
 }
-RTableDBox.prototype.add = add;
 
-function get(k, v)
+// Attach one global listener to handle the datastore
+function RTableAddListener(cbRecordsChanged)
 {
-  return this.m_table[k];
+  g_cbRecordsChanged = cbRecordsChanged;
+  g_datastore.recordsChanged.addListener(recordsChanged);
 }
-RTableDBox.prototype.get = get;
 
+// Call this once at init time to complete the initialization
 function RTableInit(dboxClient, cbReady)
 {
   var datastoreManager = dboxClient.getDatastoreManager();
@@ -86,5 +107,6 @@ function RTableInit(dboxClient, cbReady)
 }
 
 feeds_ns.RTableDBox = RTableDBox;
+feeds_ns.RTableAddListener = RTableAddListener;
 feeds_ns.RTableInit = RTableInit;
 })();

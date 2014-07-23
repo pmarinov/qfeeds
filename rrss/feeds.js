@@ -37,11 +37,92 @@ function Feeds(feedsCB)
 
   self.p_dbOpen();
 
+  // Subscribed RSS feeds stored in Dropbox (RTableDBox)
+  self.m_remote_subscriptions = null;
+
+  // RSS entries that are marked as read stored in Dropbox
+  // (RTableDBox)
+  self.m_remote_read = null;
+
   // Start the poll loop
   self.m_timeoutID = setTimeout(p_poll, 1, self);
 
   return this;
 }
+
+// object RemoteEntryRead [constructor]
+// From an RssEntry constructs a RemoteEntryRead record
+function RemoteEntryRead(rssEntry)
+{
+  this.m_rss_entry_hash = rssEntry.m_hash;
+
+  var h = rssEntry.m_rssurl_date.indexOf('_');
+  utils_ns.assert(h >= 0, "RemoteEntryRead: invalid rssurl_date hash");
+  var rssurl_hash = rssEntry.m_rssurl_date.slice(0, h);
+  this.m_rss_feed_hash = rssurl_hash;
+
+  this.m_is_read = rssEntry.m_is_read;
+  this.m_date = utils_ns.dateToStrStrict(rssEntry.m_date)
+  return this;
+}
+
+// object Feeds.rtableListener
+// Handle updates from the remote tables
+function rtableListener(table, records)
+{
+  var self = this;
+}
+Feeds.prototype.rtableListener = rtableListener;
+
+// object Feeds.rtableSyncStatusRead
+function rtableSyncStatusRead()
+{
+  var self = this;
+
+  self.updateEntriesAll(
+      function(rssEntry)
+      {
+        var remoteEntry = null;
+
+        if (rssEntry == null)  // No more entries
+          return 0;
+
+        if (rssEntry.m_dropbox_state == feeds_ns.RssSyncState.IS_LOCAL_ONLY)
+        {
+          // Record all read entries in the remote table
+          if (rssEntry.m_is_read)
+          {
+            remoteEntry = new RemoteEntryRead(rssEntry);
+            self.m_remote_subscriptions.insert(remoteEntry);
+            rssEntry.m_dropbox_state = feeds_ns.RssSyncState.IS_SYNCED;
+            return 1;  // Update entry
+          }
+        }
+
+        return 2;  // No changes to the entry, move to the next
+      });
+}
+Feeds.prototype.rtableSyncStatusRead = rtableSyncStatusRead;
+
+// object Feeds.rtableConnect
+// This method is invoked once when the application is logged into Dropbox
+function rtableConnect()
+{
+  var self = this;
+
+  var fields = [];
+  self.m_remote_subscriptions = new feeds_ns.RTableDBox('rss_entries_read', fields);
+  feeds_ns.RTableAddListener(
+      function (table, records)
+      {
+        self.rtableListener(table, records);
+      });
+
+  // Walk over all RSS entry records in the local DB and send to
+  // remote table all that were marked as read
+  self.rtableSyncStatusRead();
+}
+Feeds.prototype.rtableConnect = rtableConnect;
 
 // object Feeds.p_feedReadAll
 // Load list of feeds (RssHeaders) from IndexedDB
@@ -582,7 +663,7 @@ function feedUpdateEntry(entryHash, cbUpdate)
 
   var s = self.m_rss_entry_cnt;
 
-  // Insert entry in m_dbSubscriptions
+  // Entry goes into table 'rss_data'
   var tran = self.m_db.transaction(['rss_data'], 'readwrite');
   tran.oncomplete = function (event)
       {
@@ -602,36 +683,111 @@ function feedUpdateEntry(entryHash, cbUpdate)
   req.onsuccess = function(event)
       {
         var data = req.result;
+        var newEntry = null;
+        var shouldWrite = false;
+        var c = 0;
+
         if (data === undefined)
         {
-          log.info('db update entry (' + s + '): [' + entryHash + '], error not found');
+          log.info('db update entry (' + s + '): [' + entryHash + '], not found');
+
+          // Record with this hash is not in the DB
+          // Then create a new empty entry and ask cbUpdate() what to do
+          newEntry = feeds_ns.emptyRssEntry();
+          c =  cbUpdate(0, newEntry);
         }
         else
         {
-          //log.info('db, entry (' + s + ') already in [' + newEntry2.m_link + ']');
-          var newEntry = feeds_ns.copyRssEntry(data);
-          var c = cbUpdate(newEntry);
-          if (c != 0)
-          {
-            log.info('db, entry (' + s + ') no update needed: [' + newEntry.m_link + ']');
-            return;
-          }
-
-          var reqAdd = store.put(utils_ns.marshal(newEntry, 'm_'));
-          reqAdd.onsuccess = function(event)
-              {
-                var data = reqAdd.result;
-                log.info('db, entry (' + s + ') updated: [' + newEntry.m_link + ']');
-              }
-          reqAdd.onerror = function(event)
-              {
-                log.error('db, entry (' + s + ') error [' + newEntry.m_link + ']');
-                log.error('db, entry (' + s + ') error msg: ' + reqAdd.error.message);
-              }
+          // Ask for updated data
+          newEntry = feeds_ns.copyRssEntry(data);
+          c = cbUpdate(0, newEntry);
         }
+
+        if (c != 0)
+        {
+          log.info('db, entry (' + s + ') no update needed: [' + newEntry.m_link + ']');
+          return;
+        }
+
+        var reqAdd = store.put(utils_ns.marshal(newEntry, 'm_'));
+        reqAdd.onsuccess = function(event)
+            {
+              var data = reqAdd.result;
+              log.info('db, entry (' + s + ') updated: [' + newEntry.m_link + ']');
+            }
+        reqAdd.onerror = function(event)
+            {
+              log.error('db, entry (' + s + ') error [' + newEntry.m_link + ']');
+              log.error('db, entry (' + s + ') error msg: ' + reqAdd.error.message);
+            }
       }
 }
 Feeds.prototype.feedUpdateEntry = feedUpdateEntry;
+
+// object Feeds.updateEntriesAll
+// Walk over all records for RSS entries (table: rss_data), apply any
+// changed from a cbUpdate() callback.
+function updateEntriesAll(cbUpdate)
+{
+  var self = this;
+
+  log.info('db: update all...');
+  // Insert entry in m_dbSubscriptions
+  var tran = self.m_db.transaction(['rss_data'], 'readwrite');
+  tran.oncomplete = function (event)
+      {
+        log.trace('read transaction completed');
+      };
+  tran.onabort = function (event)
+      {
+        log.error('read transaction aborted');
+      };
+  tran.onerror = function (event)
+      {
+        log.error('read transaction error');
+      };
+  var store = tran.objectStore('rss_data');
+  var cursor = store.openCursor();  // navigate all entries
+  cursor.onsuccess = function(event)
+      {
+        var req = null;
+
+        var cursor = event.target.result;
+        if (!cursor)
+        {
+          cbUpdate(null);  // Tell the callback we are done
+          return;
+        }
+
+        var entry = cursor.value;
+
+        // Call the update callback for this value
+        var r = cbUpdate(cursor.value);
+        if (r == 0)
+        {
+          return;  // done with all entries
+        }
+        else if (r == 1)  // Write new value and move to the next
+        {
+          req = cursor.update(cursor.value);
+          req.onsuccess = function(event)
+              {
+                var data = req.result;
+                log.info('db, update success: ' + req.result);
+              }
+          req.onerror = function(event)
+              {
+                log.error('db, update error msg: ' + req.error.message);
+              }
+          cursor.continue();
+        }
+        else if (r == 2)  // Don't write anything, move to the next
+        {
+          cursor.continue();
+        }
+      }
+}
+Feeds.prototype.updateEntriesAll = updateEntriesAll;
 
 // object Feeds.p_feedUpdate
 // update fields and entries in m_rssFeeds[] that are new
