@@ -42,7 +42,8 @@ function RTableDBox(name, fields)
   g_tables.push(
       {
         table: name,
-        id: self.m_tableId
+        id: self.m_tableId,
+        fields: self.m_fields
       });
 
   return self;
@@ -71,12 +72,39 @@ RTableDBox.prototype.readAll = readAll;
 function recordsChanged(dstoreEvent)
 {
   var i = 0;
+  var k = 0;
+  var p = 0;
+  var rec = null;
+  var fields = null;
+  var key = null;
   var records = null;
+  var objlist = []
+  var obj = null;
   // For each table call to notify for changed records
   for (i = 0; i < g_tables.length; ++i)
   {
+    // Dropbox doesn't give us a row from the table, it gives us a record
+    // which can the be used for inquiring what exactly is this event and
+    // also to access the data by calls to record.get('m_field')
     records = dstoreEvent.affectedRecordsForTable(g_tables[i].id);
-    g_cbRecordsChanged(g_tables[i].name, records);
+    fields = g_tables[i].fields;
+
+    // Now for this record, by using the known list of fields, produce
+    // an object
+    for (k = 0; k < records.length; ++k)
+    {
+      rec = records[i];
+
+      obj = new Object();
+      for (p = 0; p < fields.length; ++p)
+      {
+        key = fields[p];
+        obj[key] = rec.get(key);  // Dropbox.Datastore.Record.get()
+      }
+      objlist.push(obj);
+    }
+
+    g_cbRecordsChanged(g_tables[i].name, objlist);
   }
 }
 

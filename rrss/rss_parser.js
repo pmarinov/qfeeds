@@ -25,7 +25,8 @@ var RssSyncState =
 {
   IS_SYNCED: 0,
   IS_REMOTE_ONLY: 1,
-  IS_LOCAL_ONLY: 2
+  IS_LOCAL_ONLY: 2,
+  IS_PENDING_SYNC: 3
 }
 
 // object RssEntry [constructor]

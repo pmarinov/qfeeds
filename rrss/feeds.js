@@ -37,6 +37,9 @@ function Feeds(feedsCB)
 
   self.p_dbOpen();
 
+  // Set to true if Dropbox status is logged in
+  self.m_remote_is_connected = false;
+
   // Subscribed RSS feeds stored in Dropbox (RTableDBox)
   self.m_remote_subscriptions = null;
 
@@ -54,6 +57,13 @@ function Feeds(feedsCB)
 // From an RssEntry constructs a RemoteEntryRead record
 function RemoteEntryRead(rssEntry)
 {
+  this.m_rss_entry_hash = null;
+  this.m_rss_feed_hash = null;
+  this.m_is_read = false;
+  this.m_date = null;
+  if (rssEntry == null)
+    return this;
+
   this.m_rss_entry_hash = rssEntry.m_hash;
 
   var h = rssEntry.m_rssurl_date.indexOf('_');
@@ -110,7 +120,14 @@ function rtableConnect()
 {
   var self = this;
 
-  var fields = [];
+  self.m_remote_is_connected = true;
+
+  // To obtain the list of fields:
+  // 1. A new empty RemoteEntryRead
+  // 2. Enumerate fields that start with 'm_'
+  var dummy = new RemoteEntryRead(null);
+  var fields = utils_ns.listOfFields(dummy, 'm_');
+
   self.m_remote_subscriptions = new feeds_ns.RTableDBox('rss_entries_read', fields);
   feeds_ns.RTableAddListener(
       function (table, records)
@@ -123,6 +140,14 @@ function rtableConnect()
   self.rtableSyncStatusRead();
 }
 Feeds.prototype.rtableConnect = rtableConnect;
+
+// object Feeds.rtableDisconnect
+// This method is invoked once when the application is logged out from Dropbox
+function rtableDisconnect()
+{
+  self.m_remote_is_connected = false;
+}
+Feeds.prototype.rtableDisconnect = rtableDisconnect;
 
 // object Feeds.p_feedReadAll
 // Load list of feeds (RssHeaders) from IndexedDB

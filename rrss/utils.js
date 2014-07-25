@@ -159,6 +159,31 @@ Array.prototype.binarySearch = function(find, comparator)
   return -(low + 1);
 };
 
+// Find list of that start with _prefix_
+function listOfFields(obj, prefix)
+{
+  var i = 0;
+  var f = '';
+  var p = '';
+  var fields = Object.keys(obj);
+  var mfields = [];
+  for (i = 0; i < fields.length; ++i)
+  {
+    var f = fields[i];
+
+    var p = fields[i].substr(0, prefix.length);
+    if (p != prefix)
+    {
+      console.log('skip: ' + f);
+      continue;
+    }
+    console.log(f);
+    mfields.push(f);
+  }
+
+  return mfields;
+}
+
 // marshal all fields of v into a temp object
 // move only values of fields starting with prefix
 // NOTE: the temp object's fields are references not
@@ -170,13 +195,14 @@ function marshal(obj, prefix)
   var fields = Object.keys(obj);
   var f = '';
   var v = null;
+  var p = '';
   var d = '';
   for (i = 0; i < fields.length; ++i)
   {
-    var f = fields[i];
-    var v = obj[f];
+    f = fields[i];
+    v = obj[f];
 
-    var p = fields[i].substr(0, prefix.length);
+    p = fields[i].substr(0, prefix.length);
     if (p != prefix)
     {
       console.log('skip: ' + f + ":" + v);
@@ -220,6 +246,7 @@ utils_ns.dateToStrStrict = dateToStrStrict;
 utils_ns.domFindInside = domFindInside;
 utils_ns.domFind = domFind;
 utils_ns.clickIsInside = clickIsInside;
+utils_ns.listOfFields = listOfFields;
 utils_ns.marshal = marshal;
 
 
