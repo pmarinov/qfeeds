@@ -324,26 +324,7 @@ function p_getDispCBHandlers()
             log.info('feed is not yet subscribed: ' + feedUrl);
           else
           {
-            self.m_feedsDB.feedUpdateEntry(entryHash,
-                function(state, dbEntry)
-                {
-                  if (state == 0)
-                  {
-                    utils_ns.assert(dbEntry.m_hash == entryHash, 'markAsRead: bad data');
-
-                    if (dbEntry.m_is_read == isRead)  // Already in the state it needs to be?
-                      return 1;  // Don't record in the DB
-                    else
-                    {
-                      dbEntry.m_is_read = isRead;
-                      return 0;  // Record in the DB
-                    }
-                  }
-                  else if (state == 1)
-                  {
-                    log.error('db update entry (' + s + '): [' + entryHash + '], error not found');
-                  }
-                });
+            self.m_feedsDB.markEntryAsRead(entryHash, isRead);
           }
         }
   }
@@ -1650,7 +1631,7 @@ function p_updateFeeds(updates)
       // New content for this feed
       // TODO: check what changed, flag that the feed changed
       // self.m_feeds[key] = v;
-      log.info("possible new content");
+      log.trace("possible new content");
     }
   }
 }

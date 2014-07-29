@@ -81,30 +81,56 @@ function RemoteEntryRead(rssEntry)
 function rtableListener(table, records)
 {
   var self = this;
+
+  log.info('TODO: implement listener');
+  log.info(records);
 }
 Feeds.prototype.rtableListener = rtableListener;
 
-// object Feeds.rtableSyncStatusRead
-function rtableSyncStatusRead()
+// object Feeds.p_rtableSyncEntry
+// Sync one RSS entry with the remote table
+function p_rtableSyncEntry(rssEntry)
+{
+  var self = this;
+
+  var remoteEntry = null;
+  var remoteId = null;
+
+  if (feeds_ns.RTableIsOnline())
+  {
+    remoteEntry = new RemoteEntryRead(rssEntry);
+    remoteId = self.m_remote_read.insert(remoteEntry, rssEntry.m_remote_id);
+    rssEntry.m_remote_state = feeds_ns.RssSyncState.IS_SYNCED;
+    rssEntry.m_remote_id = remoteId;
+    log.trace('rtableSyncEntry: remote OK (' + rssEntry.m_hash + ')');
+  }
+  else
+  {
+    // Data can't be sent, mark it for sending at the next opportunity
+    rssEntry.m_remote_state = feeds_ns.RssSyncState.IS_PENDING_SYNC;
+    log.info('rtableSyncEntry: local only (' + rssEntry.m_hash + ' -> IS_PENDING_SYNC)');
+  }
+}
+Feeds.prototype.p_rtableSyncEntry = p_rtableSyncEntry;
+
+// object Feeds.p_rtableSyncStatusRead
+function p_rtableSyncStatusRead()
 {
   var self = this;
 
   self.updateEntriesAll(
       function(rssEntry)
       {
-        var remoteEntry = null;
-
         if (rssEntry == null)  // No more entries
           return 0;
 
-        if (rssEntry.m_dropbox_state == feeds_ns.RssSyncState.IS_LOCAL_ONLY)
+        if (rssEntry.m_remote_state == feeds_ns.RssSyncState.IS_LOCAL_ONLY)
         {
           // Record all read entries in the remote table
           if (rssEntry.m_is_read)
           {
-            remoteEntry = new RemoteEntryRead(rssEntry);
-            self.m_remote_subscriptions.insert(remoteEntry);
-            rssEntry.m_dropbox_state = feeds_ns.RssSyncState.IS_SYNCED;
+            log.info('rtableSyncStatusRead: complete pending operation (' + rssEntry.m_hash + ')');
+            self.p_rtableSyncEntry(rssEntry);
             return 1;  // Update entry
           }
         }
@@ -112,13 +138,15 @@ function rtableSyncStatusRead()
         return 2;  // No changes to the entry, move to the next
       });
 }
-Feeds.prototype.rtableSyncStatusRead = rtableSyncStatusRead;
+Feeds.prototype.p_rtableSyncStatusRead = p_rtableSyncStatusRead;
 
 // object Feeds.rtableConnect
 // This method is invoked once when the application is logged into Dropbox
 function rtableConnect()
 {
   var self = this;
+
+  log.info('rtableConnect()...');
 
   self.m_remote_is_connected = true;
 
@@ -128,7 +156,7 @@ function rtableConnect()
   var dummy = new RemoteEntryRead(null);
   var fields = utils_ns.listOfFields(dummy, 'm_');
 
-  self.m_remote_subscriptions = new feeds_ns.RTableDBox('rss_entries_read', fields);
+  self.m_remote_read = new feeds_ns.RTableDBox('rss_entries_read', fields, 'm_rss_entry_hash');
   feeds_ns.RTableAddListener(
       function (table, records)
       {
@@ -137,7 +165,9 @@ function rtableConnect()
 
   // Walk over all RSS entry records in the local DB and send to
   // remote table all that were marked as read
-  self.rtableSyncStatusRead();
+  self.p_rtableSyncStatusRead();
+
+  log.info('rtableConnect(), done.');
 }
 Feeds.prototype.rtableConnect = rtableConnect;
 
@@ -162,28 +192,28 @@ function p_feedReadAll()
   var tran = self.m_db.transaction('rss_subscriptions', 'readonly');
   tran.oncomplete = function (event)
       {
-        log.info('transaction completed');
+        log.info('db: transaction completed');
       };
   tran.onabort = function (event)
       {
-        log.error('transaction aborted');
+        log.error('db: transaction aborted');
       };
   tran.onerror = function (event)
       {
-        log.error('transaction error');
+        log.error('db: transaction error');
       };
   var s = tran.objectStore('rss_subscriptions');
   var c = s.openCursor();
   c.onerror = function (event)
       {
-        log.error('cursor error');
+        log.error('db: cursor error');
       };
   c.onsuccess = function(event)
       {
         var cursor = event.target.result;
         if (!cursor)
         {
-          console.log('local db: ' + cnt + ' subscriptions retrieved');
+          console.log('db: ' + cnt + ' subscriptions retrieved');
           self.p_feedRemoveList(listToRemove);
           self.m_feedsCB.onDbInitDone();
           return;  // no more entries
@@ -236,12 +266,18 @@ function p_dbOpen()
         var s = db.createObjectStore('rss_subscriptions', { keyPath: 'm_url' });
         log.info('db: table "rss_subscriptions" created');
 
+        s.createIndex('remote_id', 'm_remote_id', { unique: false });
+        log.info('db: index "remote_id" created');
+
         // Records of type RssEntry
         var d = db.createObjectStore('rss_data', { keyPath: 'm_hash' });
         log.info('db: table "rss_data" created');
 
         d.createIndex('rssurl_date', 'm_rssurl_date', { unique: false });
         log.info('db: index "rssurl_date" created');
+
+        d.createIndex('remote_id', 'm_remote_id', { unique: false });
+        log.info('db: index "remote_id" created');
 
         // Records of pref=value: store user preferences as k/v pairs
         var d = db.createObjectStore('preferences', { keyPath: 'm_pref' });
@@ -315,15 +351,15 @@ function p_feedRecord(feed)
   var tran = self.m_db.transaction(['rss_subscriptions'], 'readwrite');
   tran.oncomplete = function (event)
       {
-        log.info('write transaction completed');
+        log.info('db: write transaction completed');
       };
   tran.onabort = function (event)
       {
-        log.error('write transaction aborted');
+        log.error('db: write transaction aborted');
       };
   tran.onerror = function (event)
       {
-        log.error('write transaction error');
+        log.error('db: write transaction error');
       };
   var store = tran.objectStore('rss_subscriptions');
   var req = store.get(feed2.m_url);
@@ -336,44 +372,44 @@ function p_feedRecord(feed)
         else
         {
           // Check if the record in the DB needs updating
-          log.info('db, entry already in [' + feed2.m_url + ']');
+          log.info('db: entry already in [' + feed2.m_url + ']');
           if (feed2.m_title != data.m_title)
           {
-            console.log('db, new title: ' + feed2.m_title + ' (old: ' + data.m_title + ')');
+            console.log('db: new title: ' + feed2.m_title + ' (old: ' + data.m_title + ')');
             needsUpdate = true;
           };
           if (feed2.m_link != data.m_link)
           {
-            console.log('db, new link: ' + feed2.m_link + ' (old: ' + data.m_link + ')');
+            console.log('db: new link: ' + feed2.m_link + ' (old: ' + data.m_link + ')');
             needsUpdate = true;
           };
           if (feed2.m_description != data.m_description)
           {
-            console.log('db, new description: ' + feed2.m_description + ' ' +
+            console.log('db: new description: ' + feed2.m_description + ' ' +
                         '(old: ' + data.m_description + ')');
             needsUpdate = true;
           };
           if (feed2.m_rss_type != data.m_rss_type)
           {
-            console.log('db, new rss_type: ' + feed2.m_rss_type + ' ' +
+            console.log('db: new rss_type: ' + feed2.m_rss_type + ' ' +
                         '(old: ' + data.m_rss_type + ')');
             needsUpdate = true;
           };
           if (feed2.m_rss_version != data.m_rss_version)
           {
-            console.log('db, new rss_version: ' + feed2.m_rss_version + ' ' +
+            console.log('db: new rss_version: ' + feed2.m_rss_version + ' ' +
                         '(old: ' + data.m_rss_version + ')');
             needsUpdate = true;
           };
           if (feed2.m_tags != data.m_tags)
           {
-            console.log('db, new tags: ' + feed2.m_tags + ' ' +
+            console.log('db: new tags: ' + feed2.m_tags + ' ' +
                         '(old: ' + data.m_tags + ')');
             needsUpdate = true;
           }
           if (feed2.m_is_unsubscribed != data.m_is_unsubscribed)
           {
-            console.log('db, new is_unsubscribed: ' + feed2.m_is_unsubscribed + ' ' +
+            console.log('db: new is_unsubscribed: ' + feed2.m_is_unsubscribed + ' ' +
                         '(old: ' + data.m_is_unsubscribed + ')');
             needsUpdate = true;
           }
@@ -384,11 +420,11 @@ function p_feedRecord(feed)
           reqAdd.onsuccess = function(event)
               {
                 var data = reqAdd.result;
-                log.info('db added! [' + feed2.m_url + ']');
+                log.info('db: added! [' + feed2.m_url + ']');
               }
           reqAdd.onerror = function(event)
               {
-                log.error('db, error msg: ' + reqAdd.error.message);
+                log.error('db: error msg: ' + reqAdd.error.message);
               }
         }
       }
@@ -428,15 +464,15 @@ function p_feedRemoveDB(feedUrl)
   var tran = self.m_db.transaction(['rss_subscriptions'], 'readwrite');
   tran.oncomplete = function (event)
       {
-        log.info('delete transaction completed');
+        log.info('db: delete transaction completed');
       };
   tran.onabort = function (event)
       {
-        log.error('delete transaction aborted');
+        log.error('db: delete transaction aborted');
       };
   tran.onerror = function (event)
       {
-        log.error('delete transaction error');
+        log.error('db: delete transaction error');
       };
   var store = tran.objectStore('rss_subscriptions');
 
@@ -451,14 +487,14 @@ function p_feedRemoveDB(feedUrl)
         var data = req.result;
         if (data === undefined)
         {
-          log.error('delete request error, record not found for ' + feedUrl);
+          log.error('db: delete request error, record not found for ' + feedUrl);
           return;
         }
         // Record exists, delete it
         req2 = store.delete(feedUrl);
         req2.onsuccess = function(event)
             {
-              log.info('delete request success, feed: ' + feedUrl);
+              log.info('db: delete request success, feed: ' + feedUrl);
 
               var f = feeds_ns.emptyRssHeader();
               f.m_url = feedUrl;
@@ -468,12 +504,12 @@ function p_feedRemoveDB(feedUrl)
             }
         req2.onerror = function(event)
             {
-              log.error('delete request error2 for ' + req2.result.m_url);
+              log.error('db: delete request error2 for ' + req2.result.m_url);
             }
       }
   req.onerror = function(event)
       {
-        log.error('delete request error1 for ' + req.result.m_url);
+        log.error('db: delete request error1 for ' + req.result.m_url);
       }
 }
 Feeds.prototype.p_feedRemoveDB = p_feedRemoveDB;
@@ -635,14 +671,14 @@ function p_feedRecordEntry(feedUrl, newEntry, cbWriteDone)
   var tran = self.m_db.transaction(['rss_data'], 'readwrite');
   tran.oncomplete = function (event)
       {
-        log.trace('update transaction completed');
+        log.trace('db: update transaction completed');
       };
   tran.onabort = function (event)
       {
-        log.error('update transaction aborted (' + s + ')');
+        log.error('db: update transaction aborted (' + s + ')');
       };
   tran.onerror = function (event) {
-        log.error('update transaction error');
+        log.error('db: update transaction error');
       };
   var store = tran.objectStore('rss_data');
   log.trace('db check for hash (' + self.m_rss_entry_cnt + '): ' + newEntry2.m_hash);
@@ -653,25 +689,25 @@ function p_feedRecordEntry(feedUrl, newEntry, cbWriteDone)
         var data = req.result;
         if (data === undefined)
         {
-          log.info('db write entry (' + s + '): [' + newEntry2.m_link + ']');
+          log.trace('db: write entry (' + s + '): [' + newEntry2.m_link + ']');
           var reqAdd = store.put(utils_ns.marshal(newEntry2, 'm_'));
           reqAdd.onsuccess = function(event)
               {
                 var data = reqAdd.result;
-                log.info('db, entry (' + s + ') added: [' + newEntry2.m_link + ']');
+                log.trace('db: entry (' + s + ') added: [' + newEntry2.m_link + ']');
                 cbWriteDone(0);
               }
           reqAdd.onerror = function(event)
               {
-                log.error('db, entry (' + s + ') error [' + newEntry2.m_link + ']');
-                log.error('db, entry (' + s + ') error msg: ' + reqAdd.error.message);
+                log.error('db: entry (' + s + ') error [' + newEntry2.m_link + ']');
+                log.error('db: entry (' + s + ') error msg: ' + reqAdd.error.message);
                 cbWriteDone(1);
               }
         }
         else
         {
            cbWriteDone(3);
-          //log.info('db, entry (' + s + ') already in [' + newEntry2.m_link + ']');
+          //log.info('db: entry (' + s + ') already in [' + newEntry2.m_link + ']');
         }
       }
 }
@@ -692,17 +728,17 @@ function feedUpdateEntry(entryHash, cbUpdate)
   var tran = self.m_db.transaction(['rss_data'], 'readwrite');
   tran.oncomplete = function (event)
       {
-        log.info('update transaction completed');
+        log.info('db: update transaction completed');
       };
   tran.onabort = function (event)
       {
-        log.error('update transaction aborted (' + s + ')');
+        log.error('db: update transaction aborted (' + s + ')');
       };
   tran.onerror = function (event) {
-        log.error('update transaction error');
+        log.error('db: update transaction error');
       };
   var store = tran.objectStore('rss_data');
-  log.trace('db check for hash (' + self.m_rss_entry_cnt + '): ' + entryHash);
+  log.trace('db: check for hash (' + self.m_rss_entry_cnt + '): ' + entryHash);
   var req = store.get(entryHash);
   ++self.m_rss_entry_cnt;
   req.onsuccess = function(event)
@@ -714,7 +750,7 @@ function feedUpdateEntry(entryHash, cbUpdate)
 
         if (data === undefined)
         {
-          log.info('db update entry (' + s + '): [' + entryHash + '], not found');
+          log.info('db: update entry (' + s + '): [' + entryHash + '], not found');
 
           // Record with this hash is not in the DB
           // Then create a new empty entry and ask cbUpdate() what to do
@@ -730,7 +766,7 @@ function feedUpdateEntry(entryHash, cbUpdate)
 
         if (c != 0)
         {
-          log.info('db, entry (' + s + ') no update needed: [' + newEntry.m_link + ']');
+          log.info('db: entry (' + s + ') no update needed: [' + newEntry.m_link + ']');
           return;
         }
 
@@ -738,16 +774,47 @@ function feedUpdateEntry(entryHash, cbUpdate)
         reqAdd.onsuccess = function(event)
             {
               var data = reqAdd.result;
-              log.info('db, entry (' + s + ') updated: [' + newEntry.m_link + ']');
+              log.trace('db: entry (' + s + ') updated: [' + newEntry.m_link + ']');
             }
         reqAdd.onerror = function(event)
             {
-              log.error('db, entry (' + s + ') error [' + newEntry.m_link + ']');
-              log.error('db, entry (' + s + ') error msg: ' + reqAdd.error.message);
+              log.error('db: entry (' + s + ') error [' + newEntry.m_link + ']');
+              log.error('db: entry (' + s + ') error msg: ' + reqAdd.error.message);
             }
       }
 }
 Feeds.prototype.feedUpdateEntry = feedUpdateEntry;
+
+// object Feeds.markEntryAsRead
+// Mark entry as read in the local DB
+// Send update to remote DB
+function markEntryAsRead(entryHash, isRead)
+{
+  var self = this;
+
+  self.feedUpdateEntry(entryHash,
+      function(state, dbEntry)
+      {
+        if (state == 0)
+        {
+          utils_ns.assert(dbEntry.m_hash == entryHash, 'markAsRead: bad data');
+
+          if (dbEntry.m_is_read == isRead)  // Already in the state it needs to be?
+            return 1;  // Don't record in the DB
+          else
+          {
+            dbEntry.m_is_read = isRead;
+            self.p_rtableSyncEntry(dbEntry);
+            return 0;  // Record in the DB
+          }
+        }
+        else if (state == 1)
+        {
+          log.error('db: update entry (' + s + '): [' + entryHash + '], error not found');
+        }
+      });
+}
+Feeds.prototype.markEntryAsRead = markEntryAsRead;
 
 // object Feeds.updateEntriesAll
 // Walk over all records for RSS entries (table: rss_data), apply any
@@ -761,15 +828,15 @@ function updateEntriesAll(cbUpdate)
   var tran = self.m_db.transaction(['rss_data'], 'readwrite');
   tran.oncomplete = function (event)
       {
-        log.trace('read transaction completed');
+        log.trace('db: read transaction completed');
       };
   tran.onabort = function (event)
       {
-        log.error('read transaction aborted');
+        log.error('db: read transaction aborted');
       };
   tran.onerror = function (event)
       {
-        log.error('read transaction error');
+        log.error('db: read transaction error');
       };
   var store = tran.objectStore('rss_data');
   var cursor = store.openCursor();  // navigate all entries
@@ -798,11 +865,11 @@ function updateEntriesAll(cbUpdate)
           req.onsuccess = function(event)
               {
                 var data = req.result;
-                log.info('db, update success: ' + req.result);
+                log.info('db: update success: ' + req.result);
               }
           req.onerror = function(event)
               {
-                log.error('db, update error msg: ' + req.error.message);
+                log.error('db: update error msg: ' + req.error.message);
               }
           cursor.continue();
         }
@@ -880,15 +947,15 @@ function feedReadEntriesAll(cbFilter)
   var tran = self.m_db.transaction(['rss_data'], 'readonly');
   tran.oncomplete = function (event)
       {
-        log.trace('read transaction completed');
+        log.trace('db: read transaction completed');
       };
   tran.onabort = function (event)
       {
-        log.error('read transaction aborted');
+        log.error('db: read transaction aborted');
       };
   tran.onerror = function (event)
       {
-        log.error('read transaction error');
+        log.error('db: read transaction error');
       };
   var store = tran.objectStore('rss_data');
   var cursor = store.openCursor();  // navigate all entries
@@ -936,15 +1003,15 @@ function feedReadEntries(feedUrl, startTime, isDescending, cbFilter)
   var tran = self.m_db.transaction(['rss_data'], 'readonly');
   tran.oncomplete = function (event)
       {
-        log.trace('read transaction completed');
+        log.trace('db: read transaction completed');
       };
   tran.onabort = function (event)
       {
-        log.error('read transaction aborted');
+        log.error('db: read transaction aborted');
       };
   tran.onerror = function (event)
       {
-        log.error('read transaction error');
+        log.error('db: read transaction error');
       };
   var store = tran.objectStore('rss_data');
   var index = store.index('rssurl_date');
