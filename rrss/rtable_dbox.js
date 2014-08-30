@@ -199,7 +199,7 @@ function recordsChanged(dstoreEvent)
         for (p = 0; p < fields.length; ++p)
         {
           key = fields[p];
-          if (key == self.m_key)
+          if (key == g_tables[i].m_key)
             updatedObj.data[key] = rec.getId();  // Key is also an ID
           else
             updatedObj.data[key] = rec.get(key);  // Dropbox.Datastore.Record.get()
@@ -208,7 +208,7 @@ function recordsChanged(dstoreEvent)
       objlist.push(updatedObj);
     }
 
-    g_cbRecordsChanged(g_tables[i].name, objlist);
+    g_cbRecordsChanged(g_tables[i].m_tableId, objlist);
   }
 }
 

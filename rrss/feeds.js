@@ -72,20 +72,67 @@ function RemoteEntryRead(rssEntry)
   this.m_rss_feed_hash = rssurl_hash;
 
   this.m_is_read = rssEntry.m_is_read;
-  this.m_date = utils_ns.dateToStrStrict(rssEntry.m_date)
+  this.m_date = utils_ns.dateToStrStrict(rssEntry.m_date);
   return this;
 }
 
-// object Feeds.rtableListener
+// object Feeds.p_rtableListener
 // Handle updates from the remote tables
-function rtableListener(table, records)
+function p_rtableListener(table, records)
 {
   var self = this;
 
-  log.info('TODO: implement listener');
-  log.info(records);
+  var k = 0;
+  var r = null;
+  for (k = 0; k < records.length; ++k)
+  {
+    (function()  // scope
+    {
+      r = records[k];
+
+      // Skip operation if it is local
+      if (r.isLocal)  // our own loop-back?
+        return;  // leave the anonymous scope
+
+      // Skip operation if it is remote delete
+      // Local delete will take place when scheduled
+      if (r.isDeleted)  // remotely deleted?
+        return;  // leave the anonymous scope
+
+      // Reflect the new state on the screen (if the feed is currently displayed)
+      self.m_feedsCB.onRemoteMarkAsRead(r.data.m_rss_entry_hash, r.data.m_rss_feed_hash, r.data.m_is_read);
+
+      // Apply new state in the IndexedDB
+      self.feedUpdateEntry(r.data.m_rss_entry_hash,
+          function(state, dbEntry)
+          {
+            if (state == 0)
+            {
+              utils_ns.assert(dbEntry.m_hash == r.data.m_rss_entry_hash, 'markAsRead: bad data');
+              log.info('db: update entry (' + r.data.m_rss_entry_hash + '): is_read = ' + r.data.m_is_read);
+
+              if (dbEntry.m_is_read == r.data.m_is_read)  // Already in the state it needs to be?
+                return 1;  // Don't record in the DB
+              else
+              {
+                dbEntry.m_is_read = r.data.m_is_read;
+                return 0;  // Record in the DB
+              }
+            }
+            else if (state == 1)
+            {
+              log.info('db: update entry (' + r.data.m_rss_entry_hash + '): not found: put local placeholder');
+              dbEntry.m_remote_state = RssSyncState.IS_REMOTE_ONLY;
+              // TODO: when entry is fetched by the RSS loop, take care to respect IS_REMOTE_ONLY
+              // TODO: don't overwrite the m_is_read flag
+              dbEntry.m_is_read = r.data.m_is_read;
+              return 0;
+            }
+          });
+    })()
+  }
 }
-Feeds.prototype.rtableListener = rtableListener;
+Feeds.prototype.p_rtableListener = p_rtableListener;
 
 // object Feeds.p_rtableSyncEntry
 // Sync one RSS entry with the remote table
@@ -160,7 +207,7 @@ function rtableConnect()
   feeds_ns.RTableAddListener(
       function (table, records)
       {
-        self.rtableListener(table, records);
+        self.p_rtableListener(table, records);
       });
 
   // Walk over all RSS entry records in the local DB and send to
@@ -811,6 +858,7 @@ function markEntryAsRead(entryHash, isRead)
         else if (state == 1)
         {
           log.error('db: update entry (' + s + '): [' + entryHash + '], error not found');
+          return 1;  // Don't record in the DB
         }
       });
 }

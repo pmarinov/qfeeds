@@ -54,7 +54,7 @@ FeedDisp.prototype.setCBHandlers = setCBHandlers;
 
 // object FeedDisp.p_markAsRead
 // Mark an entry as read/unread
-function p_markAsRead(screenIndex, isRead)
+function p_markAsRead(screenIndex, isRead, isRemoteAction)
 {
   var self = this;
 
@@ -72,9 +72,44 @@ function p_markAsRead(screenIndex, isRead)
 
   var feedUrl = $feedUrl.attr('href');
   var entryHash = $rssEntry.attr('rss_hash');
-  self.m_cb.markAsRead(entryHash, isRead, feedUrl);
+
+  // If it isRemoteAction, this is already reflected in the database
+  if (!isRemoteAction)
+    self.m_cb.markAsRead(entryHash, isRead, feedUrl);
 }
 FeedDisp.prototype.p_markAsRead = p_markAsRead;
+
+// object FeedDisp.markAsRead
+// Mark as read an entry that is already displayed
+// This is not a fast function, call it only if an entry is on the screen,
+// it is called as a result of a remote table event (entry marked as read
+// on another compter).
+function markAsRead(entryHash, isRead)
+{
+  var self = this;
+
+  var i = 0;
+  var $rssEntry = null;
+  var hash = null;
+  var $d = {};
+
+  utils_ns.assert(self.$d.rssEntries != null, "markAsRead: $rssEntries is uninitialized");
+
+  for (i = 0; i < self.$d.rssEntries.length; ++i)
+  {
+    $rssEntry = $(self.$d.rssEntries[i]);
+
+    hash = $rssEntry.attr('rss_hash');
+    if (hash == entryHash)
+    {
+      self.p_markAsRead(i, isRead, true);
+      break;
+    }
+  }
+
+  utils_ns.assert(hash == entryHash, "markAsRead: entryHash not found");
+}
+FeedDisp.prototype.markAsRead = markAsRead;
 
 // object FeedDisp.p_handleDispClick
 // Handles mouse click anywhere on the display of the feeds contents
@@ -110,7 +145,7 @@ function p_handleDispClick(ev)
     if (utils_ns.clickIsInside($barUrl, ev.pageX, ev.pageY))
     {
       log.info('click on link area ' + i);
-      self.p_markAsRead(i, true);
+      self.p_markAsRead(i, true, false);
       continue;
     }
 
@@ -118,7 +153,7 @@ function p_handleDispClick(ev)
     if (utils_ns.clickIsInside($barIconRead, ev.pageX, ev.pageY))
     {
       log.info('click on marked_read area ' + i);
-      self.p_markAsRead(i, false);
+      self.p_markAsRead(i, false, false);
       continue;
     }
 
@@ -126,7 +161,7 @@ function p_handleDispClick(ev)
     if (utils_ns.clickIsInside($barIconUnread, ev.pageX, ev.pageY))
     {
       log.info('click on marked_unread area ' + i);
-      self.p_markAsRead(i, true);
+      self.p_markAsRead(i, true, false);
       continue;
     }
 
@@ -152,7 +187,7 @@ function p_handleDispClick(ev)
       d.m_currentItem = i;
     }
 
-    self.p_markAsRead(i, true);
+    self.p_markAsRead(i, true, false);
     break;
   }
 }
