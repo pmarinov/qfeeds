@@ -24,6 +24,7 @@ function App()
   log.setLevel('info');
   log.info("Obtaining indexDB handler...");
 
+  // TODO: move this into object Feeds!
   // In the following line, you should include the prefixes of implementations you want to test.
   window.indexedDB = window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB;
   // DON'T use "var indexedDB = ..." if you're not in a function.

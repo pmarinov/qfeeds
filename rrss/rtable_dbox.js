@@ -31,7 +31,7 @@ var g_cbRecordsChanged = null;
 var g_tables = [];
 
 // object RTableDBox.RTableDBox [constructor]
-// Object for access of remote table stored in Dropbox
+// Used for access of remote table stored in Dropbox
 // _fields_ is the list of all fields of objects inserted in the table
 // _key_ name of primary key, used as Dropbox ID
 // Set _key_ to '' to activate automatically generated IDs by Dropbox
@@ -146,6 +146,56 @@ function deleteAll()
 }
 RTableDBox.prototype.deleteAll = deleteAll;
 
+// object RTableDBox.p_copyObj
+// Converts from Datastore object into rtable record object
+// This means to copy all the fields listed in m_fields + m_key
+function p_copyObj(dboxObj)
+{
+  var self = this;
+
+  var p = 0;
+  var key = 0;
+  var r = new Object();
+  for (p = 0; p < self.m_fields.length; ++p)
+  {
+    key = self.m_fields[p];
+    if (key == self.m_key)
+      r[key] = dboxObj.getId();  // Key is also an ID
+    else
+      r[key] = dboxObj.get(key);  // Dropbox.Datastore.Record.get()
+  }
+
+  return r;
+}
+RTableDBox.prototype.p_copyObj = p_copyObj;
+
+// object RTableDBox.initialSync
+function initialSync()
+{
+  var self = this;
+
+  var x = 0;
+  var dboxRecs = self.m_table.query();
+  var objlist = [];
+  var rec = null;
+  var updateObj = null;
+  for (x = 0; x < dboxRecs.length; ++x)
+  {
+    rec = dboxRecs[x];
+    // Imitate generation of an updated obj
+    updateObj =
+      {
+        id: rec.getId(), // Id of this record, created by Dropbox
+        isLocal: false,  // Feeedback from locally initiated operation
+        isDeleted: false,  // The record was deletd, data is null
+        data: self.p_copyObj(rec)  // record data (based on m_fields)
+      };
+    objlist.push(updateObj);
+  }
+  g_cbRecordsChanged(self.m_tableId, objlist);
+}
+RTableDBox.prototype.initialSync = initialSync;
+
 // Invoke registered listeners once per remote table to notify of changed records
 function recordsChanged(dstoreEvent)
 {
@@ -195,6 +245,7 @@ function recordsChanged(dstoreEvent)
       }
       else
       {
+        log.info('rtable: listener: ' + rec.getId() + ' was updated remotedly.');
         updatedObj.data = new Object();
         for (p = 0; p < fields.length; ++p)
         {
@@ -208,6 +259,12 @@ function recordsChanged(dstoreEvent)
       objlist.push(updatedObj);
     }
 
+    if (g_cbRecordsChanged == null)
+    {
+      log.warning('rtable: unhandled event');
+      return;
+    }
+
     g_cbRecordsChanged(g_tables[i].m_tableId, objlist);
   }
 }
@@ -216,7 +273,6 @@ function recordsChanged(dstoreEvent)
 function RTableAddListener(cbRecordsChanged)
 {
   g_cbRecordsChanged = cbRecordsChanged;
-  g_datastore.recordsChanged.addListener(recordsChanged);
 }
 
 // Checks if Dropbox is still connected
@@ -240,6 +296,7 @@ function RTableInit(dboxClient, cbReady)
         else
         {
             g_datastore = datastore;
+            g_datastore.recordsChanged.addListener(recordsChanged);
             cbReady(0);
         }
       });

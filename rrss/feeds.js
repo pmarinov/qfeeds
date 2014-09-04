@@ -103,29 +103,34 @@ function p_rtableListener(table, records)
       self.m_feedsCB.onRemoteMarkAsRead(r.data.m_rss_entry_hash, r.data.m_rss_feed_hash, r.data.m_is_read);
 
       // Apply new state in the IndexedDB
-      self.feedUpdateEntry(r.data.m_rss_entry_hash,
+      var rss_entry_hash = r.data.m_rss_entry_hash;
+      var is_read = r.data.m_is_read;
+      self.feedUpdateEntry(rss_entry_hash,
           function(state, dbEntry)
           {
             if (state == 0)
             {
-              utils_ns.assert(dbEntry.m_hash == r.data.m_rss_entry_hash, 'markAsRead: bad data');
-              log.info('db: update entry (' + r.data.m_rss_entry_hash + '): is_read = ' + r.data.m_is_read);
+              utils_ns.assert(dbEntry.m_hash == rss_entry_hash, 'markAsRead: bad data');
 
-              if (dbEntry.m_is_read == r.data.m_is_read)  // Already in the state it needs to be?
+              if (dbEntry.m_is_read == is_read)  // Nothing changed?
+              {
+                log.info('db: update entry (' + rss_entry_hash + '): is_read = ' + is_read);
                 return 1;  // Don't record in the DB
+              }
               else
               {
-                dbEntry.m_is_read = r.data.m_is_read;
+                dbEntry.m_is_read = is_read;
+                dbEntry.m_remote_state = feeds_ns.RssSyncState.IS_SYNCED
                 return 0;  // Record in the DB
               }
             }
             else if (state == 1)
             {
-              log.info('db: update entry (' + r.data.m_rss_entry_hash + '): not found: put local placeholder');
-              dbEntry.m_remote_state = RssSyncState.IS_REMOTE_ONLY;
+              log.info('db: update entry (' + rss_entry_hash + '): not found: put local placeholder');
+              dbEntry.m_remote_state = feeds_ns.RssSyncState.IS_REMOTE_ONLY;
               // TODO: when entry is fetched by the RSS loop, take care to respect IS_REMOTE_ONLY
               // TODO: don't overwrite the m_is_read flag
-              dbEntry.m_is_read = r.data.m_is_read;
+              dbEntry.m_is_read = is_read;
               return 0;
             }
           });
@@ -209,6 +214,18 @@ function rtableConnect()
       {
         self.p_rtableListener(table, records);
       });
+
+  // There are two ways for getting data from Dropbox's datastore
+  // 1. Listen to events: these changes are reflected into the local
+  //    indexed db.
+  // 2. Do a query for an individual entry. Feeds objec never does #2,
+  //    it relies exclusively on faithfully mirroring the events.
+  //
+  // At startup time, Dropbox's datastore brings all entries that were
+  // updated remotely but doesn't generate corresponding
+  // events. Unfortunately, we have to do a full datastore query that
+  // walks all entries only to discover what changed remotely.
+  self.m_remote_read.initialSync();
 
   // Walk over all RSS entry records in the local DB and send to
   // remote table all that were marked as read
