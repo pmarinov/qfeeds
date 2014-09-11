@@ -233,7 +233,11 @@ function parseRss10(xmlStr)
   var href = getHrefField(channel, 'link', null);
   if (link.length == 0)
     link = href;
-  var description = getField(channel, 'description:first', errorsHeader);
+  var description = getField(channel, 'encoded', null);  // content:encoded
+  if (description.length == 0)
+    description = getField(channel, 'description:first', null);
+  if (description.length == 0)
+    description = getField(channel, 'description', null);
   var language = getField(channel, 'language:first', errorsHeader);
   var strTime = getField(channel, 'lastBuildDate:first', null);
   if (strTime.length == 0)

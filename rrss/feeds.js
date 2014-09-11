@@ -61,18 +61,34 @@ function RemoteEntryRead(rssEntry)
   this.m_rss_feed_hash = null;
   this.m_is_read = false;
   this.m_date = null;
-  if (rssEntry == null)
+  if (rssEntry == null)  // An empty object was requested?
     return this;
 
   this.m_rss_entry_hash = rssEntry.m_hash;
 
   var h = rssEntry.m_rssurl_date.indexOf('_');
   utils_ns.assert(h >= 0, "RemoteEntryRead: invalid rssurl_date hash");
-  var rssurl_hash = rssEntry.m_rssurl_date.slice(0, h);
+   var rssurl_hash = rssEntry.m_rssurl_date.slice(0, h);
   this.m_rss_feed_hash = rssurl_hash;
 
   this.m_is_read = rssEntry.m_is_read;
   this.m_date = utils_ns.dateToStrStrict(rssEntry.m_date);
+  return this;
+}
+
+// object RemoteFeedUrl [constructor]
+// From an RssHeader constructs a RemoteFeedUrl record
+function RemoteFeedUrl(feed)
+{
+  this.m_rss_feed_hash = null;  // this is a key in the remote table
+  this.m_rss_feed_url = null;
+  this.m_tags = null;
+  if (feed == null)  // An empty object was requested?
+    return this;
+
+  this.m_rss_feed_hash = feed.m_hash;
+  this.m_rss_feed_url = feed.m_url;
+  this.m_tags = feed.m_tags;
   return this;
 }
 
@@ -81,6 +97,10 @@ function RemoteEntryRead(rssEntry)
 function p_rtableListener(table, records)
 {
   var self = this;
+
+  // Listener for 'rss_subscriptions' not yet ready
+  if (table == 'rss_subscriptions')
+    return;
 
   var k = 0;
   var r = null;
@@ -165,7 +185,39 @@ function p_rtableSyncEntry(rssEntry)
 }
 Feeds.prototype.p_rtableSyncEntry = p_rtableSyncEntry;
 
+// object Feeds.p_rtableSyncFeedEntry
+// Sync one RSS feed (RSSHeader) entry with the remote table
+function p_rtableSyncFeedEntry(feed)
+{
+  var self = this;
+
+  var remoteFeed = null;
+  var remoteId = null;
+
+  if (feeds_ns.RTableIsOnline())
+  {
+    remoteFeed = new RemoteFeedUrl(feed);
+    remoteId = self.m_remote_subscriptions.insert(remoteFeed, feed.m_remote_id);
+    feed.m_remote_state = feeds_ns.RssSyncState.IS_SYNCED;
+    feed.m_remote_id = remoteId;
+    log.trace('p_rtableSyncFeedEntry: remote OK (' + remoteFeed.m_rss_feed_url + ')');
+  }
+  else
+  {
+    // Data can't be sent, mark it for sending at the next opportunity
+    rssEntry.m_remote_state = feeds_ns.RssSyncState.IS_PENDING_SYNC;
+    log.info('p_rtableSyncFeedEntry: local only (' + remoteFeed.m_rss_feed_url + ' -> IS_PENDING_SYNC)');
+  }
+}
+Feeds.prototype.p_rtableSyncFeedEntry = p_rtableSyncFeedEntry;
+
 // object Feeds.p_rtableSyncStatusRead
+// Walk over all RSS entry records in the local DB and send to
+// remote table:
+// 1. all that were marked as read (feeds_ns.RssSyncState.IS_LOCAL_ONLY)
+// 2. all that were marked as feeds_ns.RssSyncState.IS_PENDING_SYNC
+// NOTE: By not sending is_read = false && IS_LOCAC_ONLY we
+// temporarely save a bit of space on the remote DB
 function p_rtableSyncStatusRead()
 {
   var self = this;
@@ -187,20 +239,58 @@ function p_rtableSyncStatusRead()
           }
         }
 
+        if (rssEntry.m_remote_state == feeds_ns.RssSyncState.IS_PENDING_SYNC)
+        {
+          // Record all read entries in the remote table
+          log.info('rtableSyncStatusRead: mark as pending operation (' + rssEntry.m_hash + ')');
+          self.p_rtableSyncEntry(rssEntry);
+          return 1;  // Update entry
+        }
+
         return 2;  // No changes to the entry, move to the next
       });
 }
 Feeds.prototype.p_rtableSyncStatusRead = p_rtableSyncStatusRead;
 
-// object Feeds.rtableConnect
-// This method is invoked once when the application is logged into Dropbox
-function rtableConnect()
+// object Feeds.p_rtableSyncRemoteSubscriptions
+// Walk over all RSS feed records in the local DB and send to
+// remote table if m_remote_status is feeds_ns.RssSyncState.IS_LOCAL_ONLY)
+function p_rtableSyncRemoteSubscriptions()
 {
   var self = this;
 
-  log.info('rtableConnect()...');
+  self.p_feedsUpdateAll(
+      function(feed)
+      {
+        if (feed == null)  // No more entries
+          return 0;
 
-  self.m_remote_is_connected = true;
+        if (feed.m_remote_state == feeds_ns.RssSyncState.IS_LOCAL_ONLY)
+        {
+          // Record all read entries in the remote table
+          log.info('p_rtableSyncRemoteSubscriptions: complete pending operation (' + feed.m_url + ')');
+          self.p_rtableSyncFeedEntry(feed);
+          return 1;  // Update entry
+        }
+
+        if (feed.m_remote_state == feeds_ns.RssSyncState.IS_PENDING_SYNC)
+        {
+          // Record all read entries in the remote table
+          log.info('p_rtableSyncRemoteSubscriptions: mark as pending operation (' + feed.m_url + ')');
+          self.p_rtableSyncFeedEntry(feed);
+          return 1;  // Update entry
+        }
+
+        return 2;  // No changes to the entry, move to the next
+      });
+}
+Feeds.prototype.p_rtableSyncRemoteSubscriptions = p_rtableSyncRemoteSubscriptions;
+
+// object Feeds.p_rtableInitRemoteEntryRead
+// Initialize remote table (rtable) that stores status_read for RSS entries
+function p_rtableInitRemoteEntryRead()
+{
+  var self = this;
 
   // To obtain the list of fields:
   // 1. A new empty RemoteEntryRead
@@ -209,6 +299,7 @@ function rtableConnect()
   var fields = utils_ns.listOfFields(dummy, 'm_');
 
   self.m_remote_read = new feeds_ns.RTableDBox('rss_entries_read', fields, 'm_rss_entry_hash');
+  // NOTE: !!! one listener handles all tables !!!
   feeds_ns.RTableAddListener(
       function (table, records)
       {
@@ -230,6 +321,37 @@ function rtableConnect()
   // Walk over all RSS entry records in the local DB and send to
   // remote table all that were marked as read
   self.p_rtableSyncStatusRead();
+}
+Feeds.prototype.p_rtableInitRemoteEntryRead = p_rtableInitRemoteEntryRead;
+
+// object Feeds.p_rtableInitRemoteFeedUrl
+// Initialize remote table (rtable) that stores url of RSS feeds
+function p_rtableInitRemoteFeedUrl()
+{
+  var self = this;
+
+  var dummy = new RemoteFeedUrl(null);
+  var fields = utils_ns.listOfFields(dummy, 'm_');
+
+  self.m_remote_subscriptions = new feeds_ns.RTableDBox('rss_subscriptions', fields, 'm_rss_feed_hash');
+
+  self.m_remote_subscriptions.initialSync();
+  self.p_rtableSyncRemoteSubscriptions();
+}
+Feeds.prototype.p_rtableInitRemoteFeedUrl = p_rtableInitRemoteFeedUrl;
+
+// object Feeds.rtableConnect
+// This method is invoked once when the application is logged into Dropbox
+function rtableConnect()
+{
+  var self = this;
+
+  log.info('rtableConnect()...');
+
+  self.m_remote_is_connected = true;
+
+  self.p_rtableInitRemoteEntryRead();
+  self.p_rtableInitRemoteFeedUrl();
 
   log.info('rtableConnect(), done.');
 }
@@ -1000,6 +1122,71 @@ function p_feedUpdate(feedHeaderNew, cbWriteDone)
 }
 Feeds.prototype.p_feedUpdate = p_feedUpdate;
 
+// object Feeds.p_feedsUpdateAll
+// Walk over all feeds (RssHeaders) from IndexedDB (table: rss_subscriptions),
+// apply any changed from a cbUpdate() callback.
+function p_feedsUpdateAll(cbUpdate)
+{
+  var self = this;
+
+  log.info('db: feeds update all...');
+  // Insert entry in m_dbSubscriptions
+  var tran = self.m_db.transaction(['rss_subscriptions'], 'readwrite');
+  tran.oncomplete = function (event)
+      {
+        log.trace('db: read transaction completed');
+      };
+  tran.onabort = function (event)
+      {
+        log.error('db: read transaction aborted');
+      };
+  tran.onerror = function (event)
+      {
+        log.error('db: read transaction error');
+      };
+  var store = tran.objectStore('rss_subscriptions');
+  var cursor = store.openCursor();  // navigate all entries
+  cursor.onsuccess = function(event)
+      {
+        var req = null;
+
+        var cursor = event.target.result;
+        if (!cursor)
+        {
+          cbUpdate(null);  // Tell the callback we are done
+          return;
+        }
+
+        var entry = cursor.value;
+
+        // Call the update callback for this value
+        var r = cbUpdate(cursor.value);
+        if (r == 0)
+        {
+          return;  // done with all entries
+        }
+        else if (r == 1)  // Write new value and move to the next
+        {
+          req = cursor.update(cursor.value);
+          req.onsuccess = function(event)
+              {
+                var data = req.result;
+                log.info('db: update success: ' + req.result);
+              }
+          req.onerror = function(event)
+              {
+                log.error('db: update error msg: ' + req.error.message);
+              }
+          cursor.continue();
+        }
+        else if (r == 2)  // Don't write anything, move to the next
+        {
+          cursor.continue();
+        }
+      }
+}
+Feeds.prototype.p_feedsUpdateAll = p_feedsUpdateAll;
+
 // object Feeds.feedReadEntriesAll
 // Reads from the database, all entries (flat)
 // 1. Read until cbFilter returns 0
@@ -1119,6 +1306,7 @@ Feeds.prototype.feedReadEntries = feedReadEntries;
 
 // object Feeds.feedGetList
 // return a list of all feeds
+// TODO: remove, this is no longer used outside Feeds
 function feedGetList()
 {
   var self = this;
