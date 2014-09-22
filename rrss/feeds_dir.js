@@ -313,6 +313,21 @@ function p_getFeedsCBHandlers()
           log.info("CB: onRemoteMarkAsRead...");
 
           self.p_handleRemoteMarkAsRead(hashRssEntry, hashRssFeed, isRead);
+        },
+
+    // Handle events generated from remote action. On another computer
+    // user has deleted a feed. Reflect visually the change.
+    onRemoteFeedDeleted: function(urlDeletedFeed)
+        {
+        },
+
+    // Handle events generated from remote action. On another computer
+    // user has added changed tags of a feed or added a new
+    // feed. Reflect visually the change.
+    onRemoteFeedUpdated: function(urlNewFeed, tags)
+        {
+          // The feed is already properly displayed
+          // TODO: but if there is no other feed, activate this as current
         }
   };
 

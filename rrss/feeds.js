@@ -92,15 +92,11 @@ function RemoteFeedUrl(feed)
   return this;
 }
 
-// object Feeds.p_rtableListener
-// Handle updates from the remote tables
-function p_rtableListener(table, records)
+// object Feeds.p_rtableRemoteEntryReadListener
+// Handle updates from the remote tables for 'rss_entries_read'
+function p_rtableRemoteEntryReadListener(records)
 {
   var self = this;
-
-  // Listener for 'rss_subscriptions' not yet ready
-  if (table == 'rss_subscriptions')
-    return;
 
   var k = 0;
   var r = null;
@@ -125,6 +121,7 @@ function p_rtableListener(table, records)
       // Apply new state in the IndexedDB
       var rss_entry_hash = r.data.m_rss_entry_hash;
       var is_read = r.data.m_is_read;
+      var entry_date = r.data.m_date;  // date in strict string format
       self.feedUpdateEntry(rss_entry_hash,
           function(state, dbEntry)
           {
@@ -134,7 +131,7 @@ function p_rtableListener(table, records)
 
               if (dbEntry.m_is_read == is_read)  // Nothing changed?
               {
-                log.info('db: update entry (' + rss_entry_hash + '): is_read = ' + is_read);
+                log.trace('db: update entry (' + rss_entry_hash + '): is_read = ' + is_read);
                 return 1;  // Don't record in the DB
               }
               else
@@ -146,15 +143,132 @@ function p_rtableListener(table, records)
             }
             else if (state == 1)
             {
-              log.info('db: update entry (' + rss_entry_hash + '): not found: put local placeholder');
+              log.trace('db: update entry (' + rss_entry_hash + '): not found: put local placeholder');
+              // Create a pseudo entry -- only hash, date, m_remote_state and is_read are valid
+              dbEntry.m_hash = rss_entry_hash;
+              dbEntry.m_date = entry_date;
               dbEntry.m_remote_state = feeds_ns.RssSyncState.IS_REMOTE_ONLY;
+              dbEntry.m_is_read = is_read;
+              dbEntry.m_title = '';
+              dbEntry.m_description = '';
+              dbEntry.m_link = '';
               // TODO: when entry is fetched by the RSS loop, take care to respect IS_REMOTE_ONLY
               // TODO: don't overwrite the m_is_read flag
-              dbEntry.m_is_read = is_read;
               return 0;
             }
           });
     })()
+  }
+}
+Feeds.prototype.p_rtableRemoteEntryReadListener = p_rtableRemoteEntryReadListener;
+
+// object Feeds.p_findFeedByHash
+// Find feed by its hash. This is a slow operation -- linear to the
+// size of the list of feeds
+function p_findFeedByHash(feed_hash)
+{
+  var self = this;
+  var x = 0;
+  var feed = null;
+  for (x = 0; x < self.m_rssFeeds.length; ++x)
+  {
+    feed = self.m_rssFeeds[x];
+    if (feed.m_hash == feed_hash)
+      return x;
+  }
+  return -1;
+}
+Feeds.prototype.p_findFeedByHash = p_findFeedByHash;
+
+// object Feeds.p_rtableRemoteFeedsListener
+// Handle updates from the remote tables for 'rss_subscriptions'
+function p_rtableRemoteFeedsListener(records)
+{
+  var self = this;
+  var k = 0;
+  var r = null;
+  for (k = 0; k < records.length; ++k)
+  {
+    (function()  // scope
+    {
+      r = records[k];
+
+      // Skip operation if it is local
+      if (r.isLocal)  // our own loop-back?
+        return;  // leave the anonymous scope
+
+      // Reflect the new state on the screen (remove feeds from display)
+      var x = self.p_findFeedByHash(r.id);  // id = m_rss_feed_hash
+
+      // Skip operation if it is remote delete
+      // Local delete will take place when scheduled
+      if (r.isDeleted)  // remotely deleted?
+      {
+        if (x == -1)
+        {
+          log.warn('p_rtableRemoteFeedsListener: unknown feed ' + r.id);
+          return;
+        }
+        log.info('rtable_event: deleted remotely -- ' + self.m_rssFeeds[x].m_url);
+        self.p_feedRemove(self.m_rssFeeds[x].m_url, false);
+        self.m_feedsCB.onRemoteFeedDeleted(r.id);
+        return;  // leave the anonymous scope
+      }
+
+      // A record was added or updated
+      var newFeed = null;
+      if (x == -1)   // Update or addition of a new feed from a remote operation
+      {
+        newFeed = feeds_ns.emptyRssHeader();
+      }
+      else
+      {
+        // We already have such feed locally: this is an update operation
+        newFeed = feeds_ns.copyRssHeader(self.m_rssFeeds[x]);
+      }
+      // Now apply the data that come from the remote operation
+      newFeed.m_hash = r.data.m_rss_feed_hash;
+      newFeed.m_url = r.data.m_rss_feed_url;
+      newFeed.m_title = r.data.m_rss_feed_url;  // Display URL for title before first fetch
+      newFeed.m_tags = r.data.m_tags;
+      newFeed.m_remote_state = feeds_ns.RssSyncState.IS_SYNCED;
+      newFeed.m_remote_id = r.data.m_rss_feed_hash;
+      self.p_feedRecord(newFeed, false,
+          function(wasUpdated)
+          {
+            if (wasUpdated == 1)
+            {
+              // If update was needed in the database then add/update
+              // local (in memory) list. This will also call all necessary display callbacks
+              self.p_feedAdd(newFeed, null);
+              // If any extra activation/display is needed
+              self.m_feedsCB.onRemoteFeedUpdated(newFeed.m_url, newFeed.m_tags);
+            }
+            else
+              log.info('p_rtableRemoteFeedsListener: nothing to do for ' + newFeed.m_url);
+          });
+    })()
+  }
+}
+Feeds.prototype.p_rtableRemoteFeedsListener = p_rtableRemoteFeedsListener;
+
+// object Feeds.p_rtableListener
+// Handle updates from the remote tables
+function p_rtableListener(table, records)
+{
+  var self = this;
+
+  // Listener for 'rss_subscriptions' not yet ready
+  if (table == 'rss_subscriptions')
+  {
+    self.p_rtableRemoteFeedsListener(records);
+    return;
+  }
+
+  if (table == 'rss_entries_read')
+  {
+    self.p_rtableRemoteEntryReadListener(records);
+    return;
   }
 }
 Feeds.prototype.p_rtableListener = p_rtableListener;
@@ -255,7 +369,7 @@ Feeds.prototype.p_rtableSyncStatusRead = p_rtableSyncStatusRead;
 // object Feeds.p_rtableSyncRemoteSubscriptions
 // Walk over all RSS feed records in the local DB and send to
 // remote table if m_remote_status is feeds_ns.RssSyncState.IS_LOCAL_ONLY)
-function p_rtableSyncRemoteSubscriptions()
+function p_rtableSyncRemoteSubscriptions(cbDone)
 {
   var self = this;
 
@@ -263,7 +377,11 @@ function p_rtableSyncRemoteSubscriptions()
       function(feed)
       {
         if (feed == null)  // No more entries
+        {
+          if (cbDone != null)
+            cbDone();
           return 0;
+        }
 
         if (feed.m_remote_state == feeds_ns.RssSyncState.IS_LOCAL_ONLY)
         {
@@ -335,8 +453,26 @@ function p_rtableInitRemoteFeedUrl()
 
   self.m_remote_subscriptions = new feeds_ns.RTableDBox('rss_subscriptions', fields, 'm_rss_feed_hash');
 
-  self.m_remote_subscriptions.initialSync();
-  self.p_rtableSyncRemoteSubscriptions();
+  // Prepare a map of all subscriptions from the local list
+  var k = 0;
+  var entry = null;
+  var localEntries = {};
+  for(k = 0; k < self.m_rssFeeds.length; ++k)
+  {
+    var entry = self.m_rssFeeds[k];
+    localEntries[entry.m_hash] = 0;
+  }
+
+  // First any unsyched local to remote
+  log.info('feeds: send unsynched RSS subscriptions to remote table rss_subscriptions');
+  self.p_rtableSyncRemoteSubscriptions(
+    function()  // Done sending unsynched elements from local DB to remote table 'rss_subscriptions'
+    {
+      log.info('feeds: done, unsynched -> remote table rss_subscriptions');
+      // Now bring any unknown remote locally, delete any that remain local only
+      log.info('feeds: bring any new entries from remote table rss_subscriptions to local DB');
+      self.m_remote_subscriptions.initialSync(localEntries);
+    });
 }
 Feeds.prototype.p_rtableInitRemoteFeedUrl = p_rtableInitRemoteFeedUrl;
 
@@ -349,6 +485,11 @@ function rtableConnect()
   log.info('rtableConnect()...');
 
   self.m_remote_is_connected = true;
+
+  // Delete all pending (m_is_unsubscribed = true), now that Dropbox is
+  // logged in (these are entries that are in state IS_LOCAL_ONLY or
+  // IS_SYNCED)
+  self.p_feedPendingDeleteDB(true);
 
   self.p_rtableInitRemoteEntryRead();
   self.p_rtableInitRemoteFeedUrl();
@@ -367,8 +508,53 @@ Feeds.prototype.rtableDisconnect = rtableDisconnect;
 
 // object Feeds.p_feedReadAll
 // Load list of feeds (RssHeaders) from IndexedDB
-// Delete permanently feeds marked as x_is_unsubscribed
-function p_feedReadAll()
+function p_feedReadAll(cbDone)
+{
+  var self = this;
+
+  // Read the list of RSS subscriptions from IndexDB
+  var cnt = 0;
+  var tran = self.m_db.transaction('rss_subscriptions', 'readonly');
+  tran.oncomplete = function (event)
+      {
+        log.info('db: transaction completed');
+      };
+  tran.onabort = function (event)
+      {
+        log.error('db: transaction aborted');
+      };
+  tran.onerror = function (event)
+      {
+        log.error('db: transaction error');
+      };
+  var s = tran.objectStore('rss_subscriptions');
+  var c = s.openCursor();
+  c.onerror = function (event)
+      {
+        log.error('db: cursor error');
+      };
+  c.onsuccess = function(event)
+      {
+        var cursor = event.target.result;
+        if (!cursor)
+        {
+          console.log('db: ' + cnt + ' subscriptions retrieved');
+          if (cbDone != null)
+            cbDone();
+          return;  // no more entries
+        }
+        var hdr = cursor.value;
+        if (!hdr.m_is_unsubscribed)
+          self.p_feedAdd(feeds_ns.copyRssHeader(hdr), null);
+        ++cnt;
+        cursor.continue();
+      };
+}
+Feeds.prototype.p_feedReadAll = p_feedReadAll;
+
+// object Feeds.p_feedPendingDeleteDB
+// Delete permanently from IndexedDB the feeds marked as m_is_unsubscribed
+function p_feedPendingDeleteDB(needsRTableSync, cbDone)
 {
   var self = this;
   var listToRemove = [];
@@ -399,21 +585,19 @@ function p_feedReadAll()
         var cursor = event.target.result;
         if (!cursor)
         {
-          console.log('db: ' + cnt + ' subscriptions retrieved');
-          self.p_feedRemoveList(listToRemove);
-          self.m_feedsCB.onDbInitDone();
+          // `cursor' is null when `cursor.continue()' reaches end of DB index
+          console.log('db: ' + listToRemove.length + ' subscriptions marked as unsubscribed');
+          self.p_feedRemoveList(listToRemove, needsRTableSync);
           return;  // no more entries
         }
         var hdr = cursor.value;
         if (hdr.m_is_unsubscribed)
           listToRemove.push(feeds_ns.copyRssHeader(hdr));
-        else
-          self.p_feedAdd(feeds_ns.copyRssHeader(hdr), null);
         ++cnt;
         cursor.continue();
       };
 }
-Feeds.prototype.p_feedReadAll = p_feedReadAll;
+Feeds.prototype.p_feedPendingDeleteDB = p_feedPendingDeleteDB;
 
 // object Feeds.p_dbOpen
 // This completes the initialization of the Feeds object
@@ -441,7 +625,18 @@ function p_dbOpen()
         log.info(db.objectStoreNames);
 
         self.m_db = db;
-        self.p_feedReadAll();
+        // Delete only if it is safe without Dropbox yet logged in
+        // (only entries that are IS_LOCAL_ONLY can be deleted, if
+        // you've never logged into Dropbox all entries are
+        // LOCAL_ONLY)
+        self.p_feedPendingDeleteDB(false);
+
+        // Load all entries into memory for display and for fetch loop
+        self.p_feedReadAll(
+            function()
+            {
+              self.m_feedsCB.onDbInitDone();
+            });
       };
   req.onupgradeneeded = function(event)
       {
@@ -495,7 +690,7 @@ function compareRssHeadersByUrl(feed1, feed2)
 
 // object Feeds.p_feedAdd
 // add a feed (RSSHeader) to list of feeds, start the fetch pump loop
-function p_feedAdd(newFeed, cbDone)
+function p_feedAdd(newFeed, cbDone, syncRTable)
 {
   var self = this;
 
@@ -527,10 +722,17 @@ Feeds.prototype.p_feedAdd = p_feedAdd;
 
 // object Feeds.p_feedRecord
 // Insert a new record or update a record of a feed (RssHeader) in the indexedDB
-function p_feedRecord(feed)
+// Record operation will be ignored at an attempt to record a feed that is already in
+// feed -- obj: RSSHeader
+// syncRTable -- bool: true if no need to sync with remote table
+// cbResult(was_update_needed) -- callback
+// was_update_needed -- int: 1 = update was needed and entry was recorded
+// was_update_needed -- int: 0 = no update was needed, record request ignored
+function p_feedRecord(feed, syncRTable, cbResult)
 {
   var self = this;
   // operate on the copy, not on the reference
+  utils_ns.assert(feed instanceof feeds_ns.RssHeader, "copyRssHeader: x instanceof feeds_ns.RssHeader");
   var feed2 = feeds_ns.copyRssHeader(feed);
 
   // Insert entry in m_dbSubscriptions
@@ -551,67 +753,102 @@ function p_feedRecord(feed)
   var req = store.get(feed2.m_url);
   req.onsuccess = function(event)
       {
+        var tempFeed = null;
         var needsUpdate = false;
+        var needsRTableSync = false;
         var data = req.result;
         if (data === undefined)
+        {
           needsUpdate = true;  // entry is not in the DB
+          needsRTableSync = true;  // Also update RTable 'rss_subscriptions'
+        }
         else
         {
           // Check if the record in the DB needs updating
-          log.info('db: entry already in [' + feed2.m_url + ']');
-          if (feed2.m_title != data.m_title)
+          // For entry comming from RTable check only m_tags and m_remote_state, all else is empty!
+          if (syncRTable == false)
           {
-            console.log('db: new title: ' + feed2.m_title + ' (old: ' + data.m_title + ')');
-            needsUpdate = true;
-          };
-          if (feed2.m_link != data.m_link)
-          {
-            console.log('db: new link: ' + feed2.m_link + ' (old: ' + data.m_link + ')');
-            needsUpdate = true;
-          };
-          if (feed2.m_description != data.m_description)
-          {
-            console.log('db: new description: ' + feed2.m_description + ' ' +
-                        '(old: ' + data.m_description + ')');
-            needsUpdate = true;
-          };
-          if (feed2.m_rss_type != data.m_rss_type)
-          {
-            console.log('db: new rss_type: ' + feed2.m_rss_type + ' ' +
-                        '(old: ' + data.m_rss_type + ')');
-            needsUpdate = true;
-          };
-          if (feed2.m_rss_version != data.m_rss_version)
-          {
-            console.log('db: new rss_version: ' + feed2.m_rss_version + ' ' +
-                        '(old: ' + data.m_rss_version + ')');
-            needsUpdate = true;
-          };
-          if (feed2.m_tags != data.m_tags)
-          {
-            console.log('db: new tags: ' + feed2.m_tags + ' ' +
-                        '(old: ' + data.m_tags + ')');
-            needsUpdate = true;
+            if (feed2.m_tags != data.m_tags)
+            {
+              console.log('db: new remote tags: ' + feed2.m_tags + ' ' +
+                          '(old: ' + data.m_tags + ')');
+              needsUpdate = true;
+            }
+            if (feed2.m_remote_state != data.m_remote_state)
+            {
+              console.log('db: new remote state: ' + feed2.m_remote_state + ' ' +
+                          '(old: ' + data.m_remote_state + ')');
+              needsUpdate = true;
+            }
           }
-          if (feed2.m_is_unsubscribed != data.m_is_unsubscribed)
+          else
           {
-            console.log('db: new is_unsubscribed: ' + feed2.m_is_unsubscribed + ' ' +
-                        '(old: ' + data.m_is_unsubscribed + ')');
-            needsUpdate = true;
+            log.info('db: entry already in [' + feed2.m_url + ']');
+            if (feed2.m_title != data.m_title)
+            {
+              console.log('db: new title: ' + feed2.m_title + ' (old: ' + data.m_title + ')');
+              needsUpdate = true;
+            };
+            if (feed2.m_link != data.m_link)
+            {
+              console.log('db: new link: ' + feed2.m_link + ' (old: ' + data.m_link + ')');
+              needsUpdate = true;
+            };
+            if (feed2.m_description != data.m_description)
+            {
+              console.log('db: new description: ' + feed2.m_description + ' ' +
+                          '(old: ' + data.m_description + ')');
+              needsUpdate = true;
+            };
+            if (feed2.m_rss_type != data.m_rss_type)
+            {
+              console.log('db: new rss_type: ' + feed2.m_rss_type + ' ' +
+                          '(old: ' + data.m_rss_type + ')');
+              needsUpdate = true;
+            };
+            if (feed2.m_rss_version != data.m_rss_version)
+            {
+              console.log('db: new rss_version: ' + feed2.m_rss_version + ' ' +
+                          '(old: ' + data.m_rss_version + ')');
+              needsUpdate = true;
+            };
+            if (feed2.m_tags != data.m_tags)
+            {
+              console.log('db: new tags: ' + feed2.m_tags + ' ' +
+                          '(old: ' + data.m_tags + ')');
+              needsUpdate = true;
+              needsRTableSync = true;  // Also update RTable 'rss_subscriptions'
+            }
+            if (feed2.m_is_unsubscribed != data.m_is_unsubscribed)
+            {
+              console.log('db: new is_unsubscribed: ' + feed2.m_is_unsubscribed + ' ' +
+                          '(old: ' + data.m_is_unsubscribed + ')');
+              needsUpdate = true;
+            }
           }
         };
         if (needsUpdate)
         {
+          if (needsRTableSync)
+            self.p_rtableSyncFeedEntry(feed2);  // new url or tags
+
           var reqAdd = store.put(utils_ns.marshal(feed2, 'm_'));
           reqAdd.onsuccess = function(event)
               {
                 var data = reqAdd.result;
                 log.info('db: added! [' + feed2.m_url + ']');
+                if (cbResult != null)  // Notifier callback provided?
+                  cbResult(1);  // Notify that update was needed and entry was recorded
               }
           reqAdd.onerror = function(event)
               {
                 log.error('db: error msg: ' + reqAdd.error.message);
               }
+        }
+        else
+        {
+          if (cbResult != null)  // Notifier callback provided?
+            cbResult(0);  // Notify that no update was needed
         }
       }
 }
@@ -627,7 +864,7 @@ function feedAddByUrl(feedUrl, cbDone)
   newFeed.m_title = feedUrl;
 
   // Add to table rss_subscriptions (it will be updated when more data is fetched)
-  self.p_feedRecord(newFeed);
+  self.p_feedRecord(newFeed, true, null);
 
   // Add to the resident list of feeds (will become part of the fetch loop)
   // Do first fetch of RSS
@@ -642,7 +879,7 @@ Feeds.prototype.feedAddByUrl = feedAddByUrl;
 
 // object Feeds.p_feedRemoveDB
 // Deletes a feed from database table 'rss_subscriptions'
-function p_feedRemoveDB(feedUrl)
+function p_feedRemoveDB(feedUrl, needsRTableSync)
 {
   var self = this;
 
@@ -676,6 +913,16 @@ function p_feedRemoveDB(feedUrl)
           log.error('db: delete request error, record not found for ' + feedUrl);
           return;
         }
+        if (needsRTableSync)
+        {
+          // If this entry was ever synched to remote table, then delete it from remote table
+          if (data.m_remote_state == feeds_ns.RssSyncState.IS_SYNCED)
+          {
+            log.info('p_feedRemoveDB: delete from remote table, feed: ' + feedUrl);
+            self.m_remote_subscriptions.deleteRec(data.m_hash);  // delete by hash of feed url
+          }
+        }
+
         // Record exists, delete it
         req2 = store.delete(feedUrl);
         req2.onsuccess = function(event)
@@ -702,7 +949,7 @@ Feeds.prototype.p_feedRemoveDB = p_feedRemoveDB;
 
 // object Feeds.p_feedRemoveList
 // Deletes a list of feeds from database table 'rss_subscriptions'
-function p_feedRemoveList(listToRemove)
+function p_feedRemoveList(listToRemove, needsRTableSync)
 {
   var self = this;
 
@@ -714,14 +961,14 @@ function p_feedRemoveList(listToRemove)
     utils_ns.assert(hdr instanceof feeds_ns.RssHeader, "p_feedRemoveList: x instanceof feeds_ns.RssHeader");
 
     log.info('execute deferred remove: ' + hdr.m_url);
-    self.p_feedRemoveDB(hdr.m_url);
+    self.p_feedRemoveDB(hdr.m_url, needsRTableSync);
   }
 }
 Feeds.prototype.p_feedRemoveList = p_feedRemoveList;
 
-// object Feeds.feedRemove
+// object Feeds.p_feedRemove
 // Deletes a feed from database table 'rss_subscriptions' and list of feeds
-function feedRemove(feedUrl)
+function p_feedRemove(feedUrl, needsRTableSync)
 {
   var self = this;
 
@@ -741,7 +988,16 @@ function feedRemove(feedUrl)
   // Delete from the database
   var kk = [];
   kk.push(feed);
-  self.p_feedRemoveList(kk);
+  self.p_feedRemoveList(kk, needsRTableSync);
+}
+Feeds.prototype.p_feedRemove = p_feedRemove;
+
+// object Feeds.feedRemove
+// Deletes a feed from database table 'rss_subscriptions' and list of feeds
+function feedRemove(feedUrl)
+{
+  var self = this;
+  self.p_feedRemove(feedUrl, true);
 }
 Feeds.prototype.feedRemove = feedRemove;
 
@@ -768,7 +1024,7 @@ function feedMarkUnsubscribed(feedUrl, isUnsubscribed)
 
   var flagUpdatedHeader = self.p_feedUpdateHeader(index, target);
   if (flagUpdatedHeader)  // Record any changes in IndexedDB
-    self.p_feedRecord(target);
+    self.p_feedRecord(target, null);
 }
 Feeds.prototype.feedMarkUnsubscribed = feedMarkUnsubscribed;
 
@@ -799,7 +1055,7 @@ function feedSetTags(feedUrl, tags)
   self.m_feedsCB.onRssUpdated(updated);
 
   // Update the database record (IndexedDb)
-  self.p_feedRecord(targetFeed);
+  self.p_feedRecord(targetFeed, true, null);
   return 0;
 }
 Feeds.prototype.feedSetTags = feedSetTags;
@@ -873,7 +1129,19 @@ function p_feedRecordEntry(feedUrl, newEntry, cbWriteDone)
   req.onsuccess = function(event)
       {
         var data = req.result;
+        var needsWrite = false;
         if (data === undefined)
+          needsWrite = true;
+        else if (data.m_remote_state == feeds_ns.RssSyncState.IS_REMOTE_ONLY)
+        {
+          log.info('db: found IS_REMOTE_ONLY (' + s + '): [' + newEntry2.m_link + ']');
+          log.info('db: (' + s + '): m_is_read = ' + data.m_is_read);
+          log.info('db: write entry (' + s + '): [' + newEntry2.m_link + ']');
+          needsWrite = true;
+          newEntry2.m_is_read = data.m_is_read;
+          newEntry2.m_remote_state = feeds_ns.RssSyncState.IS_SYNCED;
+        }
+        if (needsWrite)
         {
           log.trace('db: write entry (' + s + '): [' + newEntry2.m_link + ']');
           var reqAdd = store.put(utils_ns.marshal(newEntry2, 'm_'));
@@ -941,7 +1209,7 @@ function feedUpdateEntry(entryHash, cbUpdate)
           // Record with this hash is not in the DB
           // Then create a new empty entry and ask cbUpdate() what to do
           newEntry = feeds_ns.emptyRssEntry();
-          c =  cbUpdate(0, newEntry);
+          c = cbUpdate(1, newEntry);
         }
         else
         {
@@ -952,7 +1220,7 @@ function feedUpdateEntry(entryHash, cbUpdate)
 
         if (c != 0)
         {
-          log.info('db: entry (' + s + ') no update needed: [' + newEntry.m_link + ']');
+          log.trace('db: entry (' + s + ') no update needed: [' + newEntry.m_link + ']');
           return;
         }
 
@@ -1091,7 +1359,7 @@ function p_feedUpdate(feedHeaderNew, cbWriteDone)
   // Check if any fields of rssFeed header have new values
   var flagUpdatedHeader = self.p_feedUpdateHeader(index, feedHeaderNew);
   if (flagUpdatedHeader)  // Record any changes in IndexedDB
-    self.p_feedRecord(feedHeaderNew);
+    self.p_feedRecord(feedHeaderNew, true, null);
 
   // Send each entry in the RSS feed to the database
   // for possible write operation
@@ -1100,6 +1368,8 @@ function p_feedUpdate(feedHeaderNew, cbWriteDone)
   var keyNew = '';
   var newEntry = null;
   var cntDone = 0;
+  var totalCnt = 0;
+  var unchangedCnt = 0;
   for (i = 0; i < keysNew.length; ++i)
   {
     keyNew = keysNew[i];
@@ -1109,11 +1379,19 @@ function p_feedUpdate(feedHeaderNew, cbWriteDone)
     self.p_feedRecordEntry(target.m_url, newEntry,
        function(state)  // CB: write operation completed
        {
+         if (state == 0)  // New entry added to the table 'rss_data'?
+           ++totalCnt;
+         if (state == 3)  // Unchanged?
+           ++unchangedCnt;
+
          --cntDone;
          if (cntDone == 0)
          {
            if (cbWriteDone != null)
+           {
+             log.info(totalCnt + ' new entries recorded in table rss_data, ' + unchangedCnt + ' unchanged');
              cbWriteDone();
+           }
          }
        });
   }

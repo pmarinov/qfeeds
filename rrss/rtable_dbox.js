@@ -146,6 +146,20 @@ function deleteAll()
 }
 RTableDBox.prototype.deleteAll = deleteAll;
 
+// object RTableDBox.deleteRec
+function deleteRec(entryKey)
+{
+  var self = this;
+  var entry = self.m_table.get(entryKey);
+  if (entry.isDeleted())
+  {
+      log.info('rtable: already deleted Id ' + recID + ', done.')
+  }
+  entry.deleteRecord();
+  log.info('rtable: deleting Id ' + entryKey + '...')
+}
+RTableDBox.prototype.deleteRec = deleteRec;
+
 // object RTableDBox.p_copyObj
 // Converts from Datastore object into rtable record object
 // This means to copy all the fields listed in m_fields + m_key
@@ -170,7 +184,10 @@ function p_copyObj(dboxObj)
 RTableDBox.prototype.p_copyObj = p_copyObj;
 
 // object RTableDBox.initialSync
-function initialSync()
+// local -- dictionary of keys of local entries this way initialSync()
+//          can generate events for all that were deleted remotely too
+// local = null, won't generate delete events
+function initialSync(local)
 {
   var self = this;
 
@@ -191,7 +208,42 @@ function initialSync()
         data: self.p_copyObj(rec)  // record data (based on m_fields)
       };
     objlist.push(updateObj);
+
+    if (local == null)
+      continue;
+
+    if (local[rec.getId()] === undefined)
+      continue;
+
+    local[rec.getId()] = 1;
   }
+  g_cbRecordsChanged(self.m_tableId, objlist);
+
+  if (local == null)
+    return;
+
+  // Generate event _deleted_ for all that were in local but
+  // not in the remote table
+  var keys = Object.keys(local);
+  var key = null;
+  objlist = [];
+  for (x = 0; x < keys.length; ++x)
+  {
+    key = keys[x];
+    if (local[key] == 1)  // In local AND in remote
+      continue;
+
+    // local[key] is only in local, needs to be deleted
+    updateObj =
+      {
+        id: key, // Id of this record, created by Dropbox
+        isLocal: false,  // Feeedback from locally initiated operation
+        isDeleted: true,  // The record was deletd, data is null
+        data: null  // record data, no data needed for delete operation
+      };
+    objlist.push(updateObj);
+  }
+  log.info('rtable.initialSync: ' + objlist.length + ' record(s) not in remote table that will be deleted');
   g_cbRecordsChanged(self.m_tableId, objlist);
 }
 RTableDBox.prototype.initialSync = initialSync;
@@ -230,7 +282,7 @@ function recordsChanged(dstoreEvent)
             isDeleted: false,  // The record was deletd, data is null
             data: null  // record data (based on m_fields)
           };
-      rec = records[i];
+      rec = records[k];
       updatedObj.id = rec.getId();
       updatedObj.data = null;
       if (isLocal)
@@ -245,7 +297,8 @@ function recordsChanged(dstoreEvent)
       }
       else
       {
-        log.info('rtable: listener: ' + rec.getId() + ' was updated remotedly.');
+        if (!isLocal)
+          log.info('rtable: listener: ' + rec.getId() + ' was updated remotedly.');
         updatedObj.data = new Object();
         for (p = 0; p < fields.length; ++p)
         {
@@ -266,6 +319,7 @@ function recordsChanged(dstoreEvent)
     }
 
     g_cbRecordsChanged(g_tables[i].m_tableId, objlist);
+    objlist = [];
   }
 }
 

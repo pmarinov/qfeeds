@@ -89,8 +89,12 @@ function RssHeader(url, title, link, description, language, updated)
   this.m_rss_version = '';
 
   // meta (stored in db)
-  var sha1 = CryptoJS.SHA1(url);
-  this.m_hash = sha1.toString();
+  this.m_hash = null;
+  if (url != null)
+  {
+    var sha1 = CryptoJS.SHA1(url);
+    this.m_hash = sha1.toString();
+  }
   this.m_remote_state = RssSyncState.IS_LOCAL_ONLY;
   this.m_remote_id = '';  // This ID is created by remote table DB manager
 
@@ -119,6 +123,7 @@ function copyRssHeader(from)
   x.m_is_unsubscribed = from.m_is_unsubscribed;
   x.m_rss_type = from.m_rss_type;
   x.m_rss_version = from.m_rss_version;
+  x.m_remote_state = from.m_remote_state;
 
   return x;
 }
@@ -138,11 +143,15 @@ function p_calcHash()
 {
   var self = this;
 
+  if (self.m_title == null && self.m_description == null &&
+      self.m_link == null && self.m_date == null)
+    return null;
+
   var component1 = self.m_title;
   if (component1.length == 0)
     component1 = self.m_description;
 
-  var joined = [component1, self.m_link, utils_ns.dateToStr(self.m_date)].join('');
+  var joined = [component1, self.m_link, utils_ns.dateToStrStrict(self.m_date)].join('');
   var sha1 = CryptoJS.SHA1(joined);
 
   return sha1.toString();

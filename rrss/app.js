@@ -285,7 +285,7 @@ function p_dboxLoginLogout()
       function (error, client)
       {
         console.log("auth2: callback");
-        self.m_dboxConnectCB(error, client);
+        self.p_dboxConnectCB(error, client);
       });
   }
 }
