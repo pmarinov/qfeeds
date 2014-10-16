@@ -36,6 +36,9 @@ function ConnectDBox(cb)
   // Callback handlers
   self.m_cb = cb;
 
+  // progress 0%
+  self.m_cb.onDBoxProgress(0);
+
   self.m_user_email = '';
   self.m_user_name = '';
 
@@ -49,9 +52,14 @@ function ConnectDBox(cb)
 
   // Try to finish OAuth authorization.
   self.m_authenticated = false;
+
+  // progress 20%
+  self.m_cb.onDBoxProgress(20);
   self.m_dropBoxClient.authenticate({interactive: false},
     function (error, client)
     {
+      // progress 60%
+      self.m_cb.onDBoxProgress(60);
       self.p_dboxConnectCB(error, client);
     });
 
@@ -78,6 +86,8 @@ function p_dboxConnectCB(error, client)
     self.m_dropBoxClient = client;
     if (self.m_dropBoxClient.isAuthenticated())
     {
+      // progress 80%
+      self.m_cb.onDBoxProgress(80);
       self.m_authenticated = true;
       console.log('auth_pass1: OK');
       self.m_cb.onDBoxClientReady(self.m_dropBoxClient);
@@ -101,6 +111,8 @@ function p_dboxGetAccountInfo()
   self.m_dropBoxClient.getAccountInfo({httpCache: true},
     function(error, accountInfo, accountInfoData)
     {
+      // progress 100%
+      self.m_cb.onDBoxProgress(100);
       if (error)
         console.log('get_acc1: error ' + error);
       else
@@ -133,7 +145,7 @@ function p_dboxSetLoginButton()
     if (self.m_user_email != '')
       self.$d.userDropbox.text('(' + self.m_user_email + ')');
     else
-      self.$d.userDropbox.empty();
+      self.$d.userDropbox.text('(Connecting...)');
   }
   else
   {

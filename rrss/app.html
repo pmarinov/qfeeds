@@ -72,11 +72,16 @@
     </div>  <!-- #xcmd_pane_feeds_dir -->
 
     <!-- Section: Persistency -->
-    <div class="submenu_title_holder submenu_title_top_sep">
+    <div class="submenu_title_holder submenu_title_top_sep" style="height: 100%">
       <span class="indent1"></span>
       <span class="submenu_title">Persistency</span>
-    </div>
-    <div class="submenu_entry_holder">
+      <div id="xsync_progress_holder" class="progress hide" style="height: 2px; margin-bottom: 2px;">
+        <div id="xsync_progress" class="progress-bar" style="width: 5%;">
+          <span class="sr-only">(invisible progress text)</span>
+        </div>
+      </div>
+    </div>  <!-- Title: PERSISTENCY + progress bar -->
+    <div class="submenu_entry_holder" style="height: 100%">
       <span class="indent1"></span>
       <span class="submenu_entry" id="xdropbox">Logon</span>
       <div><i id="xdropbox_user"></i></div>

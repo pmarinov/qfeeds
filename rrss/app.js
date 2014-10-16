@@ -47,6 +47,8 @@ function App()
   self.$d =
   {
     areaLeftPane: utils_ns.domFind('#xleft_pane'),
+    syncProgress: utils_ns.domFind('#xsync_progress'),
+    syncProgressHolder: utils_ns.domFind('#xsync_progress_holder')
   }
 
   self.m_aboutPanel = new feeds_ns.AboutPanel();
@@ -104,6 +106,23 @@ function p_getConnectDBoxCBHandlers()
                 self.m_connectDropbox.dboxLoginLogout();  // Logout
               }
             });
+        },
+
+    onDBoxProgress: function(percent)
+        {
+          if (percent == 0)  // start
+            self.$d.syncProgressHolder.toggleClass('hide', false);
+
+          self.$d.syncProgress.attr('style', 'width: ' + percent + '%;');
+
+          if (percent == 100)  // end
+          {
+            // Postglow for 1 second :-)
+            setTimeout(function ()
+                {
+                  self.$d.syncProgressHolder.toggleClass('hide', true);
+                }, 1 * 1000);
+          }
         }
   };
 
