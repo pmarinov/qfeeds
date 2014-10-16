@@ -24,6 +24,7 @@ function App()
   log.setLevel('info');
   log.info("Obtaining indexDB handler...");
 
+  // TODO: move this into object Feeds!
   // In the following line, you should include the prefixes of implementations you want to test.
   window.indexedDB = window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB;
   // DON'T use "var indexedDB = ..." if you're not in a function.
@@ -46,7 +47,8 @@ function App()
   self.$d =
   {
     areaLeftPane: utils_ns.domFind('#xleft_pane'),
-    btnDropbox: null
+    syncProgress: utils_ns.domFind('#xsync_progress'),
+    syncProgressHolder: utils_ns.domFind('#xsync_progress_holder')
   }
 
   self.m_aboutPanel = new feeds_ns.AboutPanel();
@@ -74,36 +76,59 @@ function App()
       return self.p_handleLeftPaneClick(e);
     });
 
-  // TODO: move all dropbox stuff into a devoted handler object
-  // and a separate file
-  self.m_dropBoxClient = new Dropbox.Client({key: "2h6sz18x46w03jv"});
-  self.m_dropBoxClient.authDriver(new Dropbox.AuthDriver.ChromeExtension(
-    {
-      receiverPath: 'ownrss/chrome_oauth_receiver.html'
-    }));
-
-  self.$d.btnDropbox = utils_ns.domFind('#xdropbox');
-  self.$d.userDropbox = utils_ns.domFind('#xdropbox_user');
-  self.m_user_email = '';
-  self.m_user_name = '';
-  self.p_dboxSetLoginButton();
-
-  // Try to finish OAuth authorization.
-  self.m_authenticated = false;
-  self.m_dropBoxClient.authenticate({interactive: false},
-    function (error, client)
-    {
-      self.p_dboxConnectCB(error, client);
-    });
-
-  self.$d.btnDropbox.on('click',
-    function (e)
-    {
-      self.p_dboxLoginLogout();
-    });
-
+  // Now connect to Dropbox
+  self.m_connectDropbox = new feeds_ns.ConnectDBox(self.p_getConnectDBoxCBHandlers());
   return this;
 }
+
+// object App.p_getConnectDBoxCBHandlers()
+function p_getConnectDBoxCBHandlers()
+{
+  var self = this;
+
+  var connectDBoxCB =
+  {
+    // If user logins into Dropbox this function is called
+    // when access object is ready
+    onDBoxClientReady: function(clientDBox)
+        {
+          feeds_ns.RTableInit(clientDBox,
+            function(code)
+            {
+              if (code == 0)  // RTable init ok
+              {
+                console.log("RTable init OK");
+                self.m_feedsDir.remoteStoreConnected();
+              }
+              else
+              {
+                console.log("RTable init failed");
+                self.m_connectDropbox.dboxLoginLogout();  // Logout
+              }
+            });
+        },
+
+    onDBoxProgress: function(percent)
+        {
+          if (percent == 0)  // start
+            self.$d.syncProgressHolder.toggleClass('hide', false);
+
+          self.$d.syncProgress.attr('style', 'width: ' + percent + '%;');
+
+          if (percent == 100)  // end
+          {
+            // Postglow for 1 second :-)
+            setTimeout(function ()
+                {
+                  self.$d.syncProgressHolder.toggleClass('hide', true);
+                }, 1 * 1000);
+          }
+        }
+  };
+
+  return connectDBoxCB;
+}
+App.prototype.p_getConnectDBoxCBHandlers = p_getConnectDBoxCBHandlers;
 
 // object App.p_activatePane()
 // Activate one object into the right-hand side area (Feeds, About, etc.)
@@ -158,128 +183,6 @@ function p_handleLeftPaneClick(ev)
   return true;
 }
 App.prototype.p_handleLeftPaneClick = p_handleLeftPaneClick;
-
-var client = null;
-
-// object App.p_dboxSetLoginButton()
-function p_dboxSetLoginButton()
-{
-  var self = this;
-
-  if (self.m_authenticated)
-  {
-    self.$d.btnDropbox.text('Logout \u2192');
-    if (self.m_user_email != '')
-      self.$d.userDropbox.text('(' + self.m_user_email + ')');
-    else
-      self.$d.userDropbox.empty();
-  }
-  else
-  {
-    self.$d.btnDropbox.text('Login (Dropbox)');
-    self.$d.userDropbox.empty();
-  }
-}
-App.prototype.p_dboxSetLoginButton = p_dboxSetLoginButton;
-
-// object App.p_dboxGetAccountInfo()
-function p_dboxGetAccountInfo()
-{
-  var self = this;
-
-  self.m_dropBoxClient.getAccountInfo({httpCache: true},
-    function(error, accountInfo, accountInfoData)
-    {
-      if (error)
-        console.log('get_acc1: error ' + error);
-      else
-      {
-        self.m_user_name = accountInfoData.display_name;
-        self.m_user_email = accountInfoData.email;
-        console.log('get_acc1: accountInfo OK, (' + accountInfoData.email + ')');
-        self.p_dboxSetLoginButton();
-      }
-    });
-}
-App.prototype.p_dboxGetAccountInfo = p_dboxGetAccountInfo;
-
-// object App.p_dboxConnectCB()
-// A callback. Completes connection to Dropbox.
-function p_dboxConnectCB(error, client)
-{
-  var self = this;
-
-  if (error)
-  {
-      console.log('auth_pass1: authentication error: ' + error);
-  }
-  else
-  {
-    console.log('auth_pass1: authenticated1');
-    self.m_dropBoxClient = client;
-    if (self.m_dropBoxClient.isAuthenticated())
-    {
-      self.m_authenticated = true;
-      console.log('auth_pass1: OK');
-      feeds_ns.RTableInit(self.m_dropBoxClient,
-        function(code)
-        {
-          if (code == 0)  // RTable init ok
-          {
-            console.log("RTable init OK");
-            self.p_dboxSetLoginButton();
-            self.p_dboxGetAccountInfo();
-          }
-          else
-          {
-            console.log("RTable init failed");
-            self.p_dboxLoginLogout();
-          }
-        });
-    }
-    else
-    {
-      console.log('auth_pass1: NO');
-      self.p_dboxSetLoginButton();
-    }
-  }
-}
-App.prototype.p_dboxConnectCB = p_dboxConnectCB;
-
-// object App.p_dboxLoginLogout
-// Handles click on Login/Logout button
-function p_dboxLoginLogout()
-{
-  var self = this;
-
-  if (self.m_authenticated)
-  {
-    self.m_authenticated = false;
-    self.m_user_name = '';
-    self.m_user_email = '';
-    self.p_dboxSetLoginButton();
-
-    self.m_dropBoxClient.signOut(false,
-      function(error)
-      {
-        if (error)
-           console.log('sign_out1: error ' + error);
-        else
-           console.log('sign_out1: OK');
-     });
-  }
-  else
-  {
-    console.log("auth2: start");
-    self.m_dropBoxClient.authenticate({interactive: true},
-      function (error, client)
-      {
-        console.log("auth2: callback");
-        self.m_dboxConnectCB(error, client);
-      });
-  }
-}
-App.prototype.p_dboxLoginLogout = p_dboxLoginLogout;
 
 // object AboutPanel [constructor]
 function AboutPanel()

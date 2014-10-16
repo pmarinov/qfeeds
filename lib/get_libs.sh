@@ -1,7 +1,7 @@
 #!/bin/bash
 echo "Downloading dropbox.js..."
-curl -o dropbox-0.10.1-116.js https://dl.dropboxusercontent.com/spa/jprrh9clkci3lvn/dropbox.js/bugs/116/dropbox.js
-curl -o dropbox-datastores-1.0-latest.js https://www.dropbox.com/static/api/dropbox-datastores-1.0-latest.js
+wget https://www.dropbox.com/developers/downloads/sdks/datastore/js/dropbox-js-datastore-sdk-1.1.0.zip
+unzip dropbox-js-datastore-sdk-1.1.0.zip
 echo "Downloading jquery.js..."
 curl -O http://code.jquery.com/jquery-2.0.2.js
 echo "Downloading bootstrap.js..."

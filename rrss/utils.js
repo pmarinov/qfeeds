@@ -159,6 +159,58 @@ Array.prototype.binarySearch = function(find, comparator)
   return -(low + 1);
 };
 
+// Find list of that start with _prefix_
+function listOfFields(obj, prefix)
+{
+  var i = 0;
+  var f = '';
+  var p = '';
+  var fields = Object.keys(obj);
+  var mfields = [];
+  for (i = 0; i < fields.length; ++i)
+  {
+    var f = fields[i];
+
+    var p = fields[i].substr(0, prefix.length);
+    if (p != prefix)
+    {
+      console.log('skip: ' + f);
+      continue;
+    }
+    //console.log(f);
+    mfields.push(f);
+  }
+
+  return mfields;
+}
+
+// Create a copy of an object _src_ by skipping the fields in skip[]
+function copyFields(src, skip)
+{
+  var i = 0;
+  var k = 0;
+  var dest = new Object();
+  var fields = Object.keys(src);
+  var f = '';
+  for (i = 0; i < fields.length; ++i)
+  {
+    f = fields[i];
+    shouldSkip = false;
+    for (k = 0; k < skip.length; ++k)
+    {
+      if (skip[k] == f)
+      {
+        shouldSkip = true;
+        break;
+      }
+    }
+    if (!shouldSkip)
+      dest[f] = src[f]
+  }
+
+  return dest;
+}
+
 // marshal all fields of v into a temp object
 // move only values of fields starting with prefix
 // NOTE: the temp object's fields are references not
@@ -170,16 +222,17 @@ function marshal(obj, prefix)
   var fields = Object.keys(obj);
   var f = '';
   var v = null;
+  var p = '';
   var d = '';
   for (i = 0; i < fields.length; ++i)
   {
-    var f = fields[i];
-    var v = obj[f];
+    f = fields[i];
+    v = obj[f];
 
-    var p = fields[i].substr(0, prefix.length);
+    p = fields[i].substr(0, prefix.length);
     if (p != prefix)
     {
-      console.log('skip: ' + f + ":" + v);
+      //console.log('skip: ' + f + ":" + v);
       continue;
     }
     n[f] = v;
@@ -188,7 +241,7 @@ function marshal(obj, prefix)
     d = d.substring(0, 96);
     if (v != null && v.length > 95)
       d = d + '...';
-    console.log(f + d);
+    //console.log(f + d);
   }
   return n; 
 }
@@ -220,6 +273,8 @@ utils_ns.dateToStrStrict = dateToStrStrict;
 utils_ns.domFindInside = domFindInside;
 utils_ns.domFind = domFind;
 utils_ns.clickIsInside = clickIsInside;
+utils_ns.listOfFields = listOfFields;
+utils_ns.copyFields = copyFields;
 utils_ns.marshal = marshal;
 
 

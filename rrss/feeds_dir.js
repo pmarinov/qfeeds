@@ -95,6 +95,7 @@ function FeedsDir($dirPanel, feedDisp)
   self.m_displayList = [];
   self.m_currentFeedName = null;
   self.m_currentFeed = null;
+  self.m_currentFeedEntries = null;  // map of hashes of RSSEntries
   self.m_saveCurrentFeedName = null;
   self.m_saveCurrentFeed = null;
   self.m_newFeedUrl = null;  // New feed currently offered on display for subscription
@@ -107,6 +108,21 @@ function FeedsDir($dirPanel, feedDisp)
 
   return this;
 }
+
+// object FeedsDir.remoteStoreConnected
+function remoteStoreConnected()
+{
+  var self = this;
+  self.m_feedsDB.rtableConnect();
+}
+FeedsDir.prototype.remoteStoreConnected = remoteStoreConnected;
+
+// object FeedsDir.remoteStoreDisconnected
+function remoteStoreDisconnected()
+{
+  var self = this;
+}
+FeedsDir.prototype.remoteStoreDisconnected = remoteStoreDisconnected;
 
 // object FeedsDir.p_setFeedsDomHandlers
 // Attach handlers to various DOM events related to FeedsDir screen area
@@ -272,7 +288,7 @@ function p_getFeedsCBHandlers()
 
     onRssUpdated: function(updates)
         {
-          log.info("CB: onRssUpdated...");
+          log.trace("CB: onRssUpdated...");
 
           self.p_findUpdatedFolders();  // User added new folders?
           self.p_updateFeeds(updates);  // Updated/added feeds?
@@ -286,6 +302,32 @@ function p_getFeedsCBHandlers()
           self.p_findUpdatedFolders();  // User added new folders?
           self.p_removeFeeds(listRemoved);  // removed feeds?
           self.p_displayFeedsList();
+        },
+
+    // Handle events generated from remote action. On another computer
+    // user has marked something read or unread. If this is part of
+    // the feed that is currently on display then reflect visually the
+    // change.
+    onRemoteMarkAsRead: function(hashRssEntry, hashRssFeed, isRead)
+        {
+          log.info("CB: onRemoteMarkAsRead...");
+
+          self.p_handleRemoteMarkAsRead(hashRssEntry, hashRssFeed, isRead);
+        },
+
+    // Handle events generated from remote action. On another computer
+    // user has deleted a feed. Reflect visually the change.
+    onRemoteFeedDeleted: function(urlDeletedFeed)
+        {
+        },
+
+    // Handle events generated from remote action. On another computer
+    // user has added changed tags of a feed or added a new
+    // feed. Reflect visually the change.
+    onRemoteFeedUpdated: function(urlNewFeed, tags)
+        {
+          // The feed is already properly displayed
+          // TODO: but if there is no other feed, activate this as current
         }
   };
 
@@ -301,6 +343,8 @@ function p_getDispCBHandlers()
 
   var dispCB =
   {
+    // Called by FeedsDisp when user click on an entry and it needs
+    // to be marked as read/unread
     markAsRead: function(entryHash, isRead, feedUrl)
         {
           log.info('CB: markAsRead...');
@@ -309,19 +353,7 @@ function p_getDispCBHandlers()
             log.info('feed is not yet subscribed: ' + feedUrl);
           else
           {
-            self.m_feedsDB.feedUpdateEntry(entryHash,
-                function(dbEntry)
-                {
-                  utils_ns.assert(dbEntry.m_hash == entryHash, 'markAsRead: bad data');
-
-                  if (dbEntry.m_is_read == isRead)
-                    return 1;
-                  else
-                  {
-                    dbEntry.m_is_read = isRead;
-                    return 0;
-                  }
-                });
+            self.m_feedsDB.markEntryAsRead(entryHash, isRead);
           }
         }
   }
@@ -329,6 +361,23 @@ function p_getDispCBHandlers()
   return dispCB;
 }
 FeedsDir.prototype.p_getDispCBHandlers = p_getDispCBHandlers;
+
+// object FeedsDir.p_handleRemoteMarkAsRead
+// Called in response of an event from a remote table. An entry was
+// marked on another machine as read, reflect the changes on the screen
+// (this callback is from the local database which hash already recorded
+// the necessary changes)
+function p_handleRemoteMarkAsRead(entryHash, feedHash, isRead)
+{
+  var self = this;
+
+  // Only if this entry is among the currently displayed
+  if (self.p_isEntryOnDisplay(entryHash) == null)
+    return;
+
+  self.m_feedDisp.markAsRead(entryHash, isRead);
+}
+FeedsDir.prototype.p_handleRemoteMarkAsRead = p_handleRemoteMarkAsRead;
 
 // object FeedsDir.p_saveCurrentFeed
 // Save current feed into m_saveXXX
@@ -762,6 +811,8 @@ FeedsDir.prototype.p_handleRecentlyViewedClick = p_handleRecentlyViewedClick;
 
 // object FeedsDir.p_feedView
 // Display a feed with buttons for Subscribe
+// Feed is fetched directly from the web site not from indexedDB
+// (it is a preview for subscription action by user)
 function p_feedView(newUrl)
 {
   var self = this;
@@ -1009,6 +1060,7 @@ function p_completeUnsubscription()
   // The unsubscribed was also the current: no longer
   self.m_currentFeed = null;
   self.m_currentFeedName = null;
+  self.m_currentFeedEntries = null;
 }
 FeedsDir.prototype.p_completeUnsubscription = p_completeUnsubscription;
 
@@ -1061,6 +1113,53 @@ function p_feedIsCurrent(f)
   return true;
 }
 FeedsDir.prototype.p_feedIsCurrent = p_feedIsCurrent;
+
+// object FeedsDir.p_mapRssEntries
+// Store the hashes of all entries
+// This is used for quick check if an entry, referenced by its hash,
+// is currently on display
+function p_mapRssEntries(entries)
+{
+  var self = this;
+
+  self.m_currentFeedEntries = null;  // empty the map
+  self.m_currentFeedEntries = {};
+
+  var k = 0;
+  var h = 0;
+  var rssEntry = null;
+  var rssurl_hash = null;
+  for (k = 0; k < entries.length; ++k)
+  {
+    rssEntry = entries[k];
+    h = rssEntry.m_rssurl_date.indexOf('_');
+    utils_ns.assert(h >= 0, "p_mapRssEntries: invalid rssurl_date hash");
+    rssurl_hash = rssEntry.m_rssurl_date.slice(0, h);
+
+    self.m_currentFeedEntries[rssEntry.m_hash] = rssurl_hash;
+  }
+}
+FeedsDir.prototype.p_mapRssEntries = p_mapRssEntries;
+
+// object FeedsDir.p_isEntryOnDisplay
+// Checks if certain rss entry is currently on display
+// Returns: null of entry is not on display
+// Retrurns: rss_feed_hash is entry is currently on display
+function p_isEntryOnDisplay(entry_hash)
+{
+  var self = this;
+
+  if (self.m_currentFeedEntries == null)
+    return null;
+
+  var rssFeedHash = self.m_currentFeedEntries[entry_hash];
+
+  if (rssFeedHash === undefined)
+    return null;
+
+  return rssFeedHash;
+}
+FeedsDir.prototype.p_isEntryOnDisplay = p_isEntryOnDisplay;
 
 // object FeedsDir.p_displayFeedAndTitle
 // Helper function for p_putCurrentFeed()
@@ -1118,6 +1217,9 @@ function p_displayFeedAndTitle(f, entries)
 
   // Display the RSS items, set dispContext for it
   self.m_feedDisp.feedDisplay(entries, f.m_dispContext);
+
+  // Prepare the reverse map[rss_entry_hash] = rss_feed_hash
+  self.p_mapRssEntries(entries);
 
   // Display number of unread on the left pane (feeds directory)
   self.p_displayFeedsList();
@@ -1628,7 +1730,7 @@ function p_updateFeeds(updates)
       // New content for this feed
       // TODO: check what changed, flag that the feed changed
       // self.m_feeds[key] = v;
-      log.info("possible new content");
+      log.trace("possible new content");
     }
   }
 }

@@ -21,6 +21,14 @@ if (typeof feeds_ns === 'undefined')
 {
 "use strict";
 
+var RssSyncState =
+{
+  IS_SYNCED: 0,
+  IS_REMOTE_ONLY: 1,
+  IS_LOCAL_ONLY: 2,
+  IS_PENDING_SYNC: 3
+}
+
 // object RssEntry [constructor]
 function RssEntry(title, link, description, updated, id)
 {
@@ -29,14 +37,25 @@ function RssEntry(title, link, description, updated, id)
   this.m_description = description;
   this.m_date = updated;
   this.m_id = id;
+
+  // meta (stored in db)
   // m_hash: key in database
   this.m_hash = this.p_calcHash();
   // m_rssurl_date: compounded index in database = hash or RSSHeader url + m_date
   this.m_rssurl_date = '';  // computed before recorded in database
   this.m_is_read = false;
-  // meta
+  this.m_remote_state = RssSyncState.IS_LOCAL_ONLY;
+  this.m_remote_id = '';  // This ID is created by remote table DB manager
+
+  // meta (stored in db)
   this.x_header = null; // back-ref to header
   return this;
+}
+
+// Object RssEntry.emptyRssEntry [factory]
+function emptyRssEntry()
+{
+  return new RssEntry(null, null, null, null, null);
 }
 
 // object RssEntry.copyRssEntry [constructor]
@@ -46,6 +65,8 @@ function copyRssEntry(from)
   x.m_hash = from.m_hash;
   x.m_rssurl_date = from.m_rssurl_date;
   x.m_is_read = from.m_is_read;
+  x.m_remote_state = from.m_remote_state;
+  x.m_remote_id = from.m_remote_id;
   return x;
 }
 
@@ -67,8 +88,15 @@ function RssHeader(url, title, link, description, language, updated)
   this.m_rss_type = '';  // RSS or Atom
   this.m_rss_version = '';
 
-  var sha1 = CryptoJS.SHA1(url);
-  this.m_hash = sha1.toString();
+  // meta (stored in db)
+  this.m_hash = null;
+  if (url != null)
+  {
+    var sha1 = CryptoJS.SHA1(url);
+    this.m_hash = sha1.toString();
+  }
+  this.m_remote_state = RssSyncState.IS_LOCAL_ONLY;
+  this.m_remote_id = '';  // This ID is created by remote table DB manager
 
   // meta (not stored in db)
   // x_items are extacted from database or fetched from the source web site
@@ -78,7 +106,7 @@ function RssHeader(url, title, link, description, language, updated)
   return this;
 }
 
-// object RssHeader.emptyRssHeader [constructor]
+// object RssHeader.emptyRssHeader [factory]
 function emptyRssHeader()
 {
   return new RssHeader(null /*url*/, null /*title*/,
@@ -95,6 +123,7 @@ function copyRssHeader(from)
   x.m_is_unsubscribed = from.m_is_unsubscribed;
   x.m_rss_type = from.m_rss_type;
   x.m_rss_version = from.m_rss_version;
+  x.m_remote_state = from.m_remote_state;
 
   return x;
 }
@@ -114,11 +143,15 @@ function p_calcHash()
 {
   var self = this;
 
+  if (self.m_title == null && self.m_description == null &&
+      self.m_link == null && self.m_date == null)
+    return null;
+
   var component1 = self.m_title;
   if (component1.length == 0)
     component1 = self.m_description;
 
-  var joined = [component1, self.m_link, utils_ns.dateToStr(self.m_date)].join('');
+  var joined = [component1, self.m_link, utils_ns.dateToStrStrict(self.m_date)].join('');
   var sha1 = CryptoJS.SHA1(joined);
 
   return sha1.toString();
@@ -209,7 +242,11 @@ function parseRss10(xmlStr)
   var href = getHrefField(channel, 'link', null);
   if (link.length == 0)
     link = href;
-  var description = getField(channel, 'description:first', errorsHeader);
+  var description = getField(channel, 'encoded', null);  // content:encoded
+  if (description.length == 0)
+    description = getField(channel, 'description:first', null);
+  if (description.length == 0)
+    description = getField(channel, 'description', null);
   var language = getField(channel, 'language:first', errorsHeader);
   var strTime = getField(channel, 'lastBuildDate:first', null);
   if (strTime.length == 0)
@@ -390,7 +427,9 @@ function fetchRss(urlRss, cb)
 }
 
 // export to feeds_ns namespace
+feeds_ns.RssSyncState = RssSyncState;
 feeds_ns.RssEntry = RssEntry;
+feeds_ns.emptyRssEntry = emptyRssEntry;
 feeds_ns.copyRssEntry = copyRssEntry;
 feeds_ns.RssHeader = RssHeader;
 feeds_ns.emptyRssHeader = emptyRssHeader;
