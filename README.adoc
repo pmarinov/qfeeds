@@ -1,8 +1,7 @@
-= RRSS
 :freesoftware: http://www.gnu.org/philosophy/free-sw.html
 :screenshot1: https://dl.dropboxusercontent.com/s/tmzbqb97atmcjst/rrss_feed1.png
 
-== RRSS
+== rrss
 
 _R is a reader of RSS feeds_
 
@@ -12,23 +11,23 @@ Screenshots::
 
 Features::
 
-* RRSS is an RSS reader
+* 'rrss' is an RSS reader
 * It operates in a standalone mode as a web browser extension (Google
   Chrome)
 * Local storage is used to keep feed subscriptions and metadata
   (IndexedDB)
 * It displays feeds alone or grouped into folders
-* [Planned] It uses Dropbox, optionally, for synchronization between
+* It uses Dropbox, optionally, for synchronization between
   computers (list of subscriptions and what was marked as read)
 
 
 == License
 
-RRSS is {freesoftware}[free software], it is distributed under the
-terms of the BSD License.
+'rrss' is {freesoftware}[free software], distributed under the terms
+of the BSD License.
 
-Copyright (c) 2014, Peter Marinov and Contributors. All rights reserved.
-see LICENSE.txt, see CONTRIBUTORS.txt
+Copyright (c) 2014, Peter Marinov and Contributors. All rights reserved. +
+See LICENSE.txt, see CONTRIBUTORS.txt
 
 
 == Install for development

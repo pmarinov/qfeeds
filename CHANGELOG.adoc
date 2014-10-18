@@ -1,6 +1,11 @@
-CHANGELOG.txt, RRSS - R is a reader of RSS feeds
-------------------------------------------------
+CHANGELOG.txt, 'rrss' - R is a reader of RSS feeds
+--------------------------------------------------
 
+
+=== 2014-10-18, v0.3.0.0, pmarinov
+
+* Dropbox syncronization for list of RSS subscriptions and
+  state of entries marked as read
 
 === 2014-07-12, v0.2.0.0, pmarinov
 

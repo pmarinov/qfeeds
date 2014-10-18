@@ -1,9 +1,9 @@
-LICENSE.txt, RRSS - R is a reader of RSS feeds
-----------------------------------------------
+LICENSE.txt, 'rrss' - R is a reader of RSS feeds
+------------------------------------------------
 
 
-This software is distributed under the terms of the BSD License. Find
-the list of contributors in CONTRIBUTORS.txt
+This is free software, distributed under the terms of the BSD
+License. Find the list of contributors in CONTRIBUTORS.txt
 
 
 The BSD License

@@ -3,7 +3,7 @@
 
 "name": "rrss",
 "description": "R is a reader of RSS feeds",
-"version": "0.0.1",
+"version": "0.3.0",
 
 "icons": { "128": "chrome/icon_rss.png" },
 
