@@ -31,11 +31,12 @@
   <script src="feeds.js" type="text/javascript"></script>
   <script src="feeds_dir.js" type="text/javascript"></script>
   <script src="feed_disp.js" type="text/javascript"></script>
+  <script src="feeds_import.js" type="text/javascript"></script>
   <script src="app.js" type="text/javascript"></script>
 </head>
 <body>
   <div class="container-fluid">
-  <div class="row">
+  <div class="row" style="cursor: default;">
   <div class="col-sm-3 col-md-3 left_pane" id="xleft_pane">
     <!--Sidebar content-->
     <!-- Section: Feeds -->
@@ -71,6 +72,32 @@
     </div>  <!-- .view #xfeeds_list -->
     </div>  <!-- #xcmd_pane_feeds_dir -->
 
+    <!-- Section: Menu for feeds related operations -->
+    <div class="submenu_entry_holder" style="height: 100%; margin-top: 5px;">
+      <span class="indent1"></span>
+      <span class="submenu_entry_inline disabled" id="ximport_opml"
+            title="Import OPML">
+        Import
+      </span>
+      <span>&nbsp;&nbsp;&#8226&nbsp;&nbsp;</span>
+      <span class="submenu_entry_inline disabled" id="xexport_opml"
+            title="Export OPML [not yet implemented]">
+        Export
+      </span>
+      <!--
+      <span>&nbsp;&nbsp;&#8226&nbsp;&nbsp;</span>
+      <span class="submenu_entry_inline disabled" id="xexport_opml"
+            title="Save complete state to a file [not yet implemented]">
+        Backup
+      </span>
+      <span>&nbsp;&nbsp;&#8226&nbsp;&nbsp;</span>
+      <span class="submenu_entry_inline disabled" id="xexport_opml"
+            title="Restore complete state from a file [not yet implemented]">
+        Restore
+      </span>
+      -->
+    </div>  <!-- Feeds Actions area -->
+
     <!-- Section: Persistency -->
     <div class="submenu_title_holder submenu_title_top_sep" style="height: 100%">
       <span class="indent1"></span>
@@ -83,8 +110,8 @@
     </div>  <!-- Title: PERSISTENCY + progress bar -->
     <div class="submenu_entry_holder" style="height: 100%">
       <span class="indent1"></span>
-      <span class="submenu_entry" id="xdropbox">Logon</span>
-      <div><i id="xdropbox_user"></i></div>
+      <span class="submenu_entry_inline" id="xdropbox">Logon</span>
+      <span><i id="xdropbox_user"></i></span>
     </div>
 
     <!-- Section: Settings -->
@@ -94,7 +121,7 @@
     </div>
     <div id="xcmd_pane_settings" class="submenu_entry_holder">
       <span class="indent1"></span>
-      <span class="submenu_entry" style="color: gray" title="Disabled">Settings</span>
+      <span class="submenu_entry disabled" title="[not yet implemented]">Settings</span>
     </div>  <!-- #xcmd_pane_settings -->
     <div id="xcmd_pane_about" class="submenu_entry_holder">
       <span class="indent1"></span>
@@ -369,6 +396,87 @@
     <div class='clearfix'>
     </div>
     </div> <!-- #xdisp_pane_feeds -->
+
+    <!-- IMPORT OPML screens -->
+    <div id='xdisp_pane_import_opml' class='hide'>
+      <div id='ximport_opml_step1_input_file'>
+        IMPORT<br/>
+        Select an OPML file
+        <input type='file' id='ximport_input_opml_file'/>
+        <div class='hide' id='xdisp_opml_import_status'>
+        </div>
+      </div>  <!-- #ximport_opml_step1_input_file -->
+      <div id='ximport_opml_step2_display_file'>
+        <!-- List of OPML FOLDERS AND RSS ENTRIES -->
+        <div id='opml_title' class='title'>
+          OPML title
+        </div>
+        <div id='xopml_empty' class='empty hide'>
+          (none)
+        </div>
+
+        <!-- Top line checkbox 'All' -->
+        <div class='opmlvw_bar'>
+          <span class='pull-left' style='width: 100%'>
+            <span class='checkbox_elem bar_elem pull-left'>
+              <input type='checkbox' class='xopml_chkbox_all2' checked/>
+            </span>
+            <span class='title_source bar_elem pull-left'>
+              <span>
+              All
+              </span>
+            </span>
+          </span>
+        </div>
+
+        <!-- List of OPML folders and RSS entries -->
+        <div id='xopml_list'>
+          <div class='xopml_entry hide'>  <!-- entry could be a folder or an rss feed entry -->
+            <div class='xopml_folder opmlvw_folder_bar'>
+                <span class='xopml_folder_name opml_folder pull-left'>
+                  bagehot
+                </span>
+            </div>  <!-- .xopml_folder -->
+            <div class='xopml_feed_entry opmlvw_bar'>
+              <!-- First the fixed width stuff on the right-hand edge of the bar -->
+              <span class='pull-left' style='width: 100%'>
+                <span class='xopml_title_checkbox checkbox_elem bar_elem pull-left'>
+                  <input type='checkbox' class='xopml_checkbox' checked disabled/>
+                </span>
+                <!-- Title source is fixed width -->
+                <span class='xopml_title_source title_source bar_elem pull-left'>
+                  <span>
+                  FT.com - Martin Wolf (top columnist)
+                  </span>
+                </span>
+                <!-- The remaining space is for title:snippet -->
+                <span class='xopml_url title_url bar_elem pull-left'>
+                  http://www.ft.com/rss/comment/columnist/martinwolf
+                </span>
+                <span class='xopml_subscribed subscribed_label bar_elem pull-right hide'>
+                  [subscribed]
+                </span>
+              </span>
+            </div>  <!-- #xopml_feed_entry -->
+          </div>  <!-- .xopml_entry -->
+        </div>  <!-- #xopml_list -->
+
+        <!-- Bottom line checkbox 'All' -->
+        <div class='opmlvw_bar'>
+          <span class='pull-left' style='width: 100%'>
+            <span class='checkbox_elem bar_elem pull-left'>
+              <input type='checkbox' id='xopml_chkbox_all2' checked/>
+            </span>
+            <span class='title_source bar_elem pull-left'>
+              <span>
+              All
+              </span>
+            </span>
+          </span>
+        </div>
+
+      </div>  <!-- #ximport_opml_step2_display_file -->
+    </div>  <!-- #xdisp_pane_import_opml -->
 
     <!-- About screen display -->
     <div id='xdisp_pane_about' class='hide'>

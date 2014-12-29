@@ -21,12 +21,13 @@ if (typeof feeds_ns === 'undefined')
 
 // object FeedsDir.FeedsDir [constructor]
 // Instantiate one per application
-function FeedsDir($dirPanel, feedDisp)
+function FeedsDir($dirPanel, feedDisp, panelMng)
 {
   var self = this;
 
   self.m_feedsDB = null;
   self.m_feedDisp = feedDisp;
+  self.m_panelMng = panelMng;
   var dispCB = self.p_getDispCBHandlers();
   self.m_feedDisp.setCBHandlers(dispCB);
 
@@ -106,6 +107,8 @@ function FeedsDir($dirPanel, feedDisp)
 
   self.m_newFolder = null;
 
+  Object.preventExtensions(this);
+
   return this;
 }
 
@@ -123,6 +126,15 @@ function remoteStoreDisconnected()
   var self = this;
 }
 FeedsDir.prototype.remoteStoreDisconnected = remoteStoreDisconnected;
+
+// object FeedsDir.getFeedsDbObj
+function getFeedsDbObj()
+{
+  var self = this;
+
+  return this.m_feedsDB;
+}
+FeedsDir.prototype.getFeedsDbObj = getFeedsDbObj;
 
 // object FeedsDir.p_setFeedsDomHandlers
 // Attach handlers to various DOM events related to FeedsDir screen area
@@ -284,6 +296,7 @@ function p_getFeedsCBHandlers()
             self.p_activateDirEntry(0);
           };
           self.$d.areaLoadingMsg.toggleClass('hide', true);
+          self.m_panelMng.enableMenuEntry('ximport_opml', true);
         },
 
     onRssUpdated: function(updates)
@@ -1837,8 +1850,6 @@ function p_displayFeedsList()
   {
     folder = self.m_folders[i];
 
-    keys = Object.keys(self.m_feeds);
-
     // Count number of feeds in this folder
     inFolder = 0;
     for (j = 0; j < keys.length; ++j)
@@ -1877,7 +1888,6 @@ function p_displayFeedsList()
   }
 
   // Add all feeds that are untagged
-  keys = Object.keys(self.m_feeds);
   for (j = 0; j < keys.length; ++j)
   {
     key = keys[j];
@@ -1994,7 +2004,6 @@ function p_displayFeedsList()
   // Collapse all unused entries in self.$d.list
   for (; i < self.$d.list.length; ++i)
   {
-    x = self.m_displayList[i];
     $e = $(self.$d.list[i]);
     $e.toggleClass('hide', true);
   }

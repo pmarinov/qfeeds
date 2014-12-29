@@ -689,7 +689,7 @@ function compareRssHeadersByUrl(feed1, feed2)
 }
 
 // object Feeds.p_feedAdd
-// add a feed (RSSHeader) to list of feeds, start the fetch pump loop
+// add a feed (RSSHeader) to list of feeds, fetch the RSS for this feed
 function p_feedAdd(newFeed, cbDone, syncRTable)
 {
   var self = this;
@@ -855,7 +855,7 @@ function p_feedRecord(feed, syncRTable, cbResult)
 Feeds.prototype.p_feedRecord = p_feedRecord;
 
 // object Feeds.feedAddByUrl
-// add a new feed (by URL) to list of feeds, start the fetch pump loop (via p_feedAdd)
+// add a new feed (by URL) to list of feeds
 function feedAddByUrl(feedUrl, cbDone)
 {
   var self = this;
@@ -1584,7 +1584,6 @@ Feeds.prototype.feedReadEntries = feedReadEntries;
 
 // object Feeds.feedGetList
 // return a list of all feeds
-// TODO: remove, this is no longer used outside Feeds
 function feedGetList()
 {
   var self = this;
@@ -1598,6 +1597,23 @@ function feedGetList()
   return feedsList;
 }
 Feeds.prototype.feedGetList = feedGetList;
+
+// object Feeds.feedListSearch
+// Finds if entry with certain feed URL is in the list
+// (Performs a binary search)
+// Returns: index in the list, negative = not found
+function feedListSearch(feedUrl)
+{
+  var self = this;
+
+  var targetFeed = feeds_ns.emptyRssHeader();
+  targetFeed.m_url = feedUrl;
+
+  // Find point into the sorted m_rssFeeds[]
+  var m = self.m_rssFeeds.binarySearch(targetFeed, compareRssHeadersByUrl);
+  return m;
+}
+Feeds.prototype.feedListSearch = feedListSearch;
 
 // object Feeds.feedGetTagsList
 // return a list of all tags on feeds
