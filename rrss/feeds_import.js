@@ -25,15 +25,21 @@ function FeedsImport(feedsDB)
   var listContainer1 = utils_ns.domFind('#xopml_list');
 
   self.m_feedsDB = feedsDB;
+  self.m_opmlFeeds = null;  // Array of FeedEntry, after parsing of OPML xml
 
   self.$d =
   {
     opmlTitle: utils_ns.domFind('#opml_title'),
+    opmlTotal: utils_ns.domFind('#opml_total'),
     entryImportOpml: utils_ns.domFind('#ximport_opml'),
     inputOpmlFile: utils_ns.domFind('#ximport_input_opml_file'),
     sectionDisplayOpml: utils_ns.domFind('#ximport_opml_step2_display_file'),
     listContainer: listContainer1,
-    list: utils_ns.domFindInside(listContainer1, '.xopml_entry', -1)
+    list: utils_ns.domFindInside(listContainer1, '.xopml_entry', -1),
+    btnAll1: utils_ns.domFind('#xopml_all1', -1),
+    btnAll2: utils_ns.domFind('#xopml_all2', -1),
+    btnNone1: utils_ns.domFind('#xopml_none1', -1),
+    btnNone2: utils_ns.domFind('#xopml_none2', -1)
   };
 
   // Check for the various File API support.
@@ -46,6 +52,26 @@ function FeedsImport(feedsDB)
       {
         var f = this.files[0]
         self.handleOPMLFile(f);
+      });
+
+  self.$d.btnAll1.on('click', function ()
+      {
+        self.selectAllEntries();
+      });
+
+  self.$d.btnAll2.on('click', function ()
+      {
+        self.selectAllEntries();
+      });
+
+  self.$d.btnNone1.on('click', function ()
+      {
+        self.deselectAllEntries();
+      });
+
+  self.$d.btnNone2.on('click', function ()
+      {
+        self.deselectAllEntries();
       });
 
   return this;
@@ -70,6 +96,7 @@ function FeedEntry(folder, feedUrl, feedSiteUrl, feedTitle)
   }
 
   this.m_alreadySubscribed = false;
+  this.m_selected = true;
 
   // Help strict mode detect misstyped fields
   Object.preventExtensions(this);
@@ -207,17 +234,86 @@ function parseOPML($opml, cbSetTitle)
 }
 FeedsImport.prototype.parseOPML = parseOPML;
 
+// object FeedsImport.selectAllEntries
+// Handle action of button "All" -- select all entries
+function selectAllEntries()
+{
+  var self = this;
+
+  var i = 0;
+  var x = null;
+  var $e = null;
+  var $rssEntry = null;
+  var $checkbox = null;
+  for (i = 0; i < self.m_opmlFeeds.length; ++i)
+  {
+    x = self.m_opmlFeeds[i];
+    utils_ns.assert(x instanceof FeedEntry, 'opml: selectAllEntries: x instanceof FeedEntry');
+
+    if (x.m_isFolder)
+      continue;
+
+    if (x.m_alreadySubscribed)  // Disabled and checkbox is permanently OFF
+      continue;
+
+    $e = jQuery(self.$d.list[i]);
+
+    x.m_selected = true;
+
+    $rssEntry = utils_ns.domFindInside($e, '.xopml_feed_entry');
+    $checkbox = utils_ns.domFindInside($rssEntry, '.xopml_checkbox');
+    $checkbox.prop('checked', true);
+  }
+}
+FeedsImport.prototype.selectAllEntries = selectAllEntries;
+
+// object FeedsImport.deselectAllEntries
+// Handle action of button "None" -- deselect all entries
+function deselectAllEntries()
+{
+  var self = this;
+
+  var i = 0;
+  var x = null;
+  var $e = null;
+  var $rssEntry = null;
+  var $checkbox = null;
+  for (i = 0; i < self.m_opmlFeeds.length; ++i)
+  {
+    x = self.m_opmlFeeds[i];
+    utils_ns.assert(x instanceof FeedEntry, 'opml: deselectAllEntries: x instanceof FeedEntry');
+
+    if (x.m_isFolder)
+      continue;
+
+    if (x.m_alreadySubscribed)  // Disabled and checkbox is permanently OFF
+      continue;
+
+    $e = jQuery(self.$d.list[i]);
+
+    x.m_selected = false;
+
+    $rssEntry = utils_ns.domFindInside($e, '.xopml_feed_entry');
+    $checkbox = utils_ns.domFindInside($rssEntry, '.xopml_checkbox');
+    $checkbox.prop('checked', false);
+  }
+}
+FeedsImport.prototype.deselectAllEntries = deselectAllEntries;
+
 // object FeedsImport.displayOPML
-function displayOPML(opmlFeeds)
+//
+// It is called only once after parsing. All other actions manipulate
+// individual DOM elements.
+function displayOPML()
 {
   var self = this;
 
   var i = 0;
 
   // Can the domList accomodate all entries in opmlFeeds?
-  if (opmlFeeds.length > self.$d.list.length)
+  if (self.m_opmlFeeds.length > self.$d.list.length)
   {
-    var maxNew = opmlFeeds.length - self.$d.list.length;
+    var maxNew = self.m_opmlFeeds.length - self.$d.list.length;
     for (i = 0; i < maxNew; ++i)
       self.$d.listContainer.append($(self.$d.list[0]).clone());
   }
@@ -233,11 +329,13 @@ function displayOPML(opmlFeeds)
   var $rssEntry = null;
   var $title = null;
   var $rssUrl = null;
+  var $siteUrl = null;
   var $checkbox = null;
   var $labelSubscribed = null;
-  for (i = 0; i < opmlFeeds.length; ++i)
+  for (i = 0; i < self.m_opmlFeeds.length; ++i)
   {
-    x = opmlFeeds[i];
+    x = self.m_opmlFeeds[i];
+    utils_ns.assert(x instanceof FeedEntry, 'opml: displayOPML: x instanceof FeedEntry');
     $e = jQuery(self.$d.list[i]);
 
     $e.toggleClass('hide', false);  // Make sure entry is not hidden
@@ -256,11 +354,13 @@ function displayOPML(opmlFeeds)
     {
       $title = utils_ns.domFindInside($rssEntry, '.xopml_title_source');
       $rssUrl = utils_ns.domFindInside($rssEntry, '.xopml_url');
+      $siteUrl = utils_ns.domFindInside($rssEntry, '.xopml_site_url');
       $checkbox = utils_ns.domFindInside($rssEntry, '.xopml_checkbox');
       $labelSubscribed = utils_ns.domFindInside($rssEntry, '.xopml_subscribed');
 
       $title.text(x.m_feedTitle);
       $rssUrl.text(x.m_feedUrl);
+      $siteUrl.attr('href', x.m_feedSiteUrl);
 
       $folder.toggleClass('hide', true);
       $rssEntry.toggleClass('hide', false);
@@ -273,6 +373,8 @@ function displayOPML(opmlFeeds)
         $checkbox.prop('checked', false);
         $checkbox.prop('disabled', true);
         $labelSubscribed.toggleClass('hide', false); // Show '[subscribed]'
+        x.m_selected = false;
+        x.m_alreadySubscribed = true;
       }
       else
       {
@@ -330,13 +432,15 @@ function handleOPMLFile(file)
           if (version != '1.0')
             alert('unsupported version of opml: ' + version);
 
-          var opmlFeeds = self.parseOPML($opml, function(opmlTitle)
+          self.m_opmlFeeds = self.parseOPML($opml, function(opmlTitle)
               {
-                // Display title of OPML feed
+                // Display title of OPML feed (immediate action from
+                // parsing, no need to store it anywhere)
                 self.$d.opmlTitle.text(opmlTitle);
               });
 
-          self.displayOPML(opmlFeeds);
+          self.$d.opmlTotal.text(self.m_opmlFeeds.length + ' entries');
+          self.displayOPML();
         }
       };
 

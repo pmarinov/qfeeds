@@ -317,7 +317,7 @@
              href="http://www.ft.com/rss/comment/columnist/martinwolf"
              target="_blank">
           <img src="images/icon_arrow_goto.svg" alt="An awesome image" style="width: 25px"/>
-        </a>
+          </a>
         </span>
         <span class="xmarked_read read_unread icon bar_elem pull-right hide">
           <img src="images/icon_read.svg" class="icon_read" alt="marked read" title="Click to mark as unread"/>
@@ -411,22 +411,21 @@
         <div id='opml_title' class='title'>
           OPML title
         </div>
+        <div id='opml_total'>
+          0 entries
+        </div>
         <div id='xopml_empty' class='empty hide'>
           (none)
         </div>
 
-        <!-- Top line checkbox 'All' -->
-        <div class='opmlvw_bar'>
-          <span class='pull-left' style='width: 100%'>
-            <span class='checkbox_elem bar_elem pull-left'>
-              <input type='checkbox' class='xopml_chkbox_all2' checked/>
+        <!-- Top line buttons All/None -->
+        <div class='opmlvw_button_bar'>
+            <span class='btn_elem pull-left'>
+              <button type="button" id="xopml_all1" class="btn btn-sm" title="Select all items">All</button>
             </span>
-            <span class='title_source bar_elem pull-left'>
-              <span>
-              All
-              </span>
+            <span class='btn_elem pull-left'>
+              <button type="button" id="xopml_none1" class="btn btn-sm" title="Deselect all items">None</button>
             </span>
-          </span>
         </div>
 
         <!-- List of OPML folders and RSS entries -->
@@ -449,6 +448,13 @@
                   FT.com - Martin Wolf (top columnist)
                   </span>
                 </span>
+                <span class="bar_elem pull-left">
+                  <a class="xopml_site_url url icon"
+                     href="http://www.ft.com/rss/comment/columnist/martinwolf"
+                     target="_blank">
+                  <img src="images/icon_arrow_goto.svg" alt="An awesome image" style="width: 25px"/>
+                  </a>
+                </span>
                 <!-- The remaining space is for title:snippet -->
                 <span class='xopml_url title_url bar_elem pull-left'>
                   http://www.ft.com/rss/comment/columnist/martinwolf
@@ -461,18 +467,14 @@
           </div>  <!-- .xopml_entry -->
         </div>  <!-- #xopml_list -->
 
-        <!-- Bottom line checkbox 'All' -->
-        <div class='opmlvw_bar'>
-          <span class='pull-left' style='width: 100%'>
-            <span class='checkbox_elem bar_elem pull-left'>
-              <input type='checkbox' id='xopml_chkbox_all2' checked/>
+        <!-- Bottom line buttons All/None -->
+        <div class='opmlvw_button_bar'>
+            <span class='btn_elem pull-left'>
+              <button type="button" id="xopml_all2" class="btn btn-sm" title="Select all items">All</button>
             </span>
-            <span class='title_source bar_elem pull-left'>
-              <span>
-              All
-              </span>
+            <span class='btn_elem pull-left'>
+              <button type="button" id="xopml_none2" class="btn btn-sm" title="Deselect all items">None</button>
             </span>
-          </span>
         </div>
 
       </div>  <!-- #ximport_opml_step2_display_file -->

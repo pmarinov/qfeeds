@@ -585,6 +585,21 @@
   font-size: 85%;
 }
 
+.opmlvw_button_bar
+{
+  width: 100%;
+  height: 35px;
+  padding-top: 2px;
+  padding-left: 1px;
+  overflow: hidden;
+  border-bottom: 1px solid lightgray;
+}
+
+.opmlvw_button_bar .btn_elem
+{
+  padding-right: 5px;
+}
+
 .opmlvw_bar
 {
   width: 100%;
@@ -622,6 +637,17 @@
   text-overflow: ellipsis;
   width: 56%;
   padding-left: 4px;
+}
+
+.opmlvw_bar .icon
+{
+  opacity: 0.40;
+  width: 100%;
+}
+
+.opmlvw_bar .icon:hover
+{
+  opacity: 1.0;
 }
 
 .opmlvw_bar .subscribed_label
