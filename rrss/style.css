@@ -273,7 +273,7 @@
 .recent_container
 {
   padding-right: 15px;
-  padding-left: 15px;
+  /*padding-left: 15px;*/
 }
 
 .recent_container .title
@@ -570,6 +570,19 @@
     color: inherit;
     text-decoration: none;
     border-bottom: 1px dotted #BBB;
+}
+
+.opml_pane_area
+{
+  width: 100%;
+  float: left;
+  overflow: hidden;
+  padding-top: 12px;
+}
+
+#ximport_opml_step1_input_file .opml_error
+{
+  margin-top: 12px;
 }
 
 .opml_container

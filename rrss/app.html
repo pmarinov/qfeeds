@@ -159,16 +159,12 @@
 
     <div id='xadd_feed_area' class='add_feed_area hide'>
       <div style='font-weight: bold; font-size: 120%; margin-bottom: 12px;'>Add new:</div>
-      <div class='col-lg-6'>
       <div style='margin-top: 5px; margin-right: 6px; font-size: 85%;'>URL of an RSS feed:</div>
       <form id='xform_new_rss' class='pull-left' style="width: 100%; margin-bottom: 20px;">
         <input id='xfield_input_url' type='text' class='form-control pull-left' style='width: 60%; margin-right: 7px;'>
         <button type='submit' class='btn btn-sm add_btn_pos'>View</button>
         <button type='button' id='xform_cancel' class='btn btn-sm add_btn_pos'>Cancel</button>
       </form>
-      </div>
-      <div class="clearfix">
-      </div>
 
       <!-- List of RECENTLY VIEWED -->
       <div id='xrecent_container' class='recent_container'>
@@ -398,15 +394,18 @@
     </div> <!-- #xdisp_pane_feeds -->
 
     <!-- IMPORT OPML screens -->
-    <div id='xdisp_pane_import_opml' class='hide'>
-      <div id='ximport_opml_step1_input_file'>
-        IMPORT<br/>
-        Select an OPML file
-        <input type='file' id='ximport_input_opml_file'/>
-        <div class='hide' id='xdisp_opml_import_status'>
+    <div id='xdisp_pane_import_opml' class='opml_pane_area hide'>
+      <div style='font-weight: bold; font-size: 120%; margin-bottom: 12px;'>Import feeds via OPML</div>
+      <div id='ximport_opml_step1_input_file' class='hide'>
+        <div style='font-size: 85%' id='ximport_input_opml_file_area'>
+          Select an OPML file
+          <input type='file' id='ximport_input_opml_file'/>
+        </div>
+        <div class='alert alert-danger opml_error' role='alert' id='xopml_error1'>
+          OPML error:
         </div>
       </div>  <!-- #ximport_opml_step1_input_file -->
-      <div id='ximport_opml_step2_display_file'>
+      <div id='ximport_opml_step2_display_file' class='hide'>
         <!-- List of OPML FOLDERS AND RSS ENTRIES -->
         <div id='opml_title' class='title'>
           OPML title

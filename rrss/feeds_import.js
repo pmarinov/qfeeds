@@ -29,10 +29,14 @@ function FeedsImport(feedsDB)
 
   self.$d =
   {
+    opmlStep1: utils_ns.domFind('#ximport_opml_step1_input_file'),
+    opmlStep2: utils_ns.domFind('#ximport_opml_step2_display_file'),
     opmlTitle: utils_ns.domFind('#opml_title'),
     opmlTotal: utils_ns.domFind('#opml_total'),
+    opmlError1: utils_ns.domFind('#xopml_error1'),
     entryImportOpml: utils_ns.domFind('#ximport_opml'),
     inputOpmlFile: utils_ns.domFind('#ximport_input_opml_file'),
+    inputOpmlFileArea: utils_ns.domFind('#ximport_input_opml_file_area'),
     sectionDisplayOpml: utils_ns.domFind('#ximport_opml_step2_display_file'),
     listContainer: listContainer1,
     list: utils_ns.domFindInside(listContainer1, '.xopml_entry', -1),
@@ -41,12 +45,6 @@ function FeedsImport(feedsDB)
     btnNone1: utils_ns.domFind('#xopml_none1', -1),
     btnNone2: utils_ns.domFind('#xopml_none2', -1)
   };
-
-  // Check for the various File API support.
-  if (!(window.File && window.FileReader && window.FileList && window.Blob))
-  {
-    alert('The File APIs are not fully supported in this browser.');
-  }
 
   self.$d.inputOpmlFile.on('change', function()
       {
@@ -76,6 +74,27 @@ function FeedsImport(feedsDB)
 
   return this;
 }
+
+// Object FeedEntry.clearInputField
+function clearInputField()
+{
+  var self = this;
+
+  self.$d.inputOpmlFile.val('');  // Clear the file name
+  self.$d.opmlError1.toggleClass('hide', true); // Hide the error msg area
+}
+FeedsImport.prototype.clearInputField = clearInputField;
+
+// Object FeedEntry.showError1
+// Show error for step 1
+function showError1(msg)
+{
+  var self = this;
+
+  self.$d.opmlError1.text(msg); // Hide the error msg area
+  self.$d.opmlError1.toggleClass('hide', false); // Show the error msg area
+}
+FeedsImport.prototype.showError1 = showError1;
 
 // Object FeedEntry.FeedEntry [constructor]
 function FeedEntry(folder, feedUrl, feedSiteUrl, feedTitle)
@@ -439,6 +458,12 @@ function handleOPMLFile(file)
                 self.$d.opmlTitle.text(opmlTitle);
               });
 
+          // Activate area for step2 -- preview and selection of feeds
+          // from the OPML file
+          self.$d.opmlStep1.toggleClass('hide', true);
+          self.$d.opmlStep2.toggleClass('hide', false);
+
+          // Display the entries
           self.$d.opmlTotal.text(self.m_opmlFeeds.length + ' entries');
           self.displayOPML();
         }
@@ -463,6 +488,19 @@ function onFocusImportOpml()
   var self = this;
 
   self.$d.entryImportOpml.toggleClass('selected', true);
+
+  // Activate pane for step 1 (Select an OPML file)
+  self.clearInputField();  // Clear in case there is anything from previous input
+
+  // Check for the various File API support.
+  if (!(window.File && window.FileReader && window.FileList && window.Blob))
+  {
+    self.showError1('Generic: The File APIs are not fully supported in this browser.');
+    self.$d.inputOpmlFileArea.toggleClass('hide', true);  // Hide the input
+  }
+
+  self.$d.opmlStep1.toggleClass('hide', false);
+  self.$d.opmlStep2.toggleClass('hide', true);
 }
 FeedsImport.prototype.onFocus = onFocusImportOpml;
 
