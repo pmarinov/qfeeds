@@ -398,11 +398,10 @@
       <div style='font-weight: bold; font-size: 120%; margin-bottom: 12px;'>Import feeds via OPML</div>
       <div id='ximport_opml_step1_input_file' class='hide'>
         <div style='font-size: 85%' id='ximport_input_opml_file_area'>
-          Select an OPML file
+          Select an OPML file to see a preview
           <input type='file' id='ximport_input_opml_file'/>
         </div>
         <div class='alert alert-danger opml_error' role='alert' id='xopml_error1'>
-          OPML error:
         </div>
       </div>  <!-- #ximport_opml_step1_input_file -->
       <div id='ximport_opml_step2_display_file' class='hide'>
@@ -410,20 +409,41 @@
         <div id='opml_title' class='title'>
           OPML title
         </div>
-        <div id='opml_total'>
+        <div id='opml_total' class='total'>
           0 entries
         </div>
-        <div id='xopml_empty' class='empty hide'>
-          (none)
+        <div class='alert alert-warning alert-dismissible opml_warning' role='alert' id='xopml_warning2'>
+          <button type='button' class='close'>
+            <span>&times;</span>
+          </button>
+          <div id='xopml_warning2_text'>OPML warning:</div>
+          <button id='xopml_show_error_details' type='button' class='btn btn-sm'>
+            Details
+          </button>
+          <div id='xopml_error_details' class='hide' style='padding-top: 10px'>
+            <div class='xopml_error_entry'>
+              <div class='xopml_error_title'>
+              </div>
+              <div class='xopml_error_info' style='font-style: italic'>
+              </div>
+              <br/>
+            </div>
+          </div>
         </div>
 
         <!-- Top line buttons All/None -->
         <div class='opmlvw_button_bar'>
             <span class='btn_elem pull-left'>
-              <button type="button" id="xopml_all1" class="btn btn-sm" title="Select all items">All</button>
+              <button type='button' id='xopml_all1' class='btn btn-sm' title='Select all items'>All</button>
             </span>
             <span class='btn_elem pull-left'>
-              <button type="button" id="xopml_none1" class="btn btn-sm" title="Deselect all items">None</button>
+              <button type='button' id='xopml_none1' class='btn btn-sm' title='Deselect all items'>None</button>
+            </span>
+            <span class='btn_elem pull-right'>
+              <button type='button' id='xopml_cancel' class='btn btn-sm' title='Close the preview'>Cancel</button>
+            </span>
+            <span class='btn_elem pull-right'>
+              <button type='button' id='xopml_import' class='btn btn-sm' title='Import the selected items'>Import</button>
             </span>
         </div>
 
@@ -447,12 +467,14 @@
                   FT.com - Martin Wolf (top columnist)
                   </span>
                 </span>
-                <span class="bar_elem pull-left">
-                  <a class="xopml_site_url url icon"
-                     href="http://www.ft.com/rss/comment/columnist/martinwolf"
-                     target="_blank">
-                  <img src="images/icon_arrow_goto.svg" alt="An awesome image" style="width: 25px"/>
+                <span class='xsite_icon_holder bar_elem pull-left hide'>
+                  <a class='xopml_site_url url icon'
+                     href='http://www.ft.com/rss/comment/columnist/martinwolf'
+                     target='_blank'>
+                  <img src='images/icon_arrow_goto.svg' alt='An awesome image' style='width: 25px'/>
                   </a>
+                </span>
+                <span class='xsite_icon_empty bar_elem pull-left hide' style='width: 25px'>
                 </span>
                 <!-- The remaining space is for title:snippet -->
                 <span class='xopml_url title_url bar_elem pull-left'>
@@ -469,10 +491,10 @@
         <!-- Bottom line buttons All/None -->
         <div class='opmlvw_button_bar'>
             <span class='btn_elem pull-left'>
-              <button type="button" id="xopml_all2" class="btn btn-sm" title="Select all items">All</button>
+              <button type='button' id='xopml_all2' class='btn btn-sm' title='Select all items'>All</button>
             </span>
             <span class='btn_elem pull-left'>
-              <button type="button" id="xopml_none2" class="btn btn-sm" title="Deselect all items">None</button>
+              <button type='button' id='xopml_none2' class='btn btn-sm' title='Deselect all items'>None</button>
             </span>
         </div>
 
@@ -599,7 +621,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       </div>
       <br/>
       <div>
-        Libraries:
+        Libraries
       </div>
       <div>
         <span>
@@ -618,6 +640,18 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
           <a href="https://github.com/pimterry/loglevel" target="_blank" class="pull-left">loglevel</a>
         </span>
         <span class="pull-left" style="margin-right: 5px; margin-left: 2px;"> MIT</span>
+      </div>
+      <hr/>
+      <div>
+        Colophon
+      </div>
+      <div>
+        <span>
+          <a href="http://www.gnu.org/software/emacs" target="_blank" class="pull-left">GNU Emacs</a>,
+          <i>"Free as in Freedom"</i>
+        </span>
+      <br/>
+      <br/>
       </div>
 
       </div>  <!-- font-size: 95% -->

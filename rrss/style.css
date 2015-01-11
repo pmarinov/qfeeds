@@ -585,6 +585,16 @@
   margin-top: 12px;
 }
 
+#ximport_opml_step2_display_file .total
+{
+  padding-bottom: 15px;
+}
+
+#ximport_opml_step2_display_file .opml_warning
+{
+  margin-top: 12px;
+}
+
 .opml_container
 {
   padding-right: 15px;

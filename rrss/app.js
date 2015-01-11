@@ -24,11 +24,14 @@ function App()
   // Override previous handler.
   window.onerror = function(errorMsg, url, lineNumber)
       {
+        var stripRe = new RegExp('(chrome-extension:..[a-z]*\/)(.*)');
+        var strippedUrl = url.replace(stripRe, '$2');
         alert('Unfortunatelly the program "rrss" crashed.\n' +
-              'Plase consider making a bug report together with this information.\n\n' +
+              'Plase consider making a bug report together with this information.\n' +
+              '------\n\n' +
               errorMsg +
               '\n\n' +
-              'source file: ' + url + '\n' +
+              'source file: ' + strippedUrl + '\n' +
               'line: ' + lineNumber);
 
         if (self.m_oldOnError)  // Call previous handler

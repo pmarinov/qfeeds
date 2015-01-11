@@ -23,9 +23,11 @@ function FeedsImport(feedsDB)
   var self = this;
 
   var listContainer1 = utils_ns.domFind('#xopml_list');
+  var opmlWarning2TextDetailedContainer = utils_ns.domFind('#xopml_error_details');
 
   self.m_feedsDB = feedsDB;
   self.m_opmlFeeds = null;  // Array of FeedEntry, after parsing of OPML xml
+  self.m_parsingErrorMsgs = [];  // Parsing errors text, array if OPMLError
 
   self.$d =
   {
@@ -37,14 +39,23 @@ function FeedsImport(feedsDB)
     entryImportOpml: utils_ns.domFind('#ximport_opml'),
     inputOpmlFile: utils_ns.domFind('#ximport_input_opml_file'),
     inputOpmlFileArea: utils_ns.domFind('#ximport_input_opml_file_area'),
+    opmlWarning2: utils_ns.domFind('#xopml_warning2'),
+    opmlWarning2Text: utils_ns.domFind('#xopml_warning2_text'),
+    opmlWarning2TextDetailed: opmlWarning2TextDetailedContainer,
+    buttonErrorDetails: utils_ns.domFind('#xopml_show_error_details'),
+    errorsList: utils_ns.domFindInside(opmlWarning2TextDetailedContainer, '.xopml_error_entry', -1),
     sectionDisplayOpml: utils_ns.domFind('#ximport_opml_step2_display_file'),
     listContainer: listContainer1,
     list: utils_ns.domFindInside(listContainer1, '.xopml_entry', -1),
     btnAll1: utils_ns.domFind('#xopml_all1', -1),
     btnAll2: utils_ns.domFind('#xopml_all2', -1),
     btnNone1: utils_ns.domFind('#xopml_none1', -1),
-    btnNone2: utils_ns.domFind('#xopml_none2', -1)
+    btnNone2: utils_ns.domFind('#xopml_none2', -1),
+    btnImport: utils_ns.domFind('#xopml_import', -1),
+    btnCancel: utils_ns.domFind('#xopml_cancel', -1)
   };
+  // Help strict mode detect misstyped fields
+  Object.preventExtensions(self.$d);
 
   self.$d.inputOpmlFile.on('change', function()
       {
@@ -72,6 +83,19 @@ function FeedsImport(feedsDB)
         self.deselectAllEntries();
       });
 
+  self.$d.buttonErrorDetails.on('click', function ()
+      {
+        self.$d.opmlWarning2TextDetailed.toggleClass('hide');
+      });
+
+  self.$d.btnCancel.on('click', function ()
+      {
+        self.activateStep1();
+      });
+
+  // Help strict mode detect miss-typed fields
+  Object.preventExtensions(this);
+
   return this;
 }
 
@@ -80,8 +104,11 @@ function clearInputField()
 {
   var self = this;
 
+  self.m_parsingErrorMsgs = [];
+
   self.$d.inputOpmlFile.val('');  // Clear the file name
   self.$d.opmlError1.toggleClass('hide', true); // Hide the error msg area
+  self.$d.opmlWarning2.toggleClass('hide', true); // Hide the warning msg area
 }
 FeedsImport.prototype.clearInputField = clearInputField;
 
@@ -95,6 +122,58 @@ function showError1(msg)
   self.$d.opmlError1.toggleClass('hide', false); // Show the error msg area
 }
 FeedsImport.prototype.showError1 = showError1;
+
+// Object FeedEntry.showWarning2
+// Show a warning message while in step 2
+function showWarning2(msg)
+{
+  var self = this;
+
+  var i = 0;
+
+  self.$d.opmlWarning2Text.text(msg); // Hide the error msg area
+
+  // Can the domList accomodate all error msg entries?
+  if (self.m_parsingErrorMsgs.length > self.$d.errorsList.length)
+  {
+    var maxNew = self.m_parsingErrorMsgs.length - self.$d.errorsList.length;
+    for (i = 0; i < maxNew; ++i)
+      self.$d.opmlWarning2TextDetailed.append($(self.$d.errorsList[0]).clone());
+  }
+  // Reacquire the expanded list
+  self.$d.errorsList = utils_ns.domFindInside(self.$d.opmlWarning2TextDetailed, '.xopml_error_entry', -1);
+
+  var x = 0;
+  var $e = null;
+  var $errorEntry = null;
+  var $errorTitle = null;
+  var $errorInfo = null;
+  for (i = 0; i < self.m_parsingErrorMsgs.length; ++i)
+  {
+    x = self.m_parsingErrorMsgs[i];
+    utils_ns.assert(x instanceof OPMLError, 'opml: x instanceof OPMLError');
+    $e = jQuery(self.$d.errorsList[i]);
+
+    $errorTitle = utils_ns.domFindInside($e, '.xopml_error_title');
+    $errorInfo = utils_ns.domFindInside($e, '.xopml_error_info');
+
+    $errorTitle.text(x.m_title);
+    $errorInfo.text(x.m_info);
+
+    $e.toggleClass('hide', false);  // Make sure entry is not hidden
+  }
+
+  // Collapse all unused entries in self.$d.list
+  for (; i < self.$d.errorsList.length; ++i)
+  {
+    $e = jQuery(self.$d.errorsList[i]);
+    $e.toggleClass('hide', true);
+  }
+
+  self.$d.opmlWarning2.toggleClass('hide', false); // Show the error msg area
+  self.$d.opmlWarning2TextDetailed.toggleClass('hide', true); // Keep details area hidden
+}
+FeedsImport.prototype.showWarning2 = showWarning2;
 
 // Object FeedEntry.FeedEntry [constructor]
 function FeedEntry(folder, feedUrl, feedSiteUrl, feedTitle)
@@ -166,6 +245,28 @@ function compareOPML(e1, e2)
 }
 FeedsImport.prototype.compareOPML = compareOPML;
 
+// Object OPMLError.OPMLError [constructor]
+function OPMLError(title, info)
+{
+  this.m_title = title;
+  this.m_info = info;
+
+  // Help strict mode detect misstyped fields
+  Object.preventExtensions(this);
+
+  return this;
+}
+
+// object FeedsImport.addErrorMsg
+// Accumulate error messages into m_parseErrorMsg
+function addErrorMsg(title, msg)
+{
+  var self = this;
+
+  self.m_parsingErrorMsgs.push(new OPMLError(title, msg));
+}
+FeedsImport.prototype.addErrorMsg = addErrorMsg;
+
 // object FeedsImport.parseOPML
 // Parse OPML XML
 // Returns an array of RSS entries and folders
@@ -187,6 +288,8 @@ function parseOPML($opml, cbSetTitle)
   var feedSiteUrlStr = null;
   var typeStr = null;
   var folderNameStr = null;
+  var errorMsg = null;
+  var errorInfo = null;
   for (i = 0; i < numEntries; ++i)
   {
     $topEntry = jQuery($opml).children().eq(i);
@@ -196,7 +299,7 @@ function parseOPML($opml, cbSetTitle)
       titleStr = $topEntry.text();
       cbSetTitle(titleStr);
     }
-    else if (tagNameStr = 'OUTLINE')
+    else if (tagNameStr == 'OUTLINE')
     {
       titleStr = $topEntry.attr('title');
       feedUrlStr = $topEntry.attr('xmlurl');
@@ -205,11 +308,21 @@ function parseOPML($opml, cbSetTitle)
       typeStr = $topEntry.attr('type');
       if (typeStr == 'rss')
       {
+        if (feedUrlStr === undefined)
+        {
+            errorInfo = $topEntry.prop('outerHTML');  // The entire XML tag, all attributues and values
+            errorMsg = 'parseOPML: Missing feed URL: ' + errorInfo;
+            log.warn(errorMsg);
+
+            self.addErrorMsg('Missing feed URL:', errorInfo);
+            continue;
+        }
+
         // RSS feed at top level, this is outside any folders
         opmlEntry = new FeedEntry(null, feedUrlStr, feedSiteUrlStr, titleStr);
         opmlArray.push(opmlEntry);
       }
-      else
+      else if(typeStr === undefined)
       {
         // Folder
         opmlEntry = new FeedEntry(titleStr, null, null, null);
@@ -229,18 +342,44 @@ function parseOPML($opml, cbSetTitle)
 
           if (typeStr != 'rss')
           {
-            log.warning('Invalid OPML entry, not an RSS');
+            errorInfo = $entry.prop('outerHTML');  // The entire XML tag, all attributues and values
+            errorMsg = 'parseOPML: Not an RSS entry: ' + errorInfo;
+            log.warn(errorMsg);
+
+            self.addErrorMsg('Not an RSS entry:', errorInfo);
             continue;
+          }
+
+          if (feedUrlStr === undefined)
+          {
+              errorInfo = $entry.prop('outerHTML');  // The entire XML tag, all attributues and values
+              errorMsg = 'parseOPML: Missing feed URL: ' + errorInfo;
+              log.warn(errorMsg);
+
+              self.addErrorMsg('Missing feed URL:', errorInfo);
+              continue;
           }
 
           opmlEntry = new FeedEntry(folderNameStr, feedUrlStr, feedSiteUrlStr, titleStr);
           opmlArray.push(opmlEntry);
         }
       }
+      else
+      {
+        errorInfo = $topEntry.prop('outerHTML');  // The entire XML tag, all attributues and values
+        errorMsg = 'parseOPML: Not an RSS entry: ' + errorInfo;
+        log.warn(errorMsg);
+
+        self.addErrorMsg('Not an RSS entry:', errorInfo);
+      }
     }
     else
     {
-      log.warning('parseOPML: unknown tag ' + tagNameStr);
+      errorInfo = $topEntry.prop('outerHTML');  // The entire XML tag, all attributues and values
+      errorMsg = 'parseOPML: Unknown tag: ' + errorInfo;
+      log.warn(errorMsg);
+
+      self.addErrorMsg('Unknown tag:', errorInfo);
     }
   }
 
@@ -349,6 +488,8 @@ function displayOPML()
   var $title = null;
   var $rssUrl = null;
   var $siteUrl = null;
+  var $siteIconHolder = null;
+  var $siteIconEmpty = null;
   var $checkbox = null;
   var $labelSubscribed = null;
   for (i = 0; i < self.m_opmlFeeds.length; ++i)
@@ -374,12 +515,26 @@ function displayOPML()
       $title = utils_ns.domFindInside($rssEntry, '.xopml_title_source');
       $rssUrl = utils_ns.domFindInside($rssEntry, '.xopml_url');
       $siteUrl = utils_ns.domFindInside($rssEntry, '.xopml_site_url');
+      $siteIconHolder =  utils_ns.domFindInside($rssEntry, '.xsite_icon_holder');
+      $siteIconEmpty =  utils_ns.domFindInside($rssEntry, '.xsite_icon_empty');
       $checkbox = utils_ns.domFindInside($rssEntry, '.xopml_checkbox');
       $labelSubscribed = utils_ns.domFindInside($rssEntry, '.xopml_subscribed');
 
       $title.text(x.m_feedTitle);
       $rssUrl.text(x.m_feedUrl);
-      $siteUrl.attr('href', x.m_feedSiteUrl);
+      if (x.m_feedSiteUrl == null)
+      {
+        // No site URL, show empty space to align the columns
+        $siteIconHolder.toggleClass('hide', true);
+        $siteIconEmpty.toggleClass('hide', false);
+      }
+      else
+      {
+        $siteUrl.attr('href', x.m_feedSiteUrl);
+
+        $siteIconHolder.toggleClass('hide', false);
+        $siteIconEmpty.toggleClass('hide', true);
+      }
 
       $folder.toggleClass('hide', true);
       $rssEntry.toggleClass('hide', false);
@@ -444,12 +599,21 @@ function handleOPMLFile(file)
             }
           }
           if ($opml == null)
-            alert('opml not found');
+          {
+            self.showError1('OPML error: tag \'opml\' not found');
+            return;
+          }
           if (jQuery($opml).prop('tagName') != 'OPML')
-            alert('opml not found');
+          {
+            self.showError1('OPML error: tag \'opml\' not found');
+            return;
+          }
           var version = jQuery($opml).attr('version');
           if (version != '1.0')
-            alert('unsupported version of opml: ' + version);
+          {
+            self.showError1('OPML error: unsupported version of opml: ' + version);
+            return;
+          }
 
           self.m_opmlFeeds = self.parseOPML($opml, function(opmlTitle)
               {
@@ -457,6 +621,9 @@ function handleOPMLFile(file)
                 // parsing, no need to store it anywhere)
                 self.$d.opmlTitle.text(opmlTitle);
               });
+
+          if (self.m_parsingErrorMsgs.length > 0)
+            self.showWarning2('OPML parser encountered ' + self.m_parsingErrorMsgs.length + ' errors.');
 
           // Activate area for step2 -- preview and selection of feeds
           // from the OPML file
@@ -473,24 +640,34 @@ function handleOPMLFile(file)
 }
 FeedsImport.prototype.handleOPMLFile = handleOPMLFile;
 
-// object PanelImportOpml.onFocusLost
-function onFocusLostImportOpml()
+// object FeedsImport.activateStep1
+function activateStep1()
+{
+  var self = this;
+
+  // Activate pane for step 1 (Select an OPML file)
+  self.clearInputField();  // Clear in case there is anything from previous input
+
+  self.$d.opmlStep1.toggleClass('hide', false);
+  self.$d.opmlStep2.toggleClass('hide', true);
+}
+FeedsImport.prototype.activateStep1 = activateStep1;
+
+// object FeedsImport.onFocusLost
+function onFocusLost()
 {
   var self = this;
 
   self.$d.entryImportOpml.toggleClass('selected', false);
 }
-FeedsImport.prototype.onFocusLost = onFocusLostImportOpml;
+FeedsImport.prototype.onFocusLost = onFocusLost;
 
-// object PanelImportOpml.onFocus
-function onFocusImportOpml()
+// object FeedsImport.onFocus
+function onFocus()
 {
   var self = this;
 
   self.$d.entryImportOpml.toggleClass('selected', true);
-
-  // Activate pane for step 1 (Select an OPML file)
-  self.clearInputField();  // Clear in case there is anything from previous input
 
   // Check for the various File API support.
   if (!(window.File && window.FileReader && window.FileList && window.Blob))
@@ -499,10 +676,9 @@ function onFocusImportOpml()
     self.$d.inputOpmlFileArea.toggleClass('hide', true);  // Hide the input
   }
 
-  self.$d.opmlStep1.toggleClass('hide', false);
-  self.$d.opmlStep2.toggleClass('hide', true);
+  self.activateStep1();
 }
-FeedsImport.prototype.onFocus = onFocusImportOpml;
+FeedsImport.prototype.onFocus = onFocus;
 
 // export to feeds_ns namespace
 feeds_ns.FeedsImport = FeedsImport;
