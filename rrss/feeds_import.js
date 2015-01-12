@@ -43,6 +43,7 @@ function FeedsImport(feedsDB)
     opmlWarning2Text: utils_ns.domFind('#xopml_warning2_text'),
     opmlWarning2TextDetailed: opmlWarning2TextDetailedContainer,
     buttonErrorDetails: utils_ns.domFind('#xopml_show_error_details'),
+    buttonErrorClose: utils_ns.domFind('#xopml_error_close'),
     errorsList: utils_ns.domFindInside(opmlWarning2TextDetailedContainer, '.xopml_error_entry', -1),
     sectionDisplayOpml: utils_ns.domFind('#ximport_opml_step2_display_file'),
     listContainer: listContainer1,
@@ -86,6 +87,16 @@ function FeedsImport(feedsDB)
   self.$d.buttonErrorDetails.on('click', function ()
       {
         self.$d.opmlWarning2TextDetailed.toggleClass('hide');
+      });
+
+  self.$d.buttonErrorClose.on('click', function ()
+      {
+        self.$d.opmlWarning2.toggleClass('hide', true); // Hide the error msg area
+      });
+
+  self.$d.btnImport.on('click', function ()
+      {
+        self.handleImport();
       });
 
   self.$d.btnCancel.on('click', function ()
@@ -639,6 +650,72 @@ function handleOPMLFile(file)
   var s = reader.readAsText(file);
 }
 FeedsImport.prototype.handleOPMLFile = handleOPMLFile;
+
+// object FeedsImport.handleImport
+// Handle click on button "Import"
+function handleImport()
+{
+  var self = this;
+
+  var i = 0;
+  var x = null;
+  var $e = null;
+  var $rssEntry = null;
+  var $checkbox = null;
+  var cbox_val = false;
+  // Walk all m_opmlFeeds entries if checkbox is ON, then import
+  for (i = 0; i < self.m_opmlFeeds.length; ++i)
+  {
+    x = self.m_opmlFeeds[i];
+    utils_ns.assert(x instanceof FeedEntry, 'opml: displayOPML: x instanceof FeedEntry');
+    if (x.m_isFolder)
+      continue;  // Process only the RSS entries, skip the folders
+    $e = jQuery(self.$d.list[i]);
+    $rssEntry = utils_ns.domFindInside($e, '.xopml_feed_entry');
+    $checkbox = utils_ns.domFindInside($rssEntry, '.xopml_checkbox');
+
+    cbox_val = $checkbox.prop('checked');
+    if (!cbox_val)  // Checkbox is OFF
+    {
+      log.info('skip import for ' + x.m_feedUrl);
+      continue;
+    }
+
+    // Checkbox is ON = do import
+    (function()  // scope
+    {
+      var urlRss = x.m_feedUrl;
+      self.m_feedsDB.feedAddByUrl(x.m_feedUrl,
+          function()
+          {
+            // Feed's _add_ operation is complete
+            // (feed data is in the DB)
+            log.info("RSS imported into DB (completed): " + urlRss);
+
+            /*
+            // TODO: see how to activate the first entry, probably only if there were 0 feeds before this
+            // This function would activate an RSS feed as a result of Add operation
+            if (self.m_newFeedUrl == null)  // User already switched away to something else?
+              return;
+
+            var idx = self.p_findDirEntry(urlRss);
+            if (idx < 0)
+              return;
+
+            log.info('activate ' + idx);
+            self.p_activateDirEntry(idx);
+            */
+          });
+    })()
+
+    if (x.m_folder != null)
+    {
+      self.m_feedsDB.feedSetTags(x.m_feedUrl, x.m_folder);
+      log.info('import: in folder ' + x.m_folder + ' url:' + x.m_feedUrl);
+    }
+  }
+}
+FeedsImport.prototype.handleImport = handleImport;
 
 // object FeedsImport.activateStep1
 function activateStep1()

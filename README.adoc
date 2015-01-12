@@ -23,8 +23,9 @@ Features::
 
 == License
 
-'rrss' is {freesoftware}[free software], distributed under the terms
-of the BSD License.
+'rrss' is {freesoftware}[free software]. This means that everyone may
+use it, redistribute it, and/or modify it under the terms of the BSD
+(FreeBSD) License.
 
 Copyright (c) 2014, Peter Marinov and Contributors. All rights reserved. +
 See LICENSE.txt, see CONTRIBUTORS.txt

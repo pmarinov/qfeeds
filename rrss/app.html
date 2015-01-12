@@ -413,7 +413,7 @@
           0 entries
         </div>
         <div class='alert alert-warning alert-dismissible opml_warning' role='alert' id='xopml_warning2'>
-          <button type='button' class='close'>
+          <button type='button' class='close' id='xopml_error_close'>
             <span>&times;</span>
           </button>
           <div id='xopml_warning2_text'>OPML warning:</div>
@@ -502,7 +502,7 @@
     </div>  <!-- #xdisp_pane_import_opml -->
 
     <!-- About screen display -->
-    <div id='xdisp_pane_about' class='hide'>
+    <div id='xdisp_pane_about' class='hide' style='width: 85%'>
       <div style="text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
 color: #999999; font-weight: bold; padding-top: 10px; padding-bottom: 8px;">About 'rrss'</div>
       <span style="float: left; border-radius: 10px; border: 2px solid #e6e6e6; background: #eeeeee; width: 56px; padding: 4px 4px 4px 4px;">
@@ -522,8 +522,13 @@ color: #999999; font-weight: bold; padding-top: 10px; padding-bottom: 8px;">Abou
       <br/>
       <div>version 0.3.0</div>
       <div>Copyright (c) 2014, Peter Marinov and Contributors. All rights reserved.</div>
+      <br/>
       <div>
-        <span>Distributed under the terms of the BSD License.<span>
+        <span>
+          'rrss' is <a href='http://www.gnu.org/philosophy/free-sw.html'>free software</a>.
+          This means that everyone may use it, redistribute it, and/or
+          modify it under the terms of the BSD (FreeBSD) License.
+        </span>
         <span>
           <button type="button" id="xsee_license" class="btn btn-sm">See license</button>
           <button type="button" id="xclose_license" class="btn btn-sm hide">Close license</button>
