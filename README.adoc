@@ -22,6 +22,8 @@ Features::
 * It uses Dropbox, optionally, for synchronization between
   computers (list of subscriptions and what was marked as read)
 
+*Version:* 0.4.0
+*Status:* Suitable only for potential developers
 
 == License
 

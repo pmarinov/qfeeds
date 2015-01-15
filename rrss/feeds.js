@@ -801,7 +801,9 @@ function p_feedRecord(feed, syncRTable, cbResult)
               if (shortDesc.length > 80)
                 shortDesc = shortDesc.substring(0, 80) + '...';
               var shortOldDesc = data.m_description;
-              if (shortOldDesc.length > 80)
+              if (shortOldDesc == null)
+                shortOldDesc = '[none]'
+              else if (shortOldDesc.length > 80)
                 shortOldDesc = shortOldDesc.substring(0, 80) + '...';
               console.log('db: new description: ' + shortDesc + ' ' +
                           '(old: ' + shortOldDesc + ')');
@@ -1688,7 +1690,9 @@ function p_feedUpdateHeader(toUpdate, updated)
     if (shortDesc.length > 80)
       shortDesc = shortDesc.substring(0, 80) + '...';
     var shortOldDesc = target.m_description;
-    if (shortOldDesc.length > 80)
+    if (shortOldDesc == null)
+      shortOldDesc = '[none]'
+    else if (shortOldDesc.length > 80)
       shortOldDesc = shortOldDesc.substring(0, 80) + '...';
     console.log('new description: ' + shortDesc + ' ' +
                 '(old: ' + shortOldDesc + ')');
