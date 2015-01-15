@@ -20,6 +20,27 @@ function App()
 {
   var self = this;
 
+  var m_oldOnError = window.onerror;
+  // Override previous handler.
+  window.onerror = function(errorMsg, url, lineNumber)
+      {
+        var stripRe = new RegExp('(chrome-extension:..[a-z]*\/)(.*)');
+        var strippedUrl = url.replace(stripRe, '$2');
+        alert('Unfortunatelly the program "rrss" crashed.\n' +
+              'Plase consider making a bug report together with this information.\n' +
+              '------\n\n' +
+              errorMsg +
+              '\n\n' +
+              'source file: ' + strippedUrl + '\n' +
+              'line: ' + lineNumber);
+
+        if (self.m_oldOnError)  // Call previous handler
+          return m_oldOnError(errorMsg, url, lineNumber);
+
+        // Just let default handler run.
+        return false;
+      }
+
   // Establish compatible indexDB based on the browser
   log.setLevel('info');
   log.info("Obtaining indexDB handler...");
@@ -37,47 +58,36 @@ function App()
       window.alert("Your browser doesn't support a stable version of IndexedDB.");
   }
 
+  self.m_panelMng = new feeds_ns.PanelMng();
+
   // $feedDisp is the right-hand side panel that displays the contents of rss entries
   var $feedDisp = utils_ns.domFind('#xrss_container');
   self.m_feedDisp = new feeds_ns.FeedDisp($feedDisp);
   // $feedsPanel is the left-hand side panel that display folders and feed titles
   var $feedsPanel = utils_ns.domFind('#xfeeds_list');
-  self.m_feedsDir = new feeds_ns.FeedsDir($feedsPanel, self.m_feedDisp);
+  self.m_feedsDir = new feeds_ns.FeedsDir($feedsPanel, self.m_feedDisp, self.m_panelMng);
 
   self.$d =
   {
-    areaLeftPane: utils_ns.domFind('#xleft_pane'),
     syncProgress: utils_ns.domFind('#xsync_progress'),
     syncProgressHolder: utils_ns.domFind('#xsync_progress_holder')
   }
 
-  self.m_aboutPanel = new feeds_ns.AboutPanel();
+  self.m_panelAbout = new feeds_ns.PanelAbout();
+  var feedsDB = self.m_feedsDir.getFeedsDbObj();
+  self.m_panelImportOpml = new feeds_ns.FeedsImport(feedsDB);
 
-  self.m_commandPaneMap = [
-    {
-      $leftPaneTriggerArea: utils_ns.domFind('#xcmd_pane_feeds_dir'),
-      $rightPaneDispArea: utils_ns.domFind('#xdisp_pane_feeds'),
-      handler: self.m_feedsDir,
-      isActive: false
-    },
-    {
-      $leftPaneTriggerArea: utils_ns.domFind('#xcmd_pane_about'),
-      $rightPaneDispArea: utils_ns.domFind('#xdisp_pane_about'),
-      handler: self.m_aboutPanel,
-      isActive: false
-    }
-  ];
+  self.m_panelMng.setMenuEntryHandler('xcmd_pane_feeds_dir', self.m_feedsDir);
+  self.m_panelMng.setMenuEntryHandler('ximport_opml', self.m_panelImportOpml);
+  self.m_panelMng.setMenuEntryHandler('xcmd_pane_about', self.m_panelAbout);
 
-  // Activate Feeds display
-  self.p_activatePane(0);
-
-  self.$d.areaLeftPane.on("click", function (e)
-    {
-      return self.p_handleLeftPaneClick(e);
-    });
+  self.m_panelMng.p_activatePane(0);  // Activate feeds display
 
   // Now connect to Dropbox
   self.m_connectDropbox = new feeds_ns.ConnectDBox(self.p_getConnectDBoxCBHandlers());
+
+  Object.preventExtensions(this);
+
   return this;
 }
 
@@ -130,7 +140,7 @@ function p_getConnectDBoxCBHandlers()
 }
 App.prototype.p_getConnectDBoxCBHandlers = p_getConnectDBoxCBHandlers;
 
-// object App.p_activatePane()
+// object PanelMng.p_activatePane()
 // Activate one object into the right-hand side area (Feeds, About, etc.)
 function p_activatePane(index)
 {
@@ -160,9 +170,9 @@ function p_activatePane(index)
   self.m_commandPaneMap[index].isActive = true;
   log.info('activate pane area ' + index);
 }
-App.prototype.p_activatePane = p_activatePane;
+PanelMng.prototype.p_activatePane = p_activatePane;
 
-// object App.p_handleLeftPaneClick()
+// object PanelMng.p_handleLeftPaneClick()
 // TODO: describe correspondence between left and right panes
 function p_handleLeftPaneClick(ev)
 {
@@ -175,18 +185,126 @@ function p_handleLeftPaneClick(ev)
     if (!utils_ns.clickIsInside(self.m_commandPaneMap[i].$leftPaneTriggerArea, ev.pageX, ev.pageY))
       continue;
 
-    self.p_activatePane(i);
+    if (self.m_commandPaneMap[i].isEnabled)
+    {
+      self.p_activatePane(i);
+      log.info('pane area ' + i);
+    }
 
-    log.info('pane area ' + i);
+    return true;
   }
 
-  return true;
+  return false;
 }
-App.prototype.p_handleLeftPaneClick = p_handleLeftPaneClick;
+PanelMng.prototype.p_handleLeftPaneClick = p_handleLeftPaneClick;
 
-// object AboutPanel [constructor]
-function AboutPanel()
+// object PanelMng.enableMenuEntry()
+// Enables/Disables menu entries
+function enableMenuEntry(entryDomId, isEnabled)
 {
+  var self = this;
+
+  var actionStr = 'Enable';
+  if (!isEnabled)
+    actionStr = 'Disable';
+
+  var i = 0;
+  var e = null;
+  for (i = 0; i < self.m_commandPaneMap.length; ++i)
+  {
+    e = self.m_commandPaneMap[i];
+    if(jQuery(e.$leftPaneTriggerArea).attr('id') != entryDomId)
+      continue;
+
+    jQuery(e.$leftPaneTriggerArea).toggleClass('disabled', !isEnabled);
+    e.isEnabled = isEnabled;
+
+    log.info(actionStr + ' pane area ' + entryDomId);
+    return;
+  }
+
+  utils_ns.assert(false, 'enableMenuEntry: invalid DOM id ' + entryDomId);
+}
+PanelMng.prototype.enableMenuEntry = enableMenuEntry;
+
+// object PanelMng.setMenuEntryHandler()
+// Sets handler for activation/deactivation of right-hand panel for
+// a menu entry
+function setMenuEntryHandler(entryDomId, handler)
+{
+  var self = this;
+
+  var i = 0;
+  var e = null;
+  for (i = 0; i < self.m_commandPaneMap.length; ++i)
+  {
+    e = self.m_commandPaneMap[i];
+    if(jQuery(e.$leftPaneTriggerArea).attr('id') != entryDomId)
+      continue;
+
+    e.handler = handler;
+    log.info('Set handler for pane area ' + entryDomId);
+    return;
+  }
+
+  utils_ns.assert(false, 'setMenuEntryHandler: invalid DOM id ' + entryDomId);
+}
+PanelMng.prototype.setMenuEntryHandler = setMenuEntryHandler;
+
+// object PanelMng.PanelMng() [constructor]
+// Panel manager
+//
+// Handles commands pannel on the left-hand side and activates data panels
+// on the right-hand side
+function PanelMng()
+{
+  var self = this;
+
+  self.m_areaLeftPane = utils_ns.domFind('#xleft_pane');
+
+  var i = 0;
+  self.m_commandPaneMap = [
+    {
+      $leftPaneTriggerArea: utils_ns.domFind('#xcmd_pane_feeds_dir'),
+      $rightPaneDispArea: utils_ns.domFind('#xdisp_pane_feeds'),
+      handler: null,
+      isActive: false,
+      isEnabled: true
+    },
+    {
+      $leftPaneTriggerArea: utils_ns.domFind('#ximport_opml'),
+      $rightPaneDispArea: utils_ns.domFind('#xdisp_pane_import_opml'),
+      handler: null,
+      isActive: false,
+      isDisabled: false,
+      isEnabled: false  // Enabled after IndexedDB is loaded
+    },
+    {
+      $leftPaneTriggerArea: utils_ns.domFind('#xcmd_pane_about'),
+      $rightPaneDispArea: utils_ns.domFind('#xdisp_pane_about'),
+      handler: null,
+      isActive: false,
+      isEnabled: true
+    }
+  ];
+  for(i = 0; i < self.m_commandPaneMap.length; ++i)
+    Object.preventExtensions(self.m_commandPaneMap[i]);
+
+  self.m_areaLeftPane.on("click", function (e)
+    {
+      return self.p_handleLeftPaneClick(e);
+    });
+
+  Object.preventExtensions(this);
+
+  return this;
+}
+
+// object PanelAbout [constructor]
+function PanelAbout()
+{
+  var self = this;
+
   self.$d =
   {
     entryAbout: utils_ns.domFind('#xcmd_pane_about'),
@@ -214,22 +332,28 @@ function AboutPanel()
       self.$d.areaLicense.toggleClass("hide", true);
     });
 
+  Object.preventExtensions(this);
+
   return this;
 }
 
-// object AboutPanel.onFocusLost
+// object PanelAbout.onFocusLost
 function onFocusLostAbout()
 {
+  var self = this;
+
   self.$d.entryAbout.toggleClass('selected', false);
 }
-AboutPanel.prototype.onFocusLost = onFocusLostAbout;
+PanelAbout.prototype.onFocusLost = onFocusLostAbout;
 
-// object AboutPanel.onFocus
+// object PanelAbout.onFocus
 function onFocusAbout()
 {
+  var self = this;
+
   self.$d.entryAbout.toggleClass('selected', true);
 }
-AboutPanel.prototype.onFocus = onFocusAbout;
+PanelAbout.prototype.onFocus = onFocusAbout;
 
 var app = null;
 feeds_ns.app = null;
@@ -240,5 +364,6 @@ $(document).ready(function()
       feeds_ns.app = app;
     });
 
-feeds_ns.AboutPanel = AboutPanel;
+feeds_ns.PanelMng = PanelMng;
+feeds_ns.PanelAbout = PanelAbout;
 })();

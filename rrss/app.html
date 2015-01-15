@@ -31,11 +31,12 @@
   <script src="feeds.js" type="text/javascript"></script>
   <script src="feeds_dir.js" type="text/javascript"></script>
   <script src="feed_disp.js" type="text/javascript"></script>
+  <script src="feeds_import.js" type="text/javascript"></script>
   <script src="app.js" type="text/javascript"></script>
 </head>
 <body>
   <div class="container-fluid">
-  <div class="row">
+  <div class="row" style="cursor: default;">
   <div class="col-sm-3 col-md-3 left_pane" id="xleft_pane">
     <!--Sidebar content-->
     <!-- Section: Feeds -->
@@ -71,6 +72,32 @@
     </div>  <!-- .view #xfeeds_list -->
     </div>  <!-- #xcmd_pane_feeds_dir -->
 
+    <!-- Section: Menu for feeds related operations -->
+    <div class="submenu_entry_holder" style="height: 100%; margin-top: 5px;">
+      <span class="indent1"></span>
+      <span class="submenu_entry_inline disabled" id="ximport_opml"
+            title="Import OPML">
+        Import
+      </span>
+      <span>&nbsp;&nbsp;&#8226&nbsp;&nbsp;</span>
+      <span class="submenu_entry_inline disabled" id="xexport_opml"
+            title="Export OPML [not yet implemented]">
+        Export
+      </span>
+      <!--
+      <span>&nbsp;&nbsp;&#8226&nbsp;&nbsp;</span>
+      <span class="submenu_entry_inline disabled" id="xexport_opml"
+            title="Save complete state to a file [not yet implemented]">
+        Backup
+      </span>
+      <span>&nbsp;&nbsp;&#8226&nbsp;&nbsp;</span>
+      <span class="submenu_entry_inline disabled" id="xexport_opml"
+            title="Restore complete state from a file [not yet implemented]">
+        Restore
+      </span>
+      -->
+    </div>  <!-- Feeds Actions area -->
+
     <!-- Section: Persistency -->
     <div class="submenu_title_holder submenu_title_top_sep" style="height: 100%">
       <span class="indent1"></span>
@@ -83,8 +110,8 @@
     </div>  <!-- Title: PERSISTENCY + progress bar -->
     <div class="submenu_entry_holder" style="height: 100%">
       <span class="indent1"></span>
-      <span class="submenu_entry" id="xdropbox">Logon</span>
-      <div><i id="xdropbox_user"></i></div>
+      <span class="submenu_entry_inline" id="xdropbox">Logon</span>
+      <span><i id="xdropbox_user"></i></span>
     </div>
 
     <!-- Section: Settings -->
@@ -94,7 +121,7 @@
     </div>
     <div id="xcmd_pane_settings" class="submenu_entry_holder">
       <span class="indent1"></span>
-      <span class="submenu_entry" style="color: gray" title="Disabled">Settings</span>
+      <span class="submenu_entry disabled" title="[not yet implemented]">Settings</span>
     </div>  <!-- #xcmd_pane_settings -->
     <div id="xcmd_pane_about" class="submenu_entry_holder">
       <span class="indent1"></span>
@@ -132,16 +159,12 @@
 
     <div id='xadd_feed_area' class='add_feed_area hide'>
       <div style='font-weight: bold; font-size: 120%; margin-bottom: 12px;'>Add new:</div>
-      <div class='col-lg-6'>
       <div style='margin-top: 5px; margin-right: 6px; font-size: 85%;'>URL of an RSS feed:</div>
       <form id='xform_new_rss' class='pull-left' style="width: 100%; margin-bottom: 20px;">
         <input id='xfield_input_url' type='text' class='form-control pull-left' style='width: 60%; margin-right: 7px;'>
         <button type='submit' class='btn btn-sm add_btn_pos'>View</button>
         <button type='button' id='xform_cancel' class='btn btn-sm add_btn_pos'>Cancel</button>
       </form>
-      </div>
-      <div class="clearfix">
-      </div>
 
       <!-- List of RECENTLY VIEWED -->
       <div id='xrecent_container' class='recent_container'>
@@ -290,7 +313,7 @@
              href="http://www.ft.com/rss/comment/columnist/martinwolf"
              target="_blank">
           <img src="images/icon_arrow_goto.svg" alt="An awesome image" style="width: 25px"/>
-        </a>
+          </a>
         </span>
         <span class="xmarked_read read_unread icon bar_elem pull-right hide">
           <img src="images/icon_read.svg" class="icon_read" alt="marked read" title="Click to mark as unread"/>
@@ -370,8 +393,116 @@
     </div>
     </div> <!-- #xdisp_pane_feeds -->
 
+    <!-- IMPORT OPML screens -->
+    <div id='xdisp_pane_import_opml' class='opml_pane_area hide'>
+      <div style='font-weight: bold; font-size: 120%; margin-bottom: 12px;'>Import feeds via OPML</div>
+      <div id='ximport_opml_step1_input_file' class='hide'>
+        <div style='font-size: 85%' id='ximport_input_opml_file_area'>
+          Select an OPML file to see a preview
+          <input type='file' id='ximport_input_opml_file'/>
+        </div>
+        <div class='alert alert-danger opml_error' role='alert' id='xopml_error1'>
+        </div>
+      </div>  <!-- #ximport_opml_step1_input_file -->
+      <div id='ximport_opml_step2_display_file' class='hide'>
+        <!-- List of OPML FOLDERS AND RSS ENTRIES -->
+        <div id='opml_title' class='title'>
+          OPML title
+        </div>
+        <div id='opml_total' class='total'>
+          0 entries
+        </div>
+        <div class='alert alert-warning alert-dismissible opml_warning' role='alert' id='xopml_warning2'>
+          <button type='button' class='close' id='xopml_error_close'>
+            <span>&times;</span>
+          </button>
+          <div id='xopml_warning2_text'>OPML warning:</div>
+          <button id='xopml_show_error_details' type='button' class='btn btn-sm'>
+            Details
+          </button>
+          <div id='xopml_error_details' class='hide' style='padding-top: 10px'>
+            <div class='xopml_error_entry'>
+              <div class='xopml_error_title'>
+              </div>
+              <div class='xopml_error_info' style='font-style: italic'>
+              </div>
+              <br/>
+            </div>
+          </div>
+        </div>
+
+        <!-- Top line buttons All/None -->
+        <div class='opmlvw_button_bar'>
+            <span class='btn_elem pull-left'>
+              <button type='button' id='xopml_all1' class='btn btn-sm' title='Select all items'>All</button>
+            </span>
+            <span class='btn_elem pull-left'>
+              <button type='button' id='xopml_none1' class='btn btn-sm' title='Deselect all items'>None</button>
+            </span>
+            <span class='btn_elem pull-right'>
+              <button type='button' id='xopml_cancel' class='btn btn-sm' title='Close the preview'>Cancel</button>
+            </span>
+            <span class='btn_elem pull-right'>
+              <button type='button' id='xopml_import' class='btn btn-sm' title='Import the selected items'>Import</button>
+            </span>
+        </div>
+
+        <!-- List of OPML folders and RSS entries -->
+        <div id='xopml_list'>
+          <div class='xopml_entry hide'>  <!-- entry could be a folder or an rss feed entry -->
+            <div class='xopml_folder opmlvw_folder_bar'>
+                <span class='xopml_folder_name opml_folder pull-left'>
+                  bagehot
+                </span>
+            </div>  <!-- .xopml_folder -->
+            <div class='xopml_feed_entry opmlvw_bar'>
+              <!-- First the fixed width stuff on the right-hand edge of the bar -->
+              <span class='pull-left' style='width: 100%'>
+                <span class='xopml_title_checkbox checkbox_elem bar_elem pull-left'>
+                  <input type='checkbox' class='xopml_checkbox' checked disabled/>
+                </span>
+                <!-- Title source is fixed width -->
+                <span class='xopml_title_source title_source bar_elem pull-left'>
+                  <span>
+                  FT.com - Martin Wolf (top columnist)
+                  </span>
+                </span>
+                <span class='xsite_icon_holder bar_elem pull-left hide'>
+                  <a class='xopml_site_url url icon'
+                     href='http://www.ft.com/rss/comment/columnist/martinwolf'
+                     target='_blank'>
+                  <img src='images/icon_arrow_goto.svg' alt='An awesome image' style='width: 25px'/>
+                  </a>
+                </span>
+                <span class='xsite_icon_empty bar_elem pull-left hide' style='width: 25px'>
+                </span>
+                <!-- The remaining space is for title:snippet -->
+                <span class='xopml_url title_url bar_elem pull-left'>
+                  http://www.ft.com/rss/comment/columnist/martinwolf
+                </span>
+                <span class='xopml_subscribed subscribed_label bar_elem pull-right hide'>
+                  [subscribed]
+                </span>
+              </span>
+            </div>  <!-- #xopml_feed_entry -->
+          </div>  <!-- .xopml_entry -->
+        </div>  <!-- #xopml_list -->
+
+        <!-- Bottom line buttons All/None -->
+        <div class='opmlvw_button_bar'>
+            <span class='btn_elem pull-left'>
+              <button type='button' id='xopml_all2' class='btn btn-sm' title='Select all items'>All</button>
+            </span>
+            <span class='btn_elem pull-left'>
+              <button type='button' id='xopml_none2' class='btn btn-sm' title='Deselect all items'>None</button>
+            </span>
+        </div>
+
+      </div>  <!-- #ximport_opml_step2_display_file -->
+    </div>  <!-- #xdisp_pane_import_opml -->
+
     <!-- About screen display -->
-    <div id='xdisp_pane_about' class='hide'>
+    <div id='xdisp_pane_about' class='hide' style='width: 85%'>
       <div style="text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
 color: #999999; font-weight: bold; padding-top: 10px; padding-bottom: 8px;">About 'rrss'</div>
       <span style="float: left; border-radius: 10px; border: 2px solid #e6e6e6; background: #eeeeee; width: 56px; padding: 4px 4px 4px 4px;">
@@ -391,8 +522,13 @@ color: #999999; font-weight: bold; padding-top: 10px; padding-bottom: 8px;">Abou
       <br/>
       <div>version 0.3.0</div>
       <div>Copyright (c) 2014, Peter Marinov and Contributors. All rights reserved.</div>
+      <br/>
       <div>
-        <span>Distributed under the terms of the BSD License.<span>
+        <span>
+          'rrss' is <a href='http://www.gnu.org/philosophy/free-sw.html'>free software</a> --
+          this means that everyone may use it, redistribute it, and/or
+          modify it under the terms of the BSD (FreeBSD) License.
+        </span>
         <span>
           <button type="button" id="xsee_license" class="btn btn-sm">See license</button>
           <button type="button" id="xclose_license" class="btn btn-sm hide">Close license</button>
@@ -490,7 +626,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       </div>
       <br/>
       <div>
-        Libraries:
+        Libraries
       </div>
       <div>
         <span>
@@ -509,6 +645,18 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
           <a href="https://github.com/pimterry/loglevel" target="_blank" class="pull-left">loglevel</a>
         </span>
         <span class="pull-left" style="margin-right: 5px; margin-left: 2px;"> MIT</span>
+      </div>
+      <hr/>
+      <div>
+        Colophon
+      </div>
+      <div>
+        <span>
+          <a href="http://www.gnu.org/software/emacs" target="_blank" class="pull-left">GNU Emacs</a>,
+          <i>"Free as in Freedom"</i>
+        </span>
+      <br/>
+      <br/>
       </div>
 
       </div>  <!-- font-size: 95% -->

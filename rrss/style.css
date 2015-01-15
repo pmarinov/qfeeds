@@ -51,6 +51,16 @@
   float:left;
 }
 
+.left_pane .submenu_entry_inline
+{
+  cursor: pointer;
+}
+
+.left_pane .disabled
+{
+  color: gray;
+}
+
 .left_pane .selected
 {
   font-weight: bold;
@@ -263,7 +273,7 @@
 .recent_container
 {
   padding-right: 15px;
-  padding-left: 15px;
+  /*padding-left: 15px;*/
 }
 
 .recent_container .title
@@ -560,6 +570,130 @@
     color: inherit;
     text-decoration: none;
     border-bottom: 1px dotted #BBB;
+}
+
+.opml_pane_area
+{
+  width: 100%;
+  float: left;
+  overflow: hidden;
+  padding-top: 12px;
+}
+
+#ximport_opml_step1_input_file .opml_error
+{
+  margin-top: 12px;
+}
+
+#ximport_opml_step2_display_file .total
+{
+  padding-bottom: 15px;
+}
+
+#ximport_opml_step2_display_file .opml_warning
+{
+  margin-top: 12px;
+}
+
+.opml_container
+{
+  padding-right: 15px;
+  padding-left: 15px;
+}
+
+.opml_container .title
+{
+  margin-top: 5px;
+  margin-right: 6px;
+  font-size: 85%;
+}
+
+.opmlvw_button_bar
+{
+  width: 100%;
+  height: 35px;
+  padding-top: 2px;
+  padding-left: 1px;
+  overflow: hidden;
+  border-bottom: 1px solid lightgray;
+}
+
+.opmlvw_button_bar .btn_elem
+{
+  padding-right: 5px;
+}
+
+.opmlvw_bar
+{
+  width: 100%;
+  height: 25px;
+  top: 2px;
+  overflow: hidden;
+  font-size: 85%;
+  border-bottom: 1px solid lightgray;
+}
+
+.opmlvw_bar .checkbox_elem
+{
+  padding-right: 5px;
+  padding-top: 2px;
+}
+
+.opmlvw_bar .bar_elem
+{
+  height: 26px;
+  overflow: hidden;
+  line-height: 25px;
+}
+
+.opmlvw_bar .title_source
+{
+  width: 26%;
+  color: gray;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.opmlvw_bar .title_url
+{
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  width: 56%;
+  padding-left: 4px;
+}
+
+.opmlvw_bar .icon
+{
+  opacity: 0.40;
+  width: 100%;
+}
+
+.opmlvw_bar .icon:hover
+{
+  opacity: 1.0;
+}
+
+.opmlvw_bar .subscribed_label
+{
+  padding-left: 6px;
+  padding-right: 8px;
+}
+
+.opmlvw_folder_bar
+{
+  width: 100%;
+  height: 36px;
+  padding-top: 16px;
+  overflow: hidden;
+  font-size: 85%;
+  border-bottom: 1px solid lightgray;
+}
+
+.opmlvw_folder_bar .opml_folder
+{
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+  color: #999999;
+  font-weight: bold;
 }
 
 /* Pop-up, dark-background */

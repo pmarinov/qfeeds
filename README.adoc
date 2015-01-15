@@ -1,3 +1,5 @@
+// README.adoc for rrss
+
 :freesoftware: http://www.gnu.org/philosophy/free-sw.html
 :screenshot1: https://dl.dropboxusercontent.com/s/tmzbqb97atmcjst/rrss_feed1.png
 
@@ -23,8 +25,9 @@ Features::
 
 == License
 
-'rrss' is {freesoftware}[free software], distributed under the terms
-of the BSD License.
+'rrss' is {freesoftware}[free software] -- this means that everyone may
+use it, redistribute it, and/or modify it under the terms of the BSD
+(FreeBSD) License.
 
 Copyright (c) 2014, Peter Marinov and Contributors. All rights reserved. +
 See LICENSE.txt, see CONTRIBUTORS.txt
