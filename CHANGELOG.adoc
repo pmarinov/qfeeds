@@ -1,5 +1,4 @@
-CHANGELOG.txt, 'rrss' - R is a reader of RSS feeds
---------------------------------------------------
+== CHANGELOG.txt, 'rrss' - R is a reader of RSS feeds
 
 === 2015-01-14, v0.4.0.0, pmarinov
 

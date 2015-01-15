@@ -1,5 +1,4 @@
-CONTRIBUTORS.txt,  RRSS - R is a reader of RSS feeds
-----------------------------------------------------
+== CONTRIBUTORS.txt, 'rrss' - R is a reader of RSS feeds
 
 Thanks to the following people for their contributions:
 
