@@ -860,7 +860,8 @@ function p_feedView(newUrl)
 
         if (c != 0)
         {
-          console.error('failed: ' + errorMsg + ', for: ' + newUrl);
+          var shortMsg = errorMsg.substring(0, 80) + '...';
+          console.warn('rss fetch, failed: ' + shortMsg + ', for: ' + newUrl);
           return;
         }
 
@@ -1793,7 +1794,8 @@ function p_preFirstTimePrefetch()
       {
         if (c != 0)
         {
-          console.error('failed: ' + errorMsg + ', for: ' + self.m_urlFirstTimeOffer);
+          var shortMsg = errorMsg.substring(0, 80) + '...';
+          console.warn('rss fetch, failed: ' + shortMsg + ', for: ' + self.m_urlFirstTimeOffer);
           return;
         }
 

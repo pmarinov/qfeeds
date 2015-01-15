@@ -796,8 +796,16 @@ function p_feedRecord(feed, syncRTable, cbResult)
             };
             if (feed2.m_description != data.m_description)
             {
-              console.log('db: new description: ' + feed2.m_description + ' ' +
-                          '(old: ' + data.m_description + ')');
+              // Display shortened strings in the log
+              var shortDesc = feed2.m_description;
+              if (shortDesc.length > 80)
+                shortDesc = shortDesc.substring(0, 80) + '...';
+              var shortOldDesc = data.m_description;
+              if (shortOldDesc.length > 80)
+                shortOldDesc = shortOldDesc.substring(0, 80) + '...';
+              console.log('db: new description: ' + shortDesc + ' ' +
+                          '(old: ' + shortOldDesc + ')');
+
               needsUpdate = true;
             };
             if (feed2.m_rss_type != data.m_rss_type)
@@ -1675,8 +1683,16 @@ function p_feedUpdateHeader(toUpdate, updated)
   };
   if (updated.m_description != target.m_description)
   {
-    console.log('new description: ' + updated.m_description + ' ' +
-                '(old: ' + target.m_description + ')');
+    // Display shortened strings in the log
+    var shortDesc = updated.m_description;
+    if (shortDesc.length > 80)
+      shortDesc = shortDesc.substring(0, 80) + '...';
+    var shortOldDesc = target.m_description;
+    if (shortOldDesc.length > 80)
+      shortOldDesc = shortOldDesc.substring(0, 80) + '...';
+    console.log('new description: ' + shortDesc + ' ' +
+                '(old: ' + shortOldDesc + ')');
+
     target.m_description = updated.m_description;
     wasUpdated = true;
   };
@@ -1760,7 +1776,10 @@ function p_fetchRss(urlRss, cbDone, cbWriteDone)
           }
         }
         else
-          console.error('rss fetch, failed: ' + errorMsg + ', for: ' + feed.m_url);
+        {
+          var shortMsg = errorMsg.substring(0, 80) + '...';
+          console.warn('rss fetch, failed: ' + shortMsg + ', for: ' + feed.m_url);
+        }
 
         if (cbDone != null)
           cbDone();
