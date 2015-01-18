@@ -332,7 +332,10 @@ function RTableAddListener(cbRecordsChanged)
 // Checks if Dropbox is still connected
 function RTableIsOnline()
 {
-  return g_client.isAuthenticated();
+  if (g_client == null)
+    return false;
+  else
+    return g_client.isAuthenticated();
 }
 
 // Call this once at init time to complete the initialization

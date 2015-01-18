@@ -96,6 +96,7 @@ function p_dboxConnectCB(error, client)
     }
     else
     {
+      self.m_cb.onDBoxProgress(100);
       console.log('auth_pass1: NO');
       self.p_dboxSetLoginButton();
     }

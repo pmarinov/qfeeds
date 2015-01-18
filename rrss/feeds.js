@@ -319,8 +319,8 @@ function p_rtableSyncFeedEntry(feed)
   else
   {
     // Data can't be sent, mark it for sending at the next opportunity
-    rssEntry.m_remote_state = feeds_ns.RssSyncState.IS_PENDING_SYNC;
-    log.info('p_rtableSyncFeedEntry: local only (' + remoteFeed.m_rss_feed_url + ' -> IS_PENDING_SYNC)');
+    feed.m_remote_state = feeds_ns.RssSyncState.IS_PENDING_SYNC;
+    log.info('p_rtableSyncFeedEntry: local only (' + feed.m_rss_feed_url + ' -> IS_PENDING_SYNC)');
   }
 }
 Feeds.prototype.p_rtableSyncFeedEntry = p_rtableSyncFeedEntry;
