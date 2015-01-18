@@ -3,11 +3,18 @@
 
 "name": "rrss",
 "description": "R is a reader of RSS feeds",
-"version": "0.3.0",
+"version": "0.4.0",
 
 "icons": { "128": "chrome/icon_rss.png" },
 
-"permissions": [ "tabs", "storage", "http://*/" ],
+// Permissions:
+// "storage" is for IndexedDB;
+// "http" and "https" are needed to permit fetching via HTTP GET of
+// feeds from any sources, otherwise we get
+// 'Access-Control-Allow-Origin' failure (Chrome browser blocks the
+// extension) when fetching from sites that don't have
+// 'Allow-Origin: *' header
+"permissions": [ "storage", "http://*/", "https://*/" ],
 
 "web_accessible_resources": ["rrss/chrome_oauth_receiver.js", "rrss/chrome_oauth_receiver.html"],
 
