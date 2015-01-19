@@ -1865,12 +1865,16 @@ function p_poll(self)
     return;
   }
 
+  if (self.m_pollIndex == 0)  // progress 0%
+    self.m_feedsCB.onRssFetchProgress(0);
+
   var urlRss = self.m_rssFeeds[self.m_pollIndex].m_url;
   log.info('fetch: ' + self.m_pollIndex + ' url: ' + urlRss);
   ++self.m_pollIndex;
 
   self.p_fetchRss(urlRss, function()
       {
+        self.m_feedsCB.onRssFetchProgress((self.m_pollIndex / self.m_rssFeeds.length) * 100);
         var delay = 0;  // Don't wait in fetching the next feed
         if (self.m_pollIndex >= self.m_rssFeeds.length)
         {
@@ -1878,6 +1882,7 @@ function p_poll(self)
           self.m_pollIndex = 0;
           delay = 60;
           console.log(utils_ns.dateToStr(new Date()) +' -- poll loop completed, wait...');
+          self.m_feedsCB.onRssFetchProgress(100);  // progress 100%
         }
         self.p_reschedulePoll(delay);
       },

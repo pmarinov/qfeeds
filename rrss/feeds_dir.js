@@ -47,6 +47,8 @@ function FeedsDir($dirPanel, feedDisp, panelMng)
     titleTop: utils_ns.domFind('#xtitle_top', 1),
     titleLink: utils_ns.domFind('#xtitle_link', 1),
     addRss: utils_ns.domFind('#xadd_rss'),
+    fetchProgressHolder: utils_ns.domFind('#xrssfetch_progress_holder'),
+    fetchProgress: utils_ns.domFind('#xrssfetch_progress'),
     formNewRss: utils_ns.domFind('#xform_new_rss'),
     formFieldUrl: utils_ns.domFind('#xfield_input_url'),
     formCancel: utils_ns.domFind('#xform_cancel'),
@@ -315,6 +317,23 @@ function p_getFeedsCBHandlers()
           self.p_findUpdatedFolders();  // User added new folders?
           self.p_removeFeeds(listRemoved);  // removed feeds?
           self.p_displayFeedsList();
+        },
+
+    onRssFetchProgress: function(percent)
+        {
+          if (percent == 0)  // start
+            self.$d.fetchProgressHolder.toggleClass('hide', false);
+
+          self.$d.fetchProgress.attr('style', 'width: ' + percent + '%;');
+
+          if (percent == 100)  // end
+          {
+            // Postglow for 1 second :-)
+            setTimeout(function ()
+                {
+                  self.$d.fetchProgressHolder.toggleClass('hide', true);
+                }, 1 * 1000);
+          }
         },
 
     // Handle events generated from remote action. On another computer
