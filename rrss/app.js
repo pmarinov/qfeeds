@@ -19,6 +19,8 @@ if (typeof feeds_ns === 'undefined')
 function App()
 {
   var self = this;
+  var $popupErrorDlg = utils_ns.domFind('#xerror_popup');
+  var $popupErrorMsg = utils_ns.domFind('#xerror_pop_msg');
 
   var m_oldOnError = window.onerror;
   // Override previous handler.
@@ -26,13 +28,17 @@ function App()
       {
         var stripRe = new RegExp('(chrome-extension:..[a-z]*\/)(.*)');
         var strippedUrl = url.replace(stripRe, '$2');
-        alert('Unfortunatelly the program "rrss" crashed.\n' +
-              'Plase consider making a bug report together with this information.\n' +
-              '------\n\n' +
-              errorMsg +
-              '\n\n' +
-              'source file: ' + strippedUrl + '\n' +
-              'line: ' + lineNumber);
+        var errorMsgHTML = '<i>Plase consider making a bug report together with this information.</i><br/>' +
+              '<hr>' +
+              '<span id="xerror_msg_text"></span>' +
+              '<br/><br/>' +
+              'source file: ' + strippedUrl + '<br/>' +
+              'line: ' + lineNumber;
+
+        $popupErrorMsg.html(errorMsgHTML);
+        $('#xerror_msg_text').text(errorMsg);
+
+        $popupErrorDlg.modal('show');
 
         if (self.m_oldOnError)  // Call previous handler
           return m_oldOnError(errorMsg, url, lineNumber);

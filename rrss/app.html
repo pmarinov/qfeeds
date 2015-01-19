@@ -618,6 +618,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
           <img src='images/icon_folder_closed.svg' title='open/closed' style='width: 12px;'/>
         </a>]: <a href="http://thenounproject.com/informationarchitect" target="_blank">CD</a>, CC BY 3.0
       </div>
+      <div>Crash [
+        <a href="http://thenounproject.com/term/bicycle-accident/11183" target="_blank">
+          <img src='images/icon_bike_crash.svg' title='bicycle accident' style='width: 12px;'/>
+        </a>]: <a href="http://thenounproject.com/jmkeuning" target="_blank">James Keuning</a>, CC0
+      </div>
       <br/>
       <div>ASCII Art [
         <a href="http://patorjk.com/software/taag/#p=display&f=Big&t=rrss" target="_blank">
@@ -686,6 +691,41 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       <div class='modal-footer'>
         <button class='btn' data-dismiss='modal' aria-hidden='true'>Cancel</button>
         <button id='xbtn_new_folder_submit' class='btn btn-primary'>Create</button>
+      </div>
+
+    </div> <!-- .modal-content -->
+    </div> <!-- .modal-dialog -->
+  </div>  <!-- #xnew_folder -->
+
+  <!-- Fatal error pop-up -->
+  <div id='xerror_popup' class='modal'>
+    <div class='modal-dialog'>
+    <div class='modal-content'>
+
+      <div class='modal-header'>
+        <div>
+        <button type='button' class='close' data-dismiss='modal' aria-hidden='true'>
+          <span aria-hidden="true">&times;</span><span class="sr-only">Close</span>
+        </button>
+        </div>
+        <div class='clearfix'>
+        </div>
+        <span style='width: 70%; float: left;'>
+            <h3 id='myModalLabel'>Unfortunatelly the program "rrss" crashed</h3>
+        </span>
+        <span style='width: 30%; float: left;'>
+          <img src='images/icon_bike_crash.svg' alt='fo' style='width: 85px' title='Bicycle accident'>
+        </span>
+        <div class='clearfix'>
+        </div>
+      </div>
+      <div class='modal-body'>
+        <span id='xerror_pop_msg' style='width: 60%;'>
+        Fatal error
+        </span>
+      </div>
+      <div class='modal-footer'>
+        <button class='btn' data-dismiss='modal' aria-hidden='true'>Close</button>
       </div>
 
     </div> <!-- .modal-content -->
