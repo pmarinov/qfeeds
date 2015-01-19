@@ -118,7 +118,7 @@ function emptyRssHeader()
 function copyRssHeader(from)
 {
   var x = new RssHeader(from.m_url, from.m_title, from.m_link, from.m_description,
-                    from.m_language, new Date(from.m_date));
+                        from.m_language, new Date(from.m_date));
   x.m_tags = from.m_tags;
   x.m_is_unsubscribed = from.m_is_unsubscribed;
   x.m_rss_type = from.m_rss_type;

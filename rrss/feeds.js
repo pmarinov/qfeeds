@@ -31,10 +31,14 @@ function Feeds(feedsCB)
   // Poll loop
   self.m_pollIndex = 0;
   self.m_timeoutID = null;
+  self.m_loopIsSuspended = true;
 
   self.m_db = null;
   self.m_rss_entry_cnt = 0;
 
+  // Open IndexedDB and load all feeds (object type RSSHeader) in memory
+  // Via call-backs this will also list the feeds and folders in
+  // the panel for feeds navigation (left-hand-side)
   self.p_dbOpen();
 
   // Set to true if Dropbox status is logged in
@@ -511,6 +515,7 @@ Feeds.prototype.rtableDisconnect = rtableDisconnect;
 function p_feedReadAll(cbDone)
 {
   var self = this;
+  var feeds = [];
 
   // Read the list of RSS subscriptions from IndexDB
   var cnt = 0;
@@ -539,13 +544,15 @@ function p_feedReadAll(cbDone)
         if (!cursor)
         {
           console.log('db: ' + cnt + ' subscriptions retrieved');
+          self.p_feedInsertBatch(feeds);
           if (cbDone != null)
             cbDone();
           return;  // no more entries
         }
         var hdr = cursor.value;
+        // Just collect and insert in a batch at the end
         if (!hdr.m_is_unsubscribed)
-          self.p_feedAdd(feeds_ns.copyRssHeader(hdr), null);
+          feeds.push(feeds_ns.copyRssHeader(hdr));
         ++cnt;
         cursor.continue();
       };
@@ -635,6 +642,9 @@ function p_dbOpen()
         self.p_feedReadAll(
             function()
             {
+              log.info('p_dbOpen: all feeds loaded from IndexedDB, start the RSS fetch loop');
+              self.m_loopIsSuspended = false;
+              self.p_reschedulePoll(1);  // Start the fetch loop
               self.m_feedsCB.onDbInitDone();
             });
       };
@@ -690,7 +700,7 @@ function compareRssHeadersByUrl(feed1, feed2)
 
 // object Feeds.p_feedAdd
 // add a feed (RSSHeader) to list of feeds, fetch the RSS for this feed
-function p_feedAdd(newFeed, cbDone, syncRTable)
+function p_feedAdd(newFeed, cbDone)
 {
   var self = this;
 
@@ -719,6 +729,36 @@ function p_feedAdd(newFeed, cbDone, syncRTable)
       });
 }
 Feeds.prototype.p_feedAdd = p_feedAdd;
+
+// object Feeds.p_feedInsertBatch
+// Insert a batch of feeds (RSSHeader) to list of feeds m_rssFeeds
+function p_feedInsertBatch(feeds)
+{
+  var self = this;
+  var i = 0;
+  var newFeed = null;
+  var m = 0;
+
+  for (i = 0; i < feeds.length; ++i)
+  {
+    newFeed = feeds[i];
+
+    // Find insertion point into the sorted m_rssFeeds[]
+    m = self.m_rssFeeds.binarySearch(newFeed, compareRssHeadersByUrl);
+    if (m >= 0)  // Entry with this url is already in
+      return;
+
+    m = -(m + 1);
+    if (m >= self.m_rssFeeds.length)  // add?
+      self.m_rssFeeds.push(newFeed);
+    else  // insert
+      self.m_rssFeeds.splice(m, 0, newFeed);
+  }
+
+  // Notify event subscribers (single notification for the entire batch)
+  self.m_feedsCB.onRssUpdated(feeds);
+}
+Feeds.prototype.p_feedInsertBatch = p_feedInsertBatch;
 
 // object Feeds.p_feedRecord
 // Insert a new record or update a record of a feed (RssHeader) in the indexedDB
@@ -1797,6 +1837,10 @@ function p_reschedulePoll(delayInSeconds)
 {
   var self = this;
 
+  // Clear any previously set timeout
+  if (self.m_timeoutID != null)
+    clearTimeout(self.m_timeoutID);
+
   var delay = delayInSeconds * 1000;
   self.m_timeoutID = setTimeout(p_poll, delay, self);
 }
@@ -1815,13 +1859,19 @@ function p_poll(self)
     return;
   }
 
-  var urlRss = self.m_rssFeeds[self.m_pollIndex].m_url
+  if (self.m_loopIsSuspended)
+  {
+    self.p_reschedulePoll(60);
+    return;
+  }
+
+  var urlRss = self.m_rssFeeds[self.m_pollIndex].m_url;
   log.info('fetch: ' + self.m_pollIndex + ' url: ' + urlRss);
   ++self.m_pollIndex;
 
   self.p_fetchRss(urlRss, function()
       {
-        var delay = 1;
+        var delay = 0;  // Don't wait in fetching the next feed
         if (self.m_pollIndex >= self.m_rssFeeds.length)
         {
           // Reached the end of the poll loop
