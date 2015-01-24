@@ -369,6 +369,7 @@ function fetchRss(urlRss, cb)
   $.ajax({
     type: "GET",
     url: urlRss,
+    timeout: 12 * 1000,
     dataType: "xml",
     error: function error(jqXHR, textStatus, errorThrown)
       {

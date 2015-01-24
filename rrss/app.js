@@ -81,7 +81,7 @@ function App()
 
   self.m_panelAbout = new feeds_ns.PanelAbout();
   var feedsDB = self.m_feedsDir.getFeedsDbObj();
-  self.m_panelImportOpml = new feeds_ns.FeedsImport(feedsDB);
+  self.m_panelImportOpml = new feeds_ns.FeedsImport(feedsDB, self.m_feedsDir, self.m_panelMng);
 
   self.m_panelMng.setMenuEntryHandler('xcmd_pane_feeds_dir', self.m_feedsDir);
   self.m_panelMng.setMenuEntryHandler('ximport_opml', self.m_panelImportOpml);

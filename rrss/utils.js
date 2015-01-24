@@ -261,7 +261,7 @@ function hasFields(obj, arrayOfNames, message)
   for (i = 0; i < arrayOfNames.length; ++i)
   {
     if (obj[arrayOfNames[i]] === undefined)
-      assert(false, 'bad field "' + arrayOfNames[i] + '"; ' + message);
+      assert(false, 'missing field "' + arrayOfNames[i] + '"; ' + message);
   }
 }
 

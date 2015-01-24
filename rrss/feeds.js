@@ -141,7 +141,7 @@ function p_rtableRemoteEntryReadListener(records)
               else
               {
                 dbEntry.m_is_read = is_read;
-                dbEntry.m_remote_state = feeds_ns.RssSyncState.IS_SYNCED
+                dbEntry.m_remote_state = feeds_ns.RssSyncState.IS_SYNCED;
                 return 0;  // Record in the DB
               }
             }
@@ -281,6 +281,10 @@ Feeds.prototype.p_rtableListener = p_rtableListener;
 // Sync one RSS entry with the remote table
 function p_rtableSyncEntry(rssEntry)
 {
+  // We can't use _instanceof_ for objects that are read from the indexedDB
+  // just check for some fields to confirm this is RssEntry object
+  feeds_ns.hasFields(feed, ['m_is_read', 'm_rssurl_date'], 'p_rtableSyncEntry');
+
   var self = this;
 
   var remoteEntry = null;
@@ -307,6 +311,10 @@ Feeds.prototype.p_rtableSyncEntry = p_rtableSyncEntry;
 // Sync one RSS feed (RSSHeader) entry with the remote table
 function p_rtableSyncFeedEntry(feed)
 {
+  // We can't use _instanceof_ for objects that are read from the indexedDB
+  // just check for some fields to confirm this is RssHeader object
+  utils_ns.hasFields(feed, ['m_rss_type', 'm_rss_version'], 'p_rtableSyncFeedEntry');
+
   var self = this;
 
   var remoteFeed = null;
@@ -390,7 +398,7 @@ function p_rtableSyncRemoteSubscriptions(cbDone)
         if (feed.m_remote_state == feeds_ns.RssSyncState.IS_LOCAL_ONLY)
         {
           // Record all read entries in the remote table
-          log.info('p_rtableSyncRemoteSubscriptions: complete pending operation (' + feed.m_url + ')');
+          log.info('p_rtableSyncRemoteSubscriptions: complete pending operation add (' + feed.m_url + ')');
           self.p_rtableSyncFeedEntry(feed);
           return 1;  // Update entry
         }
@@ -913,7 +921,7 @@ function feedAddByUrl(feedUrl, cbDone)
   newFeed.m_url = feedUrl;
   newFeed.m_title = feedUrl;
 
-  // Add to table rss_subscriptions (it will be updated when more data is fetched)
+  // Add to table rss_subscriptions (it will be updated when more data is fetched, only URL for now)
   self.p_feedRecord(newFeed, true, null);
 
   // Add to the resident list of feeds (will become part of the fetch loop)
@@ -971,6 +979,10 @@ function p_feedRemoveDB(feedUrl, needsRTableSync)
             log.info('p_feedRemoveDB: delete from remote table, feed: ' + feedUrl);
             self.m_remote_subscriptions.deleteRec(data.m_hash);  // delete by hash of feed url
           }
+        }
+        else
+        {
+            log.info('p_feedRemoveDB: entry was never in remote table: ' + feedUrl);
         }
 
         // Record exists, delete it
@@ -1050,6 +1062,19 @@ function feedRemove(feedUrl)
   self.p_feedRemove(feedUrl, true);
 }
 Feeds.prototype.feedRemove = feedRemove;
+
+// object Feeds.feedUnsubscribeAll
+// Deletes all feeds from database table 'rss_subscriptions' and list of feeds
+// To call for debug purposes from the console:
+// app.m_feedsDir.m_feedsDB.feedUnsubscribeAll
+function feedUnsubscribeAll()
+{
+  var self = this;
+
+  while (self.m_rssFeeds.length > 0)
+    self.feedRemove(self.m_rssFeeds[0].m_url);
+}
+Feeds.prototype.feedUnsubscribeAll = feedUnsubscribeAll;
 
 // object Feeds.feedMarkUnsubscribed
 // Marks a feed as unsubscribed (permits undo)
@@ -1823,6 +1848,10 @@ function p_fetchRss(urlRss, cbDone, cbWriteDone)
         {
           var shortMsg = errorMsg.substring(0, 80) + '...';
           console.warn('rss fetch, failed: ' + shortMsg + ', for: ' + feed.m_url);
+
+          // Nothing to write, write operation is considered done
+          if (cbWriteDone != null)
+            cbWriteDone();
         }
 
         if (cbDone != null)

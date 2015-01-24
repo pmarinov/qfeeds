@@ -18,7 +18,7 @@ if (typeof feeds_ns === 'undefined')
 
 // object FeedsImport.FeedsImport [constructor]
 // Instantiate one per application
-function FeedsImport(feedsDB)
+function FeedsImport(feedsDB, feedsDir, panelMng)
 {
   var self = this;
 
@@ -26,6 +26,8 @@ function FeedsImport(feedsDB)
   var opmlWarning2TextDetailedContainer = utils_ns.domFind('#xopml_error_details');
 
   self.m_feedsDB = feedsDB;
+  self.m_feedsDir = feedsDir;
+  self.m_panelMng = panelMng;
   self.m_opmlFeeds = null;  // Array of FeedEntry, after parsing of OPML xml
   self.m_parsingErrorMsgs = [];  // Parsing errors text, array if OPMLError
 
@@ -33,6 +35,7 @@ function FeedsImport(feedsDB)
   {
     opmlStep1: utils_ns.domFind('#ximport_opml_step1_input_file'),
     opmlStep2: utils_ns.domFind('#ximport_opml_step2_display_file'),
+    opmlStep3: utils_ns.domFind('#ximport_opml_step3_importing'),
     opmlTitle: utils_ns.domFind('#opml_title'),
     opmlTotal: utils_ns.domFind('#opml_total'),
     opmlError1: utils_ns.domFind('#xopml_error1'),
@@ -53,7 +56,8 @@ function FeedsImport(feedsDB)
     btnNone1: utils_ns.domFind('#xopml_none1', -1),
     btnNone2: utils_ns.domFind('#xopml_none2', -1),
     btnImport: utils_ns.domFind('#xopml_import', -1),
-    btnCancel: utils_ns.domFind('#xopml_cancel', -1)
+    btnCancel: utils_ns.domFind('#xopml_cancel', -1),
+    importCounter: utils_ns.domFind('#ximport_counter')
   };
   // Help strict mode detect misstyped fields
   Object.preventExtensions(self.$d);
@@ -640,6 +644,7 @@ function handleOPMLFile(file)
           // from the OPML file
           self.$d.opmlStep1.toggleClass('hide', true);
           self.$d.opmlStep2.toggleClass('hide', false);
+          self.$d.opmlStep3.toggleClass('hide', true);
 
           // Display the entries
           self.$d.opmlTotal.text(self.m_opmlFeeds.length + ' entries');
@@ -657,12 +662,20 @@ function handleImport()
 {
   var self = this;
 
+  self.$d.importCounter.text('Importing...');
+
+  // Activate area for step3 -- imports counter
+  self.$d.opmlStep1.toggleClass('hide', true);
+  self.$d.opmlStep2.toggleClass('hide', true);
+  self.$d.opmlStep3.toggleClass('hide', false);
+
   var i = 0;
   var x = null;
   var $e = null;
   var $rssEntry = null;
   var $checkbox = null;
   var cbox_val = false;
+  var importCnt = 0;
   // Walk all m_opmlFeeds entries if checkbox is ON, then import
   for (i = 0; i < self.m_opmlFeeds.length; ++i)
   {
@@ -681,6 +694,9 @@ function handleImport()
       continue;
     }
 
+    ++importCnt;
+    self.$d.importCounter.text('Importing(' + importCnt + ')...');
+    log.info("handleImport: RSS import requested: " + x.m_feedUrl);
     // Checkbox is ON = do import
     (function()  // scope
     {
@@ -688,25 +704,20 @@ function handleImport()
       self.m_feedsDB.feedAddByUrl(x.m_feedUrl,
           function()
           {
+            --importCnt;
+            self.$d.importCounter.text('Importing(' + importCnt + ')...');
+
             // Feed's _add_ operation is complete
             // (feed data is in the DB)
-            log.info("RSS imported into DB (completed): " + urlRss);
+            log.info("handleImport: RSS imported into DB: " + urlRss);
 
-            /*
-            // TODO: see how to activate the first entry, probably only if there were 0 feeds before this
-            // This function would activate an RSS feed as a result of Add operation
-            if (self.m_newFeedUrl == null)  // User already switched away to something else?
-              return;
-
-            var idx = self.p_findDirEntry(urlRss);
-            if (idx < 0)
-              return;
-
-            log.info('activate ' + idx);
-            self.p_activateDirEntry(idx);
-            */
+            if (importCnt == 0)
+            {
+              self.m_feedsDir.p_activateDirEntry(0);
+              self.m_panelMng.p_activatePane(0);  // Activate feeds display
+            }
           });
-    })()
+    })();
 
     if (x.m_folder != null)
     {
@@ -727,6 +738,7 @@ function activateStep1()
 
   self.$d.opmlStep1.toggleClass('hide', false);
   self.$d.opmlStep2.toggleClass('hide', true);
+  self.$d.opmlStep3.toggleClass('hide', true);
 }
 FeedsImport.prototype.activateStep1 = activateStep1;
 
