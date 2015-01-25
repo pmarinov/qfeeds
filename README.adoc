@@ -14,12 +14,12 @@ Screenshots::
 Features::
 
 * 'rrss' is an RSS reader
-* It operates in a standalone mode as a web browser extension (Google
+* Operates in a standalone mode as a web browser extension (Google
   Chrome)
 * Local storage is used to keep feed subscriptions and metadata
   (IndexedDB)
-* It displays feeds alone or grouped into folders
-* It uses Dropbox, optionally, for synchronization between
+* Displays feeds alone or grouped into folders
+* Uses Dropbox, optionally, for synchronization between
   computers (list of subscriptions and what was marked as read)
 
 *Version:* 0.4.0 +

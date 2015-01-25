@@ -205,7 +205,7 @@ function copyFields(src, skip)
       }
     }
     if (!shouldSkip)
-      dest[f] = src[f]
+      dest[f] = src[f];
   }
 
   return dest;

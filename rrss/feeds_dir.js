@@ -166,7 +166,7 @@ function p_setFeedsDomHandlers()
         self.$d.areaLoadingMsg.toggleClass('hide', false);
 
         self.m_loadingInProgress = true;
-        self.m_feedsDB.feedAddByUrl(self.m_urlFirstTimeOffer,
+        self.m_feedsDB.feedAddByUrl(self.m_urlFirstTimeOffer, '',
             function()  // When feed is commited to the db, activate it
             {
               self.p_activateDirEntry(0);
@@ -360,6 +360,7 @@ function p_getFeedsCBHandlers()
         {
           // The feed is already properly displayed
           // TODO: but if there is no other feed, activate this as current
+          log.warn('TODO: activate feed ' + urlNewFeed);
         }
   };
 
@@ -978,7 +979,15 @@ function p_handleSubscribe(ev)
   }
 
   var urlRss = self.m_newFeedUrl;
-  self.m_feedsDB.feedAddByUrl(self.m_newFeedUrl,
+  var tags = '';
+  if (selectedFolder != null)
+  {
+    tags = selectedFolder;
+    log.info('subscribe: in folder ' + selectedFolder + ' url:' + self.m_newFeedUrl);
+  }
+  else
+    log.info('subscribe: url:' + self.p_newFeedUrl);
+  self.m_feedsDB.feedAddByUrl(self.m_newFeedUrl, tags,
       function()
       {
         // Feed's _add_ operation is complete
@@ -996,13 +1005,6 @@ function p_handleSubscribe(ev)
         log.info('activate ' + idx);
         self.p_activateDirEntry(idx);
       });
-  if (selectedFolder != null)
-  {
-    self.m_feedsDB.feedSetTags(self.m_newFeedUrl, selectedFolder);
-    log.info('subscribe: in folder ' + selectedFolder + ' url:' + self.m_newFeedUrl);
-  }
-  else
-    log.info('subscribe: url:' + self.p_newFeedUrl);
 }
 FeedsDir.prototype.p_handleSubscribe = p_handleSubscribe;
 

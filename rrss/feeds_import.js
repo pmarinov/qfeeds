@@ -669,62 +669,77 @@ function handleImport()
   self.$d.opmlStep2.toggleClass('hide', true);
   self.$d.opmlStep3.toggleClass('hide', false);
 
-  var i = 0;
-  var x = null;
-  var $e = null;
-  var $rssEntry = null;
-  var $checkbox = null;
-  var cbox_val = false;
-  var importCnt = 0;
-  // Walk all m_opmlFeeds entries if checkbox is ON, then import
-  for (i = 0; i < self.m_opmlFeeds.length; ++i)
+  // Don't read any RSS feeds while we are adding to the list
+  // (add operation also includes initial fetch in it)
+  self.m_feedsDB.suspendFetchLoop(true);
+
+  // Yield to UI to display initial progress message (delay 0)
+  setTimeout(function ()
   {
-    x = self.m_opmlFeeds[i];
-    utils_ns.assert(x instanceof FeedEntry, 'opml: displayOPML: x instanceof FeedEntry');
-    if (x.m_isFolder)
-      continue;  // Process only the RSS entries, skip the folders
-    $e = jQuery(self.$d.list[i]);
-    $rssEntry = utils_ns.domFindInside($e, '.xopml_feed_entry');
-    $checkbox = utils_ns.domFindInside($rssEntry, '.xopml_checkbox');
-
-    cbox_val = $checkbox.prop('checked');
-    if (!cbox_val)  // Checkbox is OFF
+    var i = 0;
+    var x = null;
+    var $e = null;
+    var $rssEntry = null;
+    var $checkbox = null;
+    var cbox_val = false;
+    var importCnt = 0;
+    var requestCompleted = false;
+    // Walk all m_opmlFeeds entries if checkbox is ON, then import
+    for (i = 0; i < self.m_opmlFeeds.length; ++i)
     {
-      log.info('skip import for ' + x.m_feedUrl);
-      continue;
-    }
+      x = self.m_opmlFeeds[i];
+      utils_ns.assert(x instanceof FeedEntry, 'opml: displayOPML: x instanceof FeedEntry');
+      if (x.m_isFolder)
+        continue;  // Process only the RSS entries, skip the folders
+      $e = jQuery(self.$d.list[i]);
+      $rssEntry = utils_ns.domFindInside($e, '.xopml_feed_entry');
+      $checkbox = utils_ns.domFindInside($rssEntry, '.xopml_checkbox');
 
-    ++importCnt;
-    self.$d.importCounter.text('Importing(' + importCnt + ')...');
-    log.info("handleImport: RSS import requested: " + x.m_feedUrl);
-    // Checkbox is ON = do import
-    (function()  // scope
-    {
-      var urlRss = x.m_feedUrl;
-      self.m_feedsDB.feedAddByUrl(x.m_feedUrl,
-          function()
-          {
-            --importCnt;
-            self.$d.importCounter.text('Importing(' + importCnt + ')...');
+      cbox_val = $checkbox.prop('checked');
+      if (!cbox_val)  // Checkbox is OFF
+      {
+        log.info('skip import for ' + x.m_feedUrl);
+        continue;
+      }
 
-            // Feed's _add_ operation is complete
-            // (feed data is in the DB)
-            log.info("handleImport: RSS imported into DB: " + urlRss);
+      ++importCnt;
+      // Checkbox is ON = do import
+      self.$d.importCounter.text('Importing (' + importCnt + ')...');
+      log.info('handleImport: (' + importCnt + ') RSS import requested: ' + x.m_feedUrl);
 
-            if (importCnt == 0)
+      (function ()  // Scope
+      {
+        var urlRss = x.m_feedUrl;
+        var tags = '';
+
+        if (x.m_folder != null)
+          tags = x.m_folder;
+
+        self.m_feedsDB.feedAddByUrl(urlRss, tags,
+            function()
             {
-              self.m_feedsDir.p_activateDirEntry(0);
-              self.m_panelMng.p_activatePane(0);  // Activate feeds display
-            }
-          });
-    })();
+              // Feed's _add_ operation is complete
+              // (feed data is in the DB)
+              log.info('handleImport: (' + importCnt + ') RSS imported into DB: ' + urlRss);
+              self.$d.importCounter.text('Importing (' + importCnt + ')...');
 
-    if (x.m_folder != null)
-    {
-      self.m_feedsDB.feedSetTags(x.m_feedUrl, x.m_folder);
-      log.info('import: in folder ' + x.m_folder + ' url:' + x.m_feedUrl);
+              --importCnt;
+
+              // Everything already imported?
+              if (requestCompleted && importCnt == 0)
+              {
+                // Resume fetch loop
+                self.m_feedsDB.suspendFetchLoop(false, -1);
+
+                // Display
+                self.m_feedsDir.p_activateDirEntry(0);
+                self.m_panelMng.p_activatePane(0);  // Activate feeds display
+              }
+            });
+      })();
     }
-  }
+    requestCompleted = true;
+  }, 0);  // Delay 0, just yield
 }
 FeedsImport.prototype.handleImport = handleImport;
 

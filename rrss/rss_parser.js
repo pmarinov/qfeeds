@@ -79,7 +79,7 @@ function RssHeader(url, title, link, description, language, updated)
   // Feeds.p_feedRecord
   this.m_url = url;
   this.m_title = title;
-  this.m_link = link;
+  this.m_link = link;  // Link to web site or page that is behind the feed m_url
   this.m_description = description;
   this.m_language = language;
   this.m_date = updated;

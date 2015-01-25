@@ -166,10 +166,10 @@ function p_rtableRemoteEntryReadListener(records)
 }
 Feeds.prototype.p_rtableRemoteEntryReadListener = p_rtableRemoteEntryReadListener;
 
-// object Feeds.p_findFeedByHash
+// object Feeds.p_feedFindByHash
 // Find feed by its hash. This is a slow operation -- linear to the
 // size of the list of feeds
-function p_findFeedByHash(feed_hash)
+function p_feedFindByHash(feed_hash)
 {
   var self = this;
   var x = 0;
@@ -182,7 +182,23 @@ function p_findFeedByHash(feed_hash)
   }
   return -1;
 }
-Feeds.prototype.p_findFeedByHash = p_findFeedByHash;
+Feeds.prototype.p_feedFindByHash = p_feedFindByHash;
+
+// object Feeds.p_feedFindByUrl
+// Find feed by its URL. Uses binary search operation.
+function p_feedFindByUrl(feedUrl)
+{
+  var self = this;
+
+  // Find feed in the list of feeds
+  var feed = feeds_ns.emptyRssHeader();
+  feed.m_url = feedUrl;
+
+  // Find into the sorted m_rssFeeds[]
+  var m = self.m_rssFeeds.binarySearch(feed, compareRssHeadersByUrl);
+  return m;
+}
+Feeds.prototype.p_feedFindByUrl = p_feedFindByUrl;
 
 // object Feeds.p_rtableRemoteFeedsListener
 // Handle updates from the remote tables for 'rss_subscriptions'
@@ -202,7 +218,7 @@ function p_rtableRemoteFeedsListener(records)
         return;  // leave the anonymous scope
 
       // Reflect the new state on the screen (remove feeds from display)
-      var x = self.p_findFeedByHash(r.id);  // id = m_rss_feed_hash
+      var x = self.p_feedFindByHash(r.id);  // id = m_rss_feed_hash
 
       // Skip operation if it is remote delete
       // Local delete will take place when scheduled
@@ -237,16 +253,22 @@ function p_rtableRemoteFeedsListener(records)
       newFeed.m_tags = r.data.m_tags;
       newFeed.m_remote_state = feeds_ns.RssSyncState.IS_SYNCED;
       newFeed.m_remote_id = r.data.m_rss_feed_hash;
+
+      // Put into local list of RSS subscriptions (self.m_rssFeeds)
+      self.p_feedInsert(newFeed);
+
       self.p_feedRecord(newFeed, false,
           function(wasUpdated)
           {
             if (wasUpdated == 1)
             {
-              // If update was needed in the database then add/update
-              // local (in memory) list. This will also call all necessary display callbacks
-              self.p_feedAdd(newFeed, null);
-              // If any extra activation/display is needed
-              self.m_feedsCB.onRemoteFeedUpdated(newFeed.m_url, newFeed.m_tags);
+              // New feed -> fetch RSS data
+              self.p_fetchRss(newFeed.m_url, null,
+                  function()  // CB: write operation is completed
+                  {
+                    // If any extra activation/display is needed
+                    self.m_feedsCB.onRemoteFeedUpdated(newFeed.m_url, newFeed.m_tags);
+                  });
             }
             else
               log.info('p_rtableRemoteFeedsListener: nothing to do for ' + newFeed.m_url);
@@ -283,7 +305,7 @@ function p_rtableSyncEntry(rssEntry)
 {
   // We can't use _instanceof_ for objects that are read from the indexedDB
   // just check for some fields to confirm this is RssEntry object
-  feeds_ns.hasFields(feed, ['m_is_read', 'm_rssurl_date'], 'p_rtableSyncEntry');
+  utils_ns.hasFields(rssEntry, ['m_is_read', 'm_rssurl_date'], 'p_rtableSyncEntry');
 
   var self = this;
 
@@ -317,21 +339,41 @@ function p_rtableSyncFeedEntry(feed)
 
   var self = this;
 
+  var localFeed = null;
   var remoteFeed = null;
   var remoteId = null;
+  var m = 0;
+
+  m = self.p_feedFindByUrl(feed.m_url);
+  if (m >= 0)
+    localFeed = self.m_rssFeeds[m];
+  else
+    localFeed = null;
 
   if (feeds_ns.RTableIsOnline())
   {
     remoteFeed = new RemoteFeedUrl(feed);
     remoteId = self.m_remote_subscriptions.insert(remoteFeed, feed.m_remote_id);
+
+    // Reflect in the local entry (m_rssFeeds)
+    if (localFeed != null)
+    {
+      localFeed.m_remote_state = feeds_ns.RssSyncState.IS_SYNCED;
+      localFeed.m_remote_id = remoteId;
+    }
+
+    // Reflect in feed copy which will be recorded back into the IndexedDB
     feed.m_remote_state = feeds_ns.RssSyncState.IS_SYNCED;
     feed.m_remote_id = remoteId;
+
     log.trace('p_rtableSyncFeedEntry: remote OK (' + remoteFeed.m_rss_feed_url + ')');
   }
   else
   {
     // Data can't be sent, mark it for sending at the next opportunity
     feed.m_remote_state = feeds_ns.RssSyncState.IS_PENDING_SYNC;
+    if (localFeed != null)
+      localFeed.m_remote_state = feeds_ns.RssSyncState.IS_PENDING_SYNC;
     log.info('p_rtableSyncFeedEntry: local only (' + feed.m_rss_feed_url + ' -> IS_PENDING_SYNC)');
   }
 }
@@ -651,8 +693,7 @@ function p_dbOpen()
             function()
             {
               log.info('p_dbOpen: all feeds loaded from IndexedDB, start the RSS fetch loop');
-              self.m_loopIsSuspended = false;
-              self.p_reschedulePoll(1);  // Start the fetch loop
+              self.suspendFetchLoop(false, 1);  // Resume fetch loop, start fetching now
               self.m_feedsCB.onDbInitDone();
             });
       };
@@ -706,9 +747,9 @@ function compareRssHeadersByUrl(feed1, feed2)
   return 0;
 }
 
-// object Feeds.p_feedAdd
-// add a feed (RSSHeader) to list of feeds, fetch the RSS for this feed
-function p_feedAdd(newFeed, cbDone)
+// object Feeds.p_feedInsert
+// Insert a feed (RSSHeader) to list of feeds m_rssFeeds
+function p_feedInsert(newFeed)
 {
   var self = this;
 
@@ -727,6 +768,16 @@ function p_feedAdd(newFeed, cbDone)
   var listNewFeeds = new Array();
   listNewFeeds.push(newFeed);
   self.m_feedsCB.onRssUpdated(listNewFeeds);
+}
+Feeds.prototype.p_feedInsert = p_feedInsert;
+
+// object Feeds.p_feedAdd
+// add a feed (RSSHeader) to list of feeds, fetch the RSS for this feed
+function p_feedAdd(newFeed, cbDone)
+{
+  var self = this;
+
+  self.p_feedInsert(newFeed);
 
   // Fetch the RSS data for this URL, update the subscribed listeners
   self.p_fetchRss(newFeed.m_url, null,
@@ -846,6 +897,8 @@ function p_feedRecord(feed, syncRTable, cbResult)
             {
               // Display shortened strings in the log
               var shortDesc = feed2.m_description;
+              if (shortDesc == null)
+                shortDesc = '[null]'
               if (shortDesc.length > 80)
                 shortDesc = shortDesc.substring(0, 80) + '...';
               var shortOldDesc = data.m_description;
@@ -888,7 +941,11 @@ function p_feedRecord(feed, syncRTable, cbResult)
         if (needsUpdate)
         {
           if (needsRTableSync)
+          {
             self.p_rtableSyncFeedEntry(feed2);  // new url or tags
+            utils_ns.assert(feed2.m_remote_state != feeds_ns.RssSyncState.IS_LOCAL_ONLY, "p_feedRecord: remote state");
+          }
+
 
           var reqAdd = store.put(utils_ns.marshal(feed2, 'm_'));
           reqAdd.onsuccess = function(event)
@@ -900,7 +957,9 @@ function p_feedRecord(feed, syncRTable, cbResult)
               }
           reqAdd.onerror = function(event)
               {
-                log.error('db: error msg: ' + reqAdd.error.message);
+                log.error('db: error msg: ' + reqAdd.error.message + ' url: ' + feed2.m_url);
+                if (cbResult != null)  // Notifier callback provided?
+                  cbResult(2);  // Notify that update was needed followed by an error
               }
         }
         else
@@ -914,20 +973,23 @@ Feeds.prototype.p_feedRecord = p_feedRecord;
 
 // object Feeds.feedAddByUrl
 // add a new feed (by URL) to list of feeds
-function feedAddByUrl(feedUrl, cbDone)
+function feedAddByUrl(feedUrl, tags, cbDone)
 {
   var self = this;
   var newFeed = feeds_ns.emptyRssHeader();
   newFeed.m_url = feedUrl;
   newFeed.m_title = feedUrl;
+  newFeed.m_tags = tags;
 
-  // Add to table rss_subscriptions (it will be updated when more data is fetched, only URL for now)
+  // Put into local list of RSS subscriptions (self.m_rssFeeds)
+  self.p_feedInsert(newFeed);
+
+  // Add to IndexedDB table rss_subscriptions and to remote table 'rss_subscriptions'
   self.p_feedRecord(newFeed, true, null);
 
-  // Add to the resident list of feeds (will become part of the fetch loop)
-  // Do first fetch of RSS
-  self.p_feedAdd(newFeed,
-      function()
+  // First fetch of the RSS data for this URL, update the subscribed listeners
+  self.p_fetchRss(feedUrl, null,
+      function()  // CB: write operation is completed
       {
         if (cbDone != null)
           cbDone();
@@ -1066,7 +1128,7 @@ Feeds.prototype.feedRemove = feedRemove;
 // object Feeds.feedUnsubscribeAll
 // Deletes all feeds from database table 'rss_subscriptions' and list of feeds
 // To call for debug purposes from the console:
-// app.m_feedsDir.m_feedsDB.feedUnsubscribeAll
+// feeds_ns.app.m_feedsDir.m_feedsDB.feedUnsubscribeAll
 function feedUnsubscribeAll()
 {
   var self = this;
@@ -1099,7 +1161,7 @@ function feedMarkUnsubscribed(feedUrl, isUnsubscribed)
 
   var flagUpdatedHeader = self.p_feedUpdateHeader(index, target);
   if (flagUpdatedHeader)  // Record any changes in IndexedDB
-    self.p_feedRecord(target, null);
+    self.p_feedRecord(target, true, null);
 }
 Feeds.prototype.feedMarkUnsubscribed = feedMarkUnsubscribed;
 
@@ -1112,16 +1174,12 @@ function feedSetTags(feedUrl, tags)
 {
   var self = this;
 
-  var targetFeed = feeds_ns.emptyRssHeader();
-  targetFeed.m_url = feedUrl;
-  targetFeed.m_title = feedUrl;
-
   // Find insertion point into the sorted m_rssFeeds[]
-  var m = self.m_rssFeeds.binarySearch(targetFeed, compareRssHeadersByUrl);
+  var m = self.p_feedFindByUrl(feedUrl);
   if (m < 0)  // Entry with this url doesn't exist
     return 1;
 
-  targetFeed = self.m_rssFeeds[m];
+  var targetFeed = self.m_rssFeeds[m];
   targetFeed.m_tags = tags;
 
   // Notify event subscribers
@@ -1129,7 +1187,7 @@ function feedSetTags(feedUrl, tags)
   updated.push(targetFeed);
   self.m_feedsCB.onRssUpdated(updated);
 
-  // Update the database record (IndexedDb)
+  // Update the database record (IndexedDb) and remote table 'rss_subscriptions'
   self.p_feedRecord(targetFeed, true, null);
   return 0;
 }
@@ -1430,10 +1488,12 @@ function p_feedUpdate(feedHeaderNew, cbWriteDone)
   // from the feed's source website
   feedHeaderNew.m_is_unsubscribed = target.m_is_unsubscribed;
   feedHeaderNew.m_tags = target.m_tags;
+  feedHeaderNew.m_remote_state = target.m_remote_state;
+  feedHeaderNew.m_remote_id = target.m_remote_id;
 
   // Check if any fields of rssFeed header have new values
   var flagUpdatedHeader = self.p_feedUpdateHeader(index, feedHeaderNew);
-  if (flagUpdatedHeader)  // Record any changes in IndexedDB
+  if (flagUpdatedHeader)  // Record any changes in IndexedDB and remote table 'rss_subscriptions'
     self.p_feedRecord(feedHeaderNew, true, null);
 
   // Send each entry in the RSS feed to the database
@@ -1445,6 +1505,7 @@ function p_feedUpdate(feedHeaderNew, cbWriteDone)
   var cntDone = 0;
   var totalCnt = 0;
   var unchangedCnt = 0;
+  var requestsDone = false;
   for (i = 0; i < keysNew.length; ++i)
   {
     keyNew = keysNew[i];
@@ -1460,15 +1521,26 @@ function p_feedUpdate(feedHeaderNew, cbWriteDone)
            ++unchangedCnt;
 
          --cntDone;
-         if (cntDone == 0)
+         if (requestsDone && cntDone == 0)
          {
            if (cbWriteDone != null)
            {
-             log.info(totalCnt + ' new entries recorded in table rss_data, ' + unchangedCnt + ' unchanged');
+             if (totalCnt > 0)
+               log.info(totalCnt + ' new entries recorded in table rss_data, ' + unchangedCnt + ' unchanged');
              cbWriteDone();
            }
          }
        });
+  }
+  requestsDone = true;
+
+  if (keysNew.length == 0)  // Nothint to write, consider operation done
+  {
+     if (cbWriteDone != null)
+     {
+       log.info('0 new entries recorded in table rss_data, 0 unchanged');
+       cbWriteDone();
+     }
   }
 
   return target;
@@ -1826,7 +1898,7 @@ function p_fetchRss(urlRss, cbDone, cbWriteDone)
       {
         if (c == 0)
         {
-          console.log('rss fetch, success: ' + feed.m_url);
+          log.trace('rss fetch, success: ' + feed.m_url);
           var target = self.p_feedUpdate(feed,
               function()  // CB: write operation completed
               {
@@ -1843,11 +1915,13 @@ function p_fetchRss(urlRss, cbDone, cbWriteDone)
             updated.push(target);
             self.m_feedsCB.onRssUpdated(updated);
           }
+          else
+            log.warn('p_fetchRss: target is null');
         }
         else
         {
           var shortMsg = errorMsg.substring(0, 80) + '...';
-          console.warn('rss fetch, failed: ' + shortMsg + ', for: ' + feed.m_url);
+          log.warn('rss fetch, failed: ' + shortMsg + ', for: ' + feed.m_url);
 
           // Nothing to write, write operation is considered done
           if (cbWriteDone != null)
@@ -1859,6 +1933,27 @@ function p_fetchRss(urlRss, cbDone, cbWriteDone)
       });
 }
 Feeds.prototype.p_fetchRss = p_fetchRss;
+
+// object Feeds.suspendFetchLoop
+// Set the delay before next iteration of the poll loop
+function suspendFetchLoop(flag, fetchWhen)
+{
+  var self = this;
+
+  if (flag)
+  {
+    self.m_loopIsSuspended = false;
+    log.info('fatch loop SUSPENDED');
+  }
+  else
+  {
+    log.info('fatch loop RESUMED, ' + fetchWhen);
+    self.m_loopIsSuspended = false;
+    if (fetchWhen >= 0)
+      self.p_reschedulePoll(fetchWhen);
+  }
+}
+Feeds.prototype.suspendFetchLoop = suspendFetchLoop;
 
 // object Feeds.p_reschedulePoll
 // Set the delay before next iteration of the poll loop
@@ -1896,6 +1991,9 @@ function p_poll(self)
 
   if (self.m_pollIndex == 0)  // progress 0%
     self.m_feedsCB.onRssFetchProgress(0);
+
+  if (self.m_rssFeeds[self.m_pollIndex].m_remote_state != feeds_ns.RssSyncState.IS_LOCAL_ONLY)
+    log.warn("p_poll: remote state");
 
   var urlRss = self.m_rssFeeds[self.m_pollIndex].m_url;
   log.info('fetch: ' + self.m_pollIndex + ' url: ' + urlRss);
