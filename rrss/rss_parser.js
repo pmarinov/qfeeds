@@ -102,6 +102,7 @@ function RssHeader(url, title, link, description, language, updated)
   // x_items are extacted from database or fetched from the source web site
   // many times header is passed with no items altogether
   this.x_items = new Object; // hash table, item hash is the key
+  this.x_pending_db = false; // _true_ when write operation starts, _false_ when completed
 
   return this;
 }
@@ -124,6 +125,8 @@ function copyRssHeader(from)
   x.m_rss_type = from.m_rss_type;
   x.m_rss_version = from.m_rss_version;
   x.m_remote_state = from.m_remote_state;
+
+  x.x_pending_db = from.x_pending_db;
 
   return x;
 }

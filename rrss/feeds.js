@@ -819,6 +819,117 @@ function p_feedInsertBatch(feeds)
 }
 Feeds.prototype.p_feedInsertBatch = p_feedInsertBatch;
 
+// object Feeds.p_feedOnDbError1
+function p_feedOnDbError1(msg, url, cbResult, r)
+{
+  var m = -1;
+  var feed = null;
+
+  log.error(msg);
+  
+  if (url != null)
+  {
+    m = self.p_feedFindByUrl(url);
+    if (m >= 0)
+    {
+      feed = self.m_rssFeeds[m];
+      feed.m_pending_db = false;
+    }
+  }
+
+  if (cbResult != null)  // Notifier callback provided?
+    cbResult(0);  // Notify that no update was needed
+}
+Feeds.prototype.p_feedOnDbError1 = p_feedOnDbError1;
+
+// object Feeds.p_feedNeedsUpdate
+function p_feedNeedsUpdate(newFeed, origFeed, shouldCompareRemoteStateOnly)
+{
+  var self = this;
+  var r =
+      {
+        needUpdate: false,
+        needsRTableSync: false
+      }
+
+  // For entry comming from RTable check only m_tags and m_remote_state, all else is empty!
+  if (shouldCompareRemoteStateOnly)
+  {
+    if (newFeed.m_tags != origFeed.m_tags)
+    {
+      console.log('db: new remote tags: ' + newFeed.m_tags + ' ' +
+                  '(old: ' + origFeed.m_tags + ')');
+      r.needsUpdate = true;
+    }
+    if (newFeed.m_remote_state != origFeed.m_remote_state)
+    {
+      console.log('db: new remote state: ' + newFeed.m_remote_state + ' ' +
+                  '(old: ' + origFeed.m_remote_state + ')');
+      r.needsUpdate = true;
+    }
+  }
+  else
+  {
+    log.info('db: entry already in [' + newFeed.m_url + ']');
+    if (newFeed.m_title != origFeed.m_title)
+    {
+      console.log('db: new title: ' + newFeed.m_title + ' (old: ' + origFeed.m_title + ')');
+      r.needsUpdate = true;
+    };
+    if (newFeed.m_link != origFeed.m_link)
+    {
+      console.log('db: new link: ' + newFeed.m_link + ' (old: ' + origFeed.m_link + ')');
+      r.needsUpdate = true;
+    };
+    if (newFeed.m_description != origFeed.m_description)
+    {
+      // Display shortened strings in the log
+      var shortDesc = newFeed.m_description;
+      if (shortDesc == null)
+        shortDesc = '[null]'
+      if (shortDesc.length > 80)
+        shortDesc = shortDesc.substring(0, 80) + '...';
+      var shortOldDesc = origFeed.m_description;
+      if (shortOldDesc == null)
+        shortOldDesc = '[none]'
+      else if (shortOldDesc.length > 80)
+        shortOldDesc = shortOldDesc.substring(0, 80) + '...';
+      console.log('db: new description: ' + shortDesc + ' ' +
+                  '(old: ' + shortOldDesc + ')');
+
+      r.needsUpdate = true;
+    };
+    if (newFeed.m_rss_type != origFeed.m_rss_type)
+    {
+      console.log('db: new rss_type: ' + newFeed.m_rss_type + ' ' +
+                  '(old: ' + origFeed.m_rss_type + ')');
+      r.needsUpdate = true;
+    };
+    if (newFeed.m_rss_version != origFeed.m_rss_version)
+    {
+      console.log('db: new rss_version: ' + newFeed.m_rss_version + ' ' +
+                  '(old: ' + origFeed.m_rss_version + ')');
+      r.needsUpdate = true;
+    };
+    if (newFeed.m_tags != origFeed.m_tags)
+    {
+      console.log('db: new tags: ' + newFeed.m_tags + ' ' +
+                  '(old: ' + origFeed.m_tags + ')');
+      r.needsUpdate = true;
+      r.needsRTableSync = true;  // Also update RTable 'rss_subscriptions'
+    }
+    if (newFeed.m_is_unsubscribed != origFeed.m_is_unsubscribed)
+    {
+      console.log('db: new is_unsubscribed: ' + newFeed.m_is_unsubscribed + ' ' +
+                  '(old: ' + origFeed.m_is_unsubscribed + ')');
+      r.needsUpdate = true;
+    }
+  }
+
+  return r;
+}
+Feeds.prototype.p_feedNeedsUpdate = p_feedNeedsUpdate;
+
 // object Feeds.p_feedRecord
 // Insert a new record or update a record of a feed (RssHeader) in the indexedDB
 // Record operation will be ignored at an attempt to record a feed that is already in
@@ -832,29 +943,48 @@ function p_feedRecord(feed, syncRTable, cbResult)
   var self = this;
   // operate on the copy, not on the reference
   utils_ns.assert(feed instanceof feeds_ns.RssHeader, "copyRssHeader: x instanceof feeds_ns.RssHeader");
-  var feed2 = feeds_ns.copyRssHeader(feed);
+  var feedUrl = feed.m_url;
 
   // Insert entry in m_dbSubscriptions
   var tran = self.m_db.transaction(['rss_subscriptions'], 'readwrite');
   tran.oncomplete = function (event)
       {
-        log.info('db: write transaction completed');
+        log.info('db: update transaction transaction completed');
       };
   tran.onabort = function (event)
       {
-        log.error('db: write transaction aborted');
+        self.p_feedOnDbError1('db: write transaction aborted', null, cbResult, 0);
       };
   tran.onerror = function (event)
       {
-        log.error('db: write transaction error');
+        self.p_feedOnDbError1('db: write transaction error', null, cbResult, 0);
       };
   var store = tran.objectStore('rss_subscriptions');
-  var req = store.get(feed2.m_url);
+
+  feed.m_pending_db = true;
+  var m = -1;
+  var req = store.get(feed.m_url);
+  req.onerror = function(event)
+      {
+        self.p_feedOnDbError1('db: read transaction error', feedUrl, cbResult, 0);
+      };
+  req.onabort = function (event)
+      {
+        self.p_feedOnDbError1('db: read transaction aborted', feedUrl, cbResult, 0);
+      };
   req.onsuccess = function(event)
       {
-        var tempFeed = null;
+        m = self.p_feedFindByUrl(feedUrl);
+        if (m < 0)
+        {
+          self.p_feedOnDbError1('db: feed already deleted', feedUrl, cbResult, 0);
+          return;
+        }
+        feed = self.m_rssFeeds[m];
+
         var needsUpdate = false;
         var needsRTableSync = false;
+
         var data = req.result;
         if (data === undefined)
         {
@@ -864,110 +994,41 @@ function p_feedRecord(feed, syncRTable, cbResult)
         else
         {
           // Check if the record in the DB needs updating
-          // For entry comming from RTable check only m_tags and m_remote_state, all else is empty!
-          if (syncRTable == false)
-          {
-            if (feed2.m_tags != data.m_tags)
-            {
-              console.log('db: new remote tags: ' + feed2.m_tags + ' ' +
-                          '(old: ' + data.m_tags + ')');
-              needsUpdate = true;
-            }
-            if (feed2.m_remote_state != data.m_remote_state)
-            {
-              console.log('db: new remote state: ' + feed2.m_remote_state + ' ' +
-                          '(old: ' + data.m_remote_state + ')');
-              needsUpdate = true;
-            }
-          }
-          else
-          {
-            log.info('db: entry already in [' + feed2.m_url + ']');
-            if (feed2.m_title != data.m_title)
-            {
-              console.log('db: new title: ' + feed2.m_title + ' (old: ' + data.m_title + ')');
-              needsUpdate = true;
-            };
-            if (feed2.m_link != data.m_link)
-            {
-              console.log('db: new link: ' + feed2.m_link + ' (old: ' + data.m_link + ')');
-              needsUpdate = true;
-            };
-            if (feed2.m_description != data.m_description)
-            {
-              // Display shortened strings in the log
-              var shortDesc = feed2.m_description;
-              if (shortDesc == null)
-                shortDesc = '[null]'
-              if (shortDesc.length > 80)
-                shortDesc = shortDesc.substring(0, 80) + '...';
-              var shortOldDesc = data.m_description;
-              if (shortOldDesc == null)
-                shortOldDesc = '[none]'
-              else if (shortOldDesc.length > 80)
-                shortOldDesc = shortOldDesc.substring(0, 80) + '...';
-              console.log('db: new description: ' + shortDesc + ' ' +
-                          '(old: ' + shortOldDesc + ')');
-
-              needsUpdate = true;
-            };
-            if (feed2.m_rss_type != data.m_rss_type)
-            {
-              console.log('db: new rss_type: ' + feed2.m_rss_type + ' ' +
-                          '(old: ' + data.m_rss_type + ')');
-              needsUpdate = true;
-            };
-            if (feed2.m_rss_version != data.m_rss_version)
-            {
-              console.log('db: new rss_version: ' + feed2.m_rss_version + ' ' +
-                          '(old: ' + data.m_rss_version + ')');
-              needsUpdate = true;
-            };
-            if (feed2.m_tags != data.m_tags)
-            {
-              console.log('db: new tags: ' + feed2.m_tags + ' ' +
-                          '(old: ' + data.m_tags + ')');
-              needsUpdate = true;
-              needsRTableSync = true;  // Also update RTable 'rss_subscriptions'
-            }
-            if (feed2.m_is_unsubscribed != data.m_is_unsubscribed)
-            {
-              console.log('db: new is_unsubscribed: ' + feed2.m_is_unsubscribed + ' ' +
-                          '(old: ' + data.m_is_unsubscribed + ')');
-              needsUpdate = true;
-            }
-          }
+          var r = p_feedNeedsUpdate(feed, data, !syncRTable);
+          needsUpdate = r.needsUpdate;
+          needsRTableSync = r.needsRTableSync;
         };
-        if (needsUpdate)
+
+        if (needsRTableSync)
         {
-          if (needsRTableSync)
-          {
-            self.p_rtableSyncFeedEntry(feed2);  // new url or tags
-            utils_ns.assert(feed2.m_remote_state != feeds_ns.RssSyncState.IS_LOCAL_ONLY, "p_feedRecord: remote state");
-          }
-
-
-          var reqAdd = store.put(utils_ns.marshal(feed2, 'm_'));
-          reqAdd.onsuccess = function(event)
-              {
-                var data = reqAdd.result;
-                log.info('db: added! [' + feed2.m_url + ']');
-                if (cbResult != null)  // Notifier callback provided?
-                  cbResult(1);  // Notify that update was needed and entry was recorded
-              }
-          reqAdd.onerror = function(event)
-              {
-                log.error('db: error msg: ' + reqAdd.error.message + ' url: ' + feed2.m_url);
-                if (cbResult != null)  // Notifier callback provided?
-                  cbResult(2);  // Notify that update was needed followed by an error
-              }
+          self.p_rtableSyncFeedEntry(feed);  // new url or tags
+          utils_ns.assert(feed.m_remote_state != feeds_ns.RssSyncState.IS_LOCAL_ONLY, "p_feedRecord: remote state");
         }
-        else
+
+        if (!needsUpdate)
         {
+          feed.m_pending_db = true;
           if (cbResult != null)  // Notifier callback provided?
             cbResult(0);  // Notify that no update was needed
+          return;
         }
-      }
+
+        var reqAdd = store.put(utils_ns.marshal(feed, 'm_'));
+        reqAdd.onsuccess = function(event)
+            {
+              var data = reqAdd.result;
+              log.info('db: added! [' + feed.m_url + ']');
+              feed.m_pending_db = true;
+              if (cbResult != null)  // Notifier callback provided?
+                cbResult(1);  // Notify that update was needed and entry was recorded
+            }
+        reqAdd.onerror = function(event)
+            {
+              // cbResult: Notify that update was needed followed by an error
+              self.p_feedOnDbError1('db: write error msg: ' + reqAdd.error.message + ' url: ' + feed.m_url,
+                                   feed.m_url, cbResult, 2);
+            }
+      } // req.onsuccess()
 }
 Feeds.prototype.p_feedRecord = p_feedRecord;
 
@@ -976,9 +1037,9 @@ Feeds.prototype.p_feedRecord = p_feedRecord;
 function feedAddByUrl(feedUrl, tags, cbDone)
 {
   var self = this;
-  var newFeed = feeds_ns.emptyRssHeader();
-  newFeed.m_url = feedUrl;
-  newFeed.m_title = feedUrl;
+  var newFeed = new feeds_ns.RssHeader(feedUrl /*url*/, feedUrl /*title*/,
+                    null /*link*/, null /*description*/,
+                    null /*language*/, null /*updated*/);
   newFeed.m_tags = tags;
 
   // Put into local list of RSS subscriptions (self.m_rssFeeds)
@@ -1490,6 +1551,7 @@ function p_feedUpdate(feedHeaderNew, cbWriteDone)
   feedHeaderNew.m_tags = target.m_tags;
   feedHeaderNew.m_remote_state = target.m_remote_state;
   feedHeaderNew.m_remote_id = target.m_remote_id;
+  feedHeaderNew.x_pending_db = target.x_pending_db;
 
   // Check if any fields of rssFeed header have new values
   var flagUpdatedHeader = self.p_feedUpdateHeader(index, feedHeaderNew);
@@ -1992,7 +2054,16 @@ function p_poll(self)
   if (self.m_pollIndex == 0)  // progress 0%
     self.m_feedsCB.onRssFetchProgress(0);
 
-  if (self.m_rssFeeds[self.m_pollIndex].m_remote_state != feeds_ns.RssSyncState.IS_LOCAL_ONLY)
+  // Some unsubscriptions might have take place in the interim
+  if (self.m_pollIndex >= self.m_rssFeeds.length)
+  {
+    self.m_feedsCB.onRssFetchProgress(100);  // progress 100%
+    self.m_pollIndex = 0;
+    self.p_reschedulePoll(60);
+    return;
+  }
+
+  if (self.m_rssFeeds[self.m_pollIndex].m_remote_state == feeds_ns.RssSyncState.IS_LOCAL_ONLY)
     log.warn("p_poll: remote state");
 
   var urlRss = self.m_rssFeeds[self.m_pollIndex].m_url;
