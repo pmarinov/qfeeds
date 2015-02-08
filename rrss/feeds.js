@@ -1553,6 +1553,9 @@ function p_feedUpdate(feedHeaderNew, cbWriteDone)
   feedHeaderNew.m_remote_id = target.m_remote_id;
   feedHeaderNew.x_pending_db = target.x_pending_db;
 
+  // Transfer any accumulated error info during RSS fetching
+  target.x_errors = feedHeaderNew.x_errors;
+
   // Check if any fields of rssFeed header have new values
   var flagUpdatedHeader = self.p_feedUpdateHeader(index, feedHeaderNew);
   if (flagUpdatedHeader)  // Record any changes in IndexedDB and remote table 'rss_subscriptions'

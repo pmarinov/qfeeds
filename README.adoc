@@ -2,9 +2,6 @@
 
 :freesoftware: http://www.gnu.org/philosophy/free-sw.html
 :screenshot1: https://dl.dropboxusercontent.com/s/tmzbqb97atmcjst/rrss_feed1.png
-:uri-changelog: {uri-rel-file-base}CHANGELOG.adoc
-:uri-contributors: {uri-rel-file-base}CONTRIBUTORS.txt
-:uri-license: {uri-rel-file-base}LICENSE.txt
 
 == rrss
 
@@ -35,7 +32,7 @@ use it, redistribute it, and/or modify it under the terms of the BSD
 (FreeBSD) License.
 
 Copyright (c) 2014, Peter Marinov and Contributors. All rights reserved. +
-See {uri-license}[LICENSE.txt], see {uri-contributors}[CONTRIBUTORS.txt]
+See LICENSE.txt, see CONTRIBUTORS.txt
 
 
 == Install for development

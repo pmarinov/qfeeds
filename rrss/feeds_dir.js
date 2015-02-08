@@ -596,6 +596,23 @@ function p_displayFeedTitle(titleInfo)
 }
 FeedsDir.prototype.p_displayFeedTitle = p_displayFeedTitle;
 
+// object FeedsDir.p_hideAreaErrors
+// Hide/Show details of feed errors. Show only if there are any errors.
+function p_hideAreaErrors(feedHeader, doHide)
+{
+  var self = this;
+
+  if (feedHeader.x_errors === undefined)
+    feedHeader.x_errors = [];
+
+  if (feedHeader.x_errors.length == 0)
+    doHide = true;
+
+  self.$d.areaFeedErrors.toggleClass('hide', doHide);  // Show the error msg area
+  self.p_hideAreaErrorDetails(true);  // Show only after click on button "Details"
+}
+FeedsDir.prototype.p_hideAreaErrors = p_hideAreaErrors;
+
 // object FeedsDir.p_hideAreaErrorDetails
 // Hide/Show details of feed errors
 function p_hideAreaErrorDetails(doHide)
@@ -610,10 +627,13 @@ FeedsDir.prototype.p_hideAreaErrorDetails = p_hideAreaErrorDetails;
 
 // object FeedsDir.p_displayFeedErrors
 // Put any feed errors in the corresponding display area
-function p_displayFeedErrors(feedHeader)
+function p_displayFeedErrors(feedHeader, displayNow)
 {
   var self = this;
   var i = 0;
+
+  if (feedHeader.x_errors === undefined)
+    feedHeader.x_errors = [];
 
   if (feedHeader.x_errors.length == 0)
   {
@@ -666,7 +686,7 @@ function p_displayFeedErrors(feedHeader)
   }
 
   self.p_hideAreaErrorDetails(true); // Keep details area hidden in the beginning
-  self.$d.areaFeedErrors.toggleClass('hide', false);  // Show the error msg area
+  self.p_hideAreaErrors(feedHeader, !displayNow);
 }
 FeedsDir.prototype.p_displayFeedErrors = p_displayFeedErrors;
 
@@ -722,6 +742,10 @@ function p_handleHideUnhideInfo(ev)
 
   self.m_settingsArea = false;  // State is "hidden"
 
+  var toShow = false;
+  if (self.$d.areaInfoFeed.hasClass('hide'))
+    toShow = true;  // Now it is hidden, so transition to stage "shown"
+
   // TODO: check if current element is a folder (then show "Folder info" section)
   self.$d.areaInfoFeed.toggleClass('hide');
   self.$d.areaRenameFolder.toggleClass('hide', true);
@@ -729,6 +753,10 @@ function p_handleHideUnhideInfo(ev)
   self.$d.areaUnsubscribeBtns.toggleClass('hide', true);
   self.$d.areaUndo.toggleClass('hide', true);
   self.$d.areaInfoFolder.toggleClass('hide', true);
+
+  // Display error info if this is an individual feed
+  if (!self.m_currentFeed.m_isFolder)
+    self.p_displayFeedErrors(self.m_currentFeed.m_header, toShow);  // Show error area if any errors
 }
 FeedsDir.prototype.p_handleHideUnhideInfo = p_handleHideUnhideInfo;
 
@@ -1049,7 +1077,7 @@ function p_feedView(newUrl)
           });
 
         // Populate error information, if any
-        self.p_displayFeedErrors(feed);
+        self.p_displayFeedErrors(feed, true);
 
         // Populate info area in case of "Info" button (info icon)
         self.$d.infoUrl.text(feed.m_url);
@@ -1385,6 +1413,14 @@ function p_displayFeedAndTitle(f, entries)
         tooltip: f.m_header.m_description,
         isFolder: false
       });
+
+    // Pull error info from m_feeds
+    // f.m_header comes from the IndexedDB where error info is not stored
+    var key = f.m_header.m_url;
+    f.m_header.x_errors = self.m_feeds[key].m_header.x_errors;
+
+    // Populate error information, if any
+    self.p_displayFeedErrors(f.m_header);
 
     // Populate info area in case of "Info" button (info icon)
     self.$d.infoUrl.text(f.m_header.m_url);
@@ -1906,6 +1942,9 @@ function p_updateFeeds(updates)
       // TODO: check what changed, flag that the feed changed
       // self.m_feeds[key] = v;
       log.trace("possible new content");
+
+      // Transfer error info from updates[] to m_feeds
+      self.m_feeds[key].m_header.x_errors = v.x_errors;
     }
   }
 }

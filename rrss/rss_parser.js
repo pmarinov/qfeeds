@@ -436,9 +436,11 @@ function fetchRss(urlRss, cb)
       }
       else
       {
-        var x = emptyRssHeader();
-        x.m_url = urlRss;
-        cb(1, x, 'Unknown RSS feed type');
+        var feed = emptyRssHeader();
+        feed.m_url = urlRss;
+        feed.m_title = urlRss;
+        errorMsg = 'Unrecognized RSS feed type';
+        cb(1, feed, new RssError('Content error', errorMsg));
       }
     })
     .fail(function ()
