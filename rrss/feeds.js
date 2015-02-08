@@ -1376,7 +1376,7 @@ function feedUpdateEntry(entryHash, cbUpdate)
   var tran = self.m_db.transaction(['rss_data'], 'readwrite');
   tran.oncomplete = function (event)
       {
-        log.info('db: update transaction completed');
+        log.trace('db: update transaction completed');
       };
   tran.onabort = function (event)
       {

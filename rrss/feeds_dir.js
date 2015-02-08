@@ -33,6 +33,7 @@ function FeedsDir($dirPanel, feedDisp, panelMng)
 
   self.m_isOnFocus = false;
 
+  var $containerFeedErrors = utils_ns.domFind('#xfeed_error_details');
   self.$d =
   {
     panel: $dirPanel,
@@ -62,6 +63,7 @@ function FeedsDir($dirPanel, feedDisp, panelMng)
     areaFolderSetBtn: utils_ns.domFind('#xset_btn_area'),
     areaUnsubscribeBtns: utils_ns.domFind('#xunsubscribe_btn_area'),
     areaUndo: utils_ns.domFind('#xfeed_unsub_undo_area'),
+    areaFeedErrors:  utils_ns.domFind('#xfeed_error_area'),
     iconSettings: utils_ns.domFind('#xsettings_icon'),
     iconLink: utils_ns.domFind('#xtitle_link'),
     menuSelectFolder: utils_ns.domFind('#xfolder_select_menu'),
@@ -70,6 +72,12 @@ function FeedsDir($dirPanel, feedDisp, panelMng)
     btnCancel: utils_ns.domFind('#xfeed_cancel'),
     btnUnsubscribe: utils_ns.domFind('#xfeed_unsubscribe'),
     btnUndo: utils_ns.domFind('#xfeed_unsub_undo'),
+    titleFeedErrors: utils_ns.domFind('#xfeed_error_text'),
+    areaFeedErrorDetails: utils_ns.domFind('#xfeed_error_details'),
+    containerFeedErrors: $containerFeedErrors,
+    errorsList: utils_ns.domFindInside($containerFeedErrors, '.xfeed_error_entry', -1),
+    btnShowErrorDetails: utils_ns.domFind('#xfeed_show_error_details'),
+    btnHideErrorDetails: utils_ns.domFind('#xfeed_hide_error_details'),
     popupNewFolder: utils_ns.domFind('#xnew_folder'),
     inputNewFolder: utils_ns.domFind('#xinput_new_folder'),
     btnNewFolderSubmit: utils_ns.domFind('#xbtn_new_folder_submit'),
@@ -190,7 +198,15 @@ function p_setFeedsDomHandlers()
   self.$d.formCancel.on('click', function(e)
       {
         self.m_newFeedUrl = null;
-        self.p_restoreCurrentFeed();
+        if (self.m_displayList.length == 0)
+        {
+          // Feeds list is empty, piggy back on onFocus()
+          self.onFocus();
+        }
+        else
+        {
+          self.p_restoreCurrentFeed();
+        }
       });
 
   self.$d.formCancelFolderRename.on('click', function(e)
@@ -238,27 +254,37 @@ function p_setFeedsDomHandlers()
         self.p_handleSubscribe(e);
       });
 
+  // Cancel screen "Add" (subscription of a new feed)
   self.$d.btnCancel.on('click', function(e)
       {
         self.m_newFeedUrl = null;
-        self.p_restoreCurrentFeed();
 
-        self.p_hideUnhideSections({
-            hideAddRss: true,
-            hideFeedContainer: false,
-            hideAreaRenameFolder: true,
-            hideAreaSelectFolder: true,
-            hideAreaSubscribeBtns: true,
-            hideAreaFolderSetBtn: true,
-            hideAreaUnsubscribeBtns: true,
-            hideUnsubscribeBtn: true,
-            hideUndoArea: true,
-            hideAreaInfoFeed: true,
-            hideAreaInfoFolder: true,
-            hideIconInfo: false,
-            hideIconSettings: false,
-            hideIconLink: false
-          });
+        if (self.m_displayList.length == 0)
+        {
+          // Feeds list is empty, piggy back on onFocus()
+          self.onFocus();
+        }
+        else
+        {
+          self.p_restoreCurrentFeed();
+
+          self.p_hideUnhideSections({
+              hideAddRss: true,
+              hideFeedContainer: false,
+              hideAreaRenameFolder: true,
+              hideAreaSelectFolder: true,
+              hideAreaSubscribeBtns: true,
+              hideAreaFolderSetBtn: true,
+              hideAreaUnsubscribeBtns: true,
+              hideUnsubscribeBtn: true,
+              hideUndoArea: true,
+              hideAreaInfoFeed: true,
+              hideAreaInfoFolder: true,
+              hideIconInfo: false,
+              hideIconSettings: false,
+              hideIconLink: false
+            });
+        }
       });
 
   self.$d.btnUnsubscribe.on('click', function (e)
@@ -269,6 +295,16 @@ function p_setFeedsDomHandlers()
   self.$d.btnUndo.on('click', function (e)
       {
         self.p_handleUndo(e);
+      });
+
+  self.$d.btnShowErrorDetails.on('click', function (e)
+      {
+        self.p_hideAreaErrorDetails(false);
+      });
+
+  self.$d.btnHideErrorDetails.on('click', function (e)
+      {
+        self.p_hideAreaErrorDetails(true); // Keep details area hidden in the beginning
       });
 }
 FeedsDir.prototype.p_setFeedsDomHandlers = p_setFeedsDomHandlers;
@@ -444,6 +480,8 @@ function p_restoreCurrentFeed()
 {
   var self = this;
 
+  utils_ns.assert(self.m_displayList.length == 0, "p_restoreCurrentFeed: feeds list is empty");
+
   self.m_currentFeedName = self.m_saveCurrentFeedName;
   self.m_currentFeed = self.m_saveCurrentFeed;
 
@@ -558,6 +596,80 @@ function p_displayFeedTitle(titleInfo)
 }
 FeedsDir.prototype.p_displayFeedTitle = p_displayFeedTitle;
 
+// object FeedsDir.p_hideAreaErrorDetails
+// Hide/Show details of feed errors
+function p_hideAreaErrorDetails(doHide)
+{
+  var self = this;
+
+  self.$d.areaFeedErrorDetails.toggleClass('hide', doHide);
+  self.$d.btnShowErrorDetails.toggleClass('hide', !doHide);
+  self.$d.btnHideErrorDetails.toggleClass('hide', doHide);
+}
+FeedsDir.prototype.p_hideAreaErrorDetails = p_hideAreaErrorDetails;
+
+// object FeedsDir.p_displayFeedErrors
+// Put any feed errors in the corresponding display area
+function p_displayFeedErrors(feedHeader)
+{
+  var self = this;
+  var i = 0;
+
+  if (feedHeader.x_errors.length == 0)
+  {
+    self.$d.areaFeedErrors.toggleClass('hide', true);
+    return;  // No errors to display
+  }
+
+  // Can the domList accomodate all error msg entries?
+  if (feedHeader.x_errors.length > self.$d.errorsList.length)
+  {
+    var maxNew = self.x_errors.length - self.$d.errorsList.length;
+    for (i = 0; i < maxNew; ++i)
+      self.$d.containerFeedErrors.append($(self.$d.errorsList[0]).clone());
+  }
+  // Reacquire the expanded list
+  self.$d.errorsList = utils_ns.domFindInside(self.$d.containerFeedErrors, '.xfeed_error_entry', -1);
+
+  var x = 0;
+  var $e = null;
+  var $errorEntry = null;
+  var $errorTitle = null;
+  var $errorInfo = null;
+  var shortInfo = '';
+  for (i = 0; i < feedHeader.x_errors.length; ++i)
+  {
+    x = feedHeader.x_errors[i];
+    utils_ns.assert(x instanceof feeds_ns.RssError, 'p_displayFeedErrors: x instanceof RssError');
+    $e = jQuery(self.$d.errorsList[i]);
+
+    shortInfo = x.m_info;
+    if (shortInfo == null || shortInfo == '')
+      shortInfo = '[no extra info]'
+    if (shortInfo.length > 512)
+      shortInfo = shortInfo.substring(0, 512) + '...';
+
+    $errorTitle = utils_ns.domFindInside($e, '.xfeed_error_title');
+    $errorInfo = utils_ns.domFindInside($e, '.xfeed_error_info');
+
+    $errorTitle.text(x.m_title);
+    $errorInfo.text(shortInfo);
+
+    $e.toggleClass('hide', false);  // Make sure entry is not hidden
+  }
+
+  // Collapse all unused entries in self.$d.list
+  for (; i < self.$d.errorsList.length; ++i)
+  {
+    $e = jQuery(self.$d.errorsList[i]);
+    $e.toggleClass('hide', true);
+  }
+
+  self.p_hideAreaErrorDetails(true); // Keep details area hidden in the beginning
+  self.$d.areaFeedErrors.toggleClass('hide', false);  // Show the error msg area
+}
+FeedsDir.prototype.p_displayFeedErrors = p_displayFeedErrors;
+
 // object FeedsDir.p_handleHideUnhideSettings
 // Handle click on the gear icon (for settings) that is next to the
 // feet or folder title in the right-side panel
@@ -628,6 +740,8 @@ function p_handleAddRssButton(ev)
 
   self.p_onFocusLostFeed();
   self.p_saveCurrentFeed();
+
+  var newUrl = self.$d.formFieldUrl.val("");
 
   self.p_hideUnhideSections({
       hideAddRss: false,
@@ -844,7 +958,7 @@ FeedsDir.prototype.p_handleRecentlyViewedClick = p_handleRecentlyViewedClick;
 
 // object FeedsDir.p_feedView
 // Display a feed with buttons for Subscribe
-// Feed is fetched directly from the web site not from indexedDB
+// Feed is fetched directly from the web site, not from indexedDB
 // (it is a preview for subscription action by user)
 function p_feedView(newUrl)
 {
@@ -882,10 +996,9 @@ function p_feedView(newUrl)
         {
           var shortMsg = errorMsg.substring(0, 80) + '...';
           console.warn('rss fetch, failed: ' + shortMsg + ', for: ' + newUrl);
-          return;
         }
-
-        console.log('success: ' + newUrl);
+        else
+          console.log('success: ' + newUrl);
 
         // Populate the list of folders in the folder selection drop-down
         self.p_generateFoldersDropDown();
@@ -935,6 +1048,9 @@ function p_feedView(newUrl)
             isFolder: false
           });
 
+        // Populate error information, if any
+        self.p_displayFeedErrors(feed);
+
         // Populate info area in case of "Info" button (info icon)
         self.$d.infoUrl.text(feed.m_url);
 
@@ -952,6 +1068,30 @@ function p_handleFormNewRss(ev)
 
   var newUrl = self.$d.formFieldUrl.val();
   log.info('new RSS URL: ' + newUrl);
+
+  // Check for empty
+  if (newUrl.length == 0)
+  {
+    log.info('empty');
+    return;
+  }
+
+  // Check for spaces
+  var i = 0;
+  var isSpacesOnly = true;
+  for (i = 0; i < newUrl.length; ++i)
+  {
+    if (newUrl[i] > ' ')
+    {
+      isSpacesOnly = false;
+      break;
+    }
+  }
+  if (isSpacesOnly)
+  {
+    log.info('spaces only');
+    return;
+  }
 
   self.p_feedView(newUrl);
 }

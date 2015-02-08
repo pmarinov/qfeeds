@@ -114,7 +114,7 @@ function FeedsImport(feedsDB, feedsDir, panelMng)
   return this;
 }
 
-// Object FeedEntry.clearInputField
+// Object FeedsImport.clearInputField
 function clearInputField()
 {
   var self = this;
@@ -127,7 +127,7 @@ function clearInputField()
 }
 FeedsImport.prototype.clearInputField = clearInputField;
 
-// Object FeedEntry.showError1
+// Object FeedsImport.showError1
 // Show error for step 1
 function showError1(msg)
 {
@@ -138,7 +138,7 @@ function showError1(msg)
 }
 FeedsImport.prototype.showError1 = showError1;
 
-// Object FeedEntry.showWarning2
+// Object FeedsImport.showWarning2
 // Show a warning message while in step 2
 function showWarning2(msg)
 {
@@ -146,7 +146,7 @@ function showWarning2(msg)
 
   var i = 0;
 
-  self.$d.opmlWarning2Text.text(msg); // Hide the error msg area
+  self.$d.opmlWarning2Text.text(msg); // Show main error title
 
   // Can the domList accomodate all error msg entries?
   if (self.m_parsingErrorMsgs.length > self.$d.errorsList.length)

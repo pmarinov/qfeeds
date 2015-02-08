@@ -212,28 +212,28 @@
     <!-- Everything above #xdisplay_feed_container are activities that take place -->
     <!-- on the right side pane with the feed contents entirely hidden            -->
 
-    <div id="xdisplay_feed_container" class="hide">
-    <div class="rss_title_area">
-        <span class="icon_holder_folder">
-          <img src="images/icon_folder.svg" alt="fo" id="ximg_folder" title="A folder this is."
-               class="hide icon unselected">
+    <div id='xdisplay_feed_container' class='hide'>
+    <div class='rss_title_area'>
+        <span class='icon_holder_folder'>
+          <img src='images/icon_folder.svg' alt='fo' id='ximg_folder' title='A folder this is.'
+               class='hide icon unselected'>
         </span>
-        <span class="icon_holder_rss">
-          <img src="images/icon_rss.svg" alt="rss" id="ximg_rss" title="Drag to move this feed into a folder"
-               style="cursor: move;" class="icon unselected">
+        <span class='icon_holder_rss'>
+          <img src='images/icon_rss.svg' alt='rss' id='ximg_rss' title='Drag to move this feed into a folder'
+               style='cursor: move;' class='icon unselected'>
         </span>
-        <span id="xtitle_top" title="zzz" class="title">Feeds</span>
-        <span id="xtitle_settings" class="icon_settings">
-        <img id="xsettings_icon" src="images/icon_gear.svg" class="icon" title="Open settings for this RSS feed"/>
+        <span id='xtitle_top' title='zzz' class='title'>Feeds</span>
+        <span id='xtitle_settings' class='icon_settings'>
+        <img id='xsettings_icon' src='images/icon_gear.svg' class='icon' title='Open settings for this RSS feed'/>
         </span>
-        <span id="xtitle_info" class="icon_settings">
-        <img id="xfeed_icon" src="images/icon_info.svg" class="icon" title="Info"/>
+        <span id='xtitle_info' class='icon_settings'>
+        <img id='xfeed_icon' src='images/icon_info.svg' class='icon' title='Info'/>
         </span>
-        <span class="icon_link_holder">
-        <a id="xtitle_link" class="icon_link"
-           href="http://www.ft.com/rss/comment/columnist/martinwolf"
-           target="_blank">
-        <img src="images/icon_arrow_goto.svg" class="icon icon_link_pos" alt="An awesome image"/>
+        <span class='icon_link_holder'>
+        <a id='xtitle_link' class='icon_link'
+           href='http://www.ft.com/rss/comment/columnist/martinwolf'
+           target='_blank'>
+        <img src='images/icon_arrow_goto.svg' class='icon icon_link_pos' alt='An awesome image'/>
         </a>
         </span>
     </div>  <!-- .rss_title_area -->
@@ -246,68 +246,95 @@
         <button type='button' id='xform_cancel_folder_name' class='btn btn-sm ren_btn_pos'>
           Cancel
         </button>
-        <div style="margin-top: 8px">
+        <div style='margin-top: 8px'>
           <i>note: The feature 'Folder rename' is not yet ready, we apologize for that.</i>
         </div>
       </form>
     </div>  <!-- #xrename_folder_area -->
 
-    <div id="xselect_folder_area" class="select_folder_area">
-      <span class="label_folder">
+    <div id='xselect_folder_area' class='select_folder_area'>
+      <span class='label_folder'>
       Folder:
       </span>
-      <span class="folder_dropdown_holder">
-      <select id="xfolder_select_menu" class="folder_dropdown">
-        <option value="xnone">None</option>
-        <option value="xnew">Create new...</option>
+      <span class='folder_dropdown_holder'>
+      <select id='xfolder_select_menu' class='folder_dropdown'>
+        <option value='xnone'>None</option>
+        <option value='xnew'>Create new...</option>
       </select>
       </span>
-      <span id="xsubscribe_btns_area" class="subscribe_btns_area">
-        <button type="button" id="xfeed_subscribe" class="btn btn-sm">Subscribe</button>
-        <button type="button" id="xfeed_cancel" class="btn btn-sm">Cancel</button>
+      <span id='xsubscribe_btns_area' class='subscribe_btns_area'>
+        <button type='button' id='xfeed_subscribe' class='btn btn-sm'>Subscribe</button>
+        <button type='button' id='xfeed_cancel' class='btn btn-sm'>Cancel</button>
       </span>
-      <span id="xset_btn_area" class="set_btn_area">
-        <button type="button" id="xfeed_setfolder" class="btn btn-sm">Set</button>
+      <span id='xset_btn_area' class='set_btn_area'>
+        <button type='button' id='xfeed_setfolder' class='btn btn-sm'>Set</button>
       </span>
-      <div class="clearfix">
+      <div class='clearfix'>
       </div>
     </div>  <!-- #xselect_folder_area -->
 
-    <div id="xunsubscribe_btn_area" class="unsubscribe_btn_area">
-      <span class="label_folder" style="padding-right: 16px;">
+    <div id='xunsubscribe_btn_area' class='unsubscribe_btn_area'>
+      <span class='label_folder' style='padding-right: 16px;'>
       Feed:
       </span>
-      <button type="button" id="xfeed_unsubscribe" class="btn btn-sm">Unsubscribe</button>
-      <div class="clearfix">
+      <button type='button' id='xfeed_unsubscribe' class='btn btn-sm'>Unsubscribe</button>
+      <div class='clearfix'>
       </div>
     </div>
 
-    <div id="xfeed_unsub_undo_area" class="unsubscribe_undo_btn_area hide">
+    <div id='xfeed_unsub_undo_area' class='unsubscribe_undo_btn_area hide'>
       <span>
       Unsubscribed!
       </span>
       <span>
-        <button type="button" id="xfeed_unsub_undo" class="btn btn-sm">Undo</button>
+        <button type='button' id='xfeed_unsub_undo' class='btn btn-sm'>Undo</button>
       </span>
-      <div class="clearfix">
+      <div class='clearfix'>
       </div>
     </div>
 
-    <div id="xfeed_info_area" class="feed_info_area">
+    <div id='xfeed_info_area' class='feed_info_area'>
       <div>
-        <span>URL: </span><span id="xfeed_info_url"></span>
+        <span>URL: </span><span id='xfeed_info_url'></span>
       </div>
-      <div class="clearfix">
+      <div class='clearfix'>
       </div>
     </div>
 
-    <div id="xfolder_info_area" class="feed_info_area">
+    <div id='xfolder_info_area' class='feed_info_area'>
       <div>
         <span>Feeds: </span><span>2 (Demo)</span>
       </div>
-      <div class="clearfix">
+      <div class='clearfix'>
       </div>
     </div>
+
+    <div id='xfeed_error_area' class='hide'>
+      <div class='alert alert-warning' role='alert'>
+        <span id='xfeed_error_text'>This RSS feed has one or more errors</span>
+        <span>
+        <button id='xfeed_show_error_details' type='button' class='btn btn-sm'>
+          Details
+        </button>
+        </span>
+        <span>
+        <button id='xfeed_hide_error_details' type='button' class='btn btn-sm'>
+          Close
+        </button>
+        </span>
+        <div id='xfeed_error_details' class='hide' style='padding-top: 10px'>
+          <div class='xfeed_error_entry'>
+            <div class='xfeed_error_title'>
+            </div>
+            <div class='xfeed_error_info' style='font-style: italic'>
+            </div>
+            <br/>
+          </div>
+        </div>  <!-- #xopml_error_details -->
+      </div>  <!-- #xopml_warning2 -->
+      <div class='clearfix'>
+      </div>
+    </div>  <!-- #xfeed_error_area -->
 
     <!-- Everything above #xrss_container are activities that take place -->
     <!-- on the right side pane with the feed contents presnet           -->
@@ -438,8 +465,8 @@
               </div>
               <br/>
             </div>
-          </div>
-        </div>
+          </div>  <!-- #xopml_error_details -->
+        </div>  <!-- #xopml_warning2 -->
 
         <!-- Top line buttons All/None -->
         <div class='opmlvw_button_bar'>
@@ -542,9 +569,13 @@ color: #999999; font-weight: bold; padding-top: 10px; padding-bottom: 8px;">Abou
       <br/>
       <div>
         <span>
-          'rrss' is <a href='http://www.gnu.org/philosophy/free-sw.html'>free software</a> --
-          this means that everyone may use it, redistribute it, and/or
-          modify it under the terms of the BSD (FreeBSD) License.
+          'rrss' is
+          <a href='http://www.gnu.org/philosophy/free-sw.html' target='_blank'>
+            free software
+          </a>
+          -- this means that everyone may use it, redistribute it,
+          and/or modify it under the terms of the BSD (FreeBSD)
+          License.
         </span>
         <span>
           <button type="button" id="xsee_license" class="btn btn-sm">See license</button>
@@ -674,8 +705,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       </div>
       <div>
         <span>
-          <a href="http://www.gnu.org/software/emacs" target="_blank" class="pull-left">GNU Emacs</a>,
-          <i>"Free as in Freedom"</i>
+          <a href="http://www.gnu.org/software/emacs" target="_blank" class="pull-left">GNU Emacs</a>
         </span>
       <br/>
       <br/>

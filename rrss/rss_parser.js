@@ -21,6 +21,18 @@ if (typeof feeds_ns === 'undefined')
 {
 "use strict";
 
+// Object RssError.RssError [constructor]
+function RssError(title, info)
+{
+  this.m_title = title;
+  this.m_info = info;
+
+  // Help strict mode detect misstyped fields
+  Object.preventExtensions(this);
+
+  return this;
+}
+
 var RssSyncState =
 {
   IS_SYNCED: 0,
@@ -103,6 +115,7 @@ function RssHeader(url, title, link, description, language, updated)
   // many times header is passed with no items altogether
   this.x_items = new Object; // hash table, item hash is the key
   this.x_pending_db = false; // _true_ when write operation starts, _false_ when completed
+  this.x_errors = [];  // array of RssError objects
 
   return this;
 }
@@ -127,6 +140,10 @@ function copyRssHeader(from)
   x.m_remote_state = from.m_remote_state;
 
   x.x_pending_db = from.x_pending_db;
+  if (from.x_errors === undefined)
+    x.x_errors = [];
+  else
+    x.x_errors = from.x_errors;
 
   return x;
 }
@@ -234,12 +251,12 @@ function parseRss10(xmlStr)
     errorMsg: null
   };
 
-  var errorsHeader = [];
+  var errors = [];
 
   var channel = jQuery('channel', xmlStr).eq(0);
   if (channel.length == 0)
-    errorsHeader.push('channel not found');
-  var title = getField(channel, 'title:first', errorsHeader);
+    errors.push('channel not found');
+  var title = getField(channel, 'title:first', errors);
   // try jQuery(channel).find('link').eq(0).is('atom\\:link')
   var link = getField(channel, 'link:first', null);
   var href = getHrefField(channel, 'link', null);
@@ -250,22 +267,19 @@ function parseRss10(xmlStr)
     description = getField(channel, 'description:first', null);
   if (description.length == 0)
     description = getField(channel, 'description', null);
-  var language = getField(channel, 'language:first', errorsHeader);
+  var language = getField(channel, 'language:first', errors);
   var strTime = getField(channel, 'lastBuildDate:first', null);
   if (strTime.length == 0)
-    strTime = getField(channel, 'pubDate:first', errorsHeader);
+    strTime = getField(channel, 'pubDate:first', errors);
   var updated = utils_ns.parseDate(strTime);
   if (updated == null)
-    errorsHeader.push('lastBuildDate bad');
-
-  if (errorsHeader.length != 0)
-  {
-    ret.errorMsg = 'rss parse error: header: ' + errorsHeader.join(', ');
-    return ret;
-  }
+    errors.push('lastBuildDate bad');
 
   ret.feed =
     new RssHeader('', title, link, description, language, updated);
+
+  var errorXML = channel.prop('outerHTML');
+  ret.feed.x_errors.push(new RssError('error: ' + errors.join(', '), errorXML));
 
   // The RSS 2.0 standard, see "Elements of <item>"
   //
@@ -288,7 +302,7 @@ function parseRss10(xmlStr)
       var description = getItemField(this, 'description', errorsEntries);
 
       if (title.length == 0 && description.length == 0)
-        errorsHeader.push('Needs "title" or "description"');
+        errors.push('Needs "title" or "description"');
 
       var strTimeEntry = getItemField(this, 'pubDate', errorsEntries);
       var updated = utils_ns.parseDate(strTimeEntry);
@@ -315,34 +329,31 @@ function parseAtom(xmlStr)
     errorMsg: null
   };
 
-  var errorsHeader = [];
+  var errors = [];
 
   var channel = jQuery('feed', xmlStr).eq(0);
   if (channel.length == 0)
-    errorsHeader.push('feed not found');
-  var title = getField(channel, 'title:first', errorsHeader);
-  var link = getHrefField(channel, 'link:first', errorsHeader);
-  var description = getField(channel, 'subtitle:first', errorsHeader);
+    errors.push('feed not found');
+  var title = getField(channel, 'title:first', errors);
+  var link = getHrefField(channel, 'link:first', errors);
+  var description = getField(channel, 'subtitle:first', errors);
   var language = getField(channel, 'xml:lang', null);
-  var strTime = getField(channel, 'updated:first', errorsHeader);
+  var strTime = getField(channel, 'updated:first', errors);
   var updated = utils_ns.parseDate(strTime);
   if (updated == null)
-    errorsHeader.push('lastBuildDate bad');
-
-  if (errorsHeader.length != 0)
-  {
-    ret.errorMsg = 'rss parse error: header: ' + errorsHeader.join(', ');
-    return ret;
-  }
+    errors.push('lastBuildDate bad');
 
   ret.feed =
     new RssHeader('', title, link, description, language, updated);
 
+  var errorXML = channel.prop('outerHTML');
+  ret.feed.x_errors.push(new RssError('error: ' + errors.join(', '), errorXML));
+
   var errorsEntries = [];
   jQuery('entry', xmlStr).each(function()
     {
-      var title = getItemField(this, 'title', errorsHeader);
-      var link = getHrefItemField(this, 'link', errorsHeader);
+      var title = getItemField(this, 'title', errors);
+      var link = getHrefItemField(this, 'link', errors);
       var description = getItemField(this, 'content', null);
       var summary = getItemField(this, 'summary', null);
       if (description.length == 0)
@@ -377,7 +388,15 @@ function fetchRss(urlRss, cb)
     error: function error(jqXHR, textStatus, errorThrown)
       {
         // Prapare the error message, will be reported by .fail()
-        errorMsg = 'error: ' + jqXHR.status + ', ' + errorThrown;
+        if (jqXHR.status == 404)
+          errorMsg = '404, Network unreachable or resource not found';
+        else
+        {
+          if (errorThrown != '')
+            errorMsg = jqXHR.status + ', ' + errorThrown;
+          else
+            errorMsg = jqXHR.status;
+        }
       }
     })
     .done(function (xmlStr)
@@ -426,11 +445,14 @@ function fetchRss(urlRss, cb)
     {
       var feed = emptyRssHeader();
       feed.m_url = urlRss;
+      feed.m_title = urlRss;
+      feed.x_errors.push(new RssError('Error in the Internet:', errorMsg));
       cb(1, feed, errorMsg);
     });
 }
 
 // export to feeds_ns namespace
+feeds_ns.RssError = RssError;
 feeds_ns.RssSyncState = RssSyncState;
 feeds_ns.RssEntry = RssEntry;
 feeds_ns.emptyRssEntry = emptyRssEntry;
