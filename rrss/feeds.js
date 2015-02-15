@@ -822,6 +822,8 @@ Feeds.prototype.p_feedInsertBatch = p_feedInsertBatch;
 // object Feeds.p_feedOnDbError1
 function p_feedOnDbError1(msg, url, cbResult, r)
 {
+  var self = this;
+
   var m = -1;
   var feed = null;
 
@@ -1532,6 +1534,8 @@ Feeds.prototype.updateEntriesAll = updateEntriesAll;
 
 // object Feeds.p_feedUpdate
 // update fields and entries in m_rssFeeds[] that are new
+// cbWriteDone -- called to signal when the write to disk operation is completed
+//                (it will be called even if 0 records are updated)
 function p_feedUpdate(feedHeaderNew, cbWriteDone)
 {
   var self = this;
@@ -1541,6 +1545,8 @@ function p_feedUpdate(feedHeaderNew, cbWriteDone)
   if (index < 0)
   {
     console.log('Feeds.update: error, ' + feedHeaderNew.m_url + ' is unknown');
+    if (cbWriteDone != null)
+      cbWriteDone();  // Nothing to write, consider operation completed
     return null;
   };
   var target = self.m_rssFeeds[index];
@@ -1555,6 +1561,8 @@ function p_feedUpdate(feedHeaderNew, cbWriteDone)
 
   // Transfer any accumulated error info during RSS fetching
   target.x_errors = feedHeaderNew.x_errors;
+  if (feedHeaderNew.x_errors != null && feedHeaderNew.x_errors.length > 0)
+    log.info('p_feedUpdate: error transfered for ' + feedHeaderNew.m_url);
 
   // Check if any fields of rssFeed header have new values
   var flagUpdatedHeader = self.p_feedUpdateHeader(index, feedHeaderNew);
@@ -1601,11 +1609,11 @@ function p_feedUpdate(feedHeaderNew, cbWriteDone)
 
   if (keysNew.length == 0)  // Nothint to write, consider operation done
   {
-     if (cbWriteDone != null)
-     {
-       log.info('0 new entries recorded in table rss_data, 0 unchanged');
-       cbWriteDone();
-     }
+    if (cbWriteDone != null)
+    {
+      log.info('0 new entries recorded in table rss_data, 0 unchanged');
+      cbWriteDone();
+    }
   }
 
   return target;
@@ -1962,36 +1970,31 @@ function p_fetchRss(urlRss, cbDone, cbWriteDone)
       function(c, feed, errorMsg)
       {
         if (c == 0)
-        {
           log.trace('rss fetch, success: ' + feed.m_url);
-          var target = self.p_feedUpdate(feed,
-              function()  // CB: write operation completed
-              {
-                // This CB is useful for when a newly added feed needs
-                // to be displayed for the first time, it relies on
-                // the fact that the data is already in the IndexedDB
-                if (cbWriteDone != null)
-                  cbWriteDone();
-              });
-          if (target != null)
-          {
-            // Notify event subscribers
-            var updated = new Array();
-            updated.push(target);
-            self.m_feedsCB.onRssUpdated(updated);
-          }
-          else
-            log.warn('p_fetchRss: target is null');
-        }
-        else
+        else  // Network error
         {
           var shortMsg = errorMsg.substring(0, 80) + '...';
           log.warn('rss fetch, failed: ' + shortMsg + ', for: ' + feed.m_url);
-
-          // Nothing to write, write operation is considered done
-          if (cbWriteDone != null)
-            cbWriteDone();
         }
+
+        var target = self.p_feedUpdate(feed,
+            function()  // CB: write operation completed
+            {
+              // This CB is useful for when a newly added feed needs
+              // to be displayed for the first time, it relies on
+              // the fact that the data is already in the IndexedDB
+              if (cbWriteDone != null)
+                cbWriteDone();
+            });
+        if (target != null)
+        {
+          // Notify event subscribers
+          var updated = new Array();
+          updated.push(target);
+          self.m_feedsCB.onRssUpdated(updated);
+        }
+        else
+          log.warn('p_fetchRss: target is null');
 
         if (cbDone != null)
           cbDone();

@@ -41,6 +41,9 @@ function timeDigits(t)
 
 function dateToStr(x)
 {
+  if (x == null)
+    return 'date_is_null';
+
   var x_date = x.getDate();
   var x_month = x.getMonth() + 1;  // Months are zero based
   var x_year = x.getFullYear();
@@ -58,6 +61,9 @@ function dateToStr(x)
 // Strict renderng of Date object, can be used as DB key
 function dateToStrStrict(x)
 {
+  if (x == null)
+    return 'date_is_null';
+
   var x_date = x.getDate();
   var x_month = x.getMonth() + 1;  // Months are zero based
   var x_year = x.getFullYear();
