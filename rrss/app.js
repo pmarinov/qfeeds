@@ -24,16 +24,18 @@ function App()
 
   var m_oldOnError = window.onerror;
   // Override previous handler.
-  window.onerror = function(errorMsg, url, lineNumber)
+  window.onerror = function(errorMsg, url, lineNumber, column, errorObj)
       {
-        var stripRe = new RegExp('(chrome-extension:..[a-z]*\/)(.*)');
+        var stripRe = new RegExp('(chrome-extension:..[a-z]*\/)(.*)', 'g');
         var strippedUrl = url.replace(stripRe, '$2');
+        var strippedStack = errorObj.stack.toString().replace(stripRe, '$2');
         var errorMsgHTML = '<i>Plase consider making a bug report together with this information.</i><br/>' +
               '<hr>' +
               '<span id="xerror_msg_text"></span>' +
               '<br/><br/>' +
-              'source file: ' + strippedUrl + '<br/>' +
-              'line: ' + lineNumber;
+              '<b>source file:</b> ' + strippedUrl + ':' + lineNumber + ':' + column + '<br/>' +
+              '<b>stack:</b> ' + '<br/>' +
+              '<pre style="font-size: 80%">' + strippedStack + '</pre>';
 
         $popupErrorMsg.html(errorMsgHTML);
         $('#xerror_msg_text').text(errorMsg);
