@@ -1897,6 +1897,8 @@ function p_feedUpdateHeader(toUpdate, updated)
   {
     // Display shortened strings in the log
     var shortDesc = updated.m_description;
+    if (shortDesc == null)
+      shortDesc = '[none]';
     if (shortDesc.length > 80)
       shortDesc = shortDesc.substring(0, 80) + '...';
     var shortOldDesc = target.m_description;
