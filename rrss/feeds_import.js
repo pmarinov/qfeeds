@@ -605,7 +605,7 @@ function handleOPMLFile(file)
 
           var i = 0;
           var $opml = null;
-          for(i = 0; i < $parsed.length; ++i)
+          for (i = 0; i < $parsed.length; ++i)
           {
             if($parsed[i].nodeName == 'OPML')
             {

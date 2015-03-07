@@ -374,6 +374,169 @@ function parseAtom(xmlStr)
   return ret;
 }
 
+//
+// Parse RSS or Atom
+function parse(feedUrl, xmlDoc)
+{
+  var ret =
+  {
+    feed: new RssHeader(feedUrl, null, null, null, null, null),
+    errorMsg: null  // One global fatal error
+  };
+
+  var $feed = xmlDoc.children[0];  // There should be one top lebel tag '<rss> or <feed>'
+  if ($feed.length == 0)
+  {
+    ret.errorMsg = 'not a valid RSS feed XML';
+    return ret;
+  }
+
+  var version = '';
+  var i = 0;
+  var j = 0;
+  var k = 0;
+  var hasChannel = false;
+  var $channel = [];
+  var $entry = null;
+  var $itemTags = [];
+  var $tag = null;
+  var tagContent = '';
+  var header_title = '';
+  var header_link = '';
+  var header_description = '';
+  var header_strTime = '';
+  var header_updated = null;
+  var item_title = '';
+  var item_link = '';
+  var item_href = '';
+  var item_description = '';
+  var item_strTime = '';
+  var item_updated = null;
+  var item_id = '';
+  var errors = [];  // [] of RssError
+  var errorXML = '';
+  var item = null;
+  var items = {};
+  if ($feed.nodeName == 'rss')
+  {
+    // ====== RSS ======
+    // $feed is <rss>...</rss>
+    version = $feed.attributes['version'];
+
+    // In practice there should be only one entry <channel>...</channel>
+    for (i = 0; i < $feed.children.length; ++i)
+    {
+      if ($feed.children[i].tagName != 'channel')
+      {
+        errorXML = jQuery($feed.children[i]).prop('outerHTML').substr(0, 256);
+        errors.push(new RssError('Unknown feed entry for channel ' +
+                    $feed.children[i].tagName, errorXML));
+        break;
+      }
+
+      hasChannel = true;
+      $channel = $feed.children[i];
+      // Inside <channel> we have things like <title>, <description> and a number of <items>
+      for (j = 0; j < $channel.children.length; ++j)
+      {
+        $entry = $channel.children[j];
+
+        if ($entry.tagName == 'item')
+        {
+          //
+          // RSS Entry (inside tag <item>)
+          // Each entry has <title>, <description>, etc.
+          $itemTags = $entry.children;
+          item_link = '';
+          for (k = 0; k < $itemTags.length; ++k)
+          {
+            $tag = $itemTags[k];
+            tagContent = jQuery($tag).text();
+
+            if ($tag.tagName == 'title')
+              item_title = tagContent;
+            else if ($tag.tagName == 'link')
+              item_link = tagContent;
+            else if ($tag.tagName == 'href')
+              item_href = tagContent;
+            else if ($tag.tagName == 'description')
+              item_description = tagContent;
+            else if ($tag.tagName == 'pubDate')
+              item_strTime = tagContent;
+            else if ($tag.tagName == 'guid')
+              item_id = tagContent;
+          }
+
+          item_updated = utils_ns.parseDate(item_strTime);
+
+          if (item_title.length == 0 && item_description.length == 0)
+          {
+            errorXML = jQuery($entry).prop('outerHTML').substr(0, 256);
+            errors.push(new RssError('Item needs "title" or "description"', errorXML));
+          }
+
+          if (item_updated == null)
+          {
+            errorXML = jQuery($entry).prop('outerHTML').substr(0, 256);
+            errors.push(new RssError('lastBuildDate bad"', errorXML));
+          }
+
+          if (item_link.length == 0)
+            item_link = item_href;
+
+          item = new RssEntry(item_title, item_link, item_description, item_updated, item_id);
+          items[item.m_hash] = item;
+        }
+        else
+        {
+          //
+          // Header elements of the RSS feed
+          tagContent = jQuery($entry).text();
+          if ($entry.tagName == 'title')
+            header_title = tagContent;
+          else if ($entry.tagName == 'link')
+            header_link = tagContent;
+          else if ($entry.tagName == 'description')
+            header_description = tagContent;
+          else if ($entry.tagName == 'lastBuildDate')
+            header_strTime = tagContent;
+          else if ($entry.tagName == 'pubDate')
+            header_strTime = tagContent;
+        }
+      }
+
+      header_updated = utils_ns.parseDate(header_strTime);
+      if (header_updated == null)
+        errorsForHeader.push('lastBuildDate bad');
+
+      ret.feed =
+        new RssHeader('', header_title, header_link, header_description, 'no language', header_updated);
+      ret.feed.m_rss_version = version;
+      ret.feed.m_rss_type = 'RSS';
+      ret.feed.x_items = items;
+      ret.feed.x_errors = errors;
+    }
+
+    if (!hasChannel)
+    {
+      errorXML = jQuery($feed).prop('outerHTML').substr(0, 512);
+      ret.feed.x_errors.push(new RssError('Feed channel tag not found', errorXML));
+    }
+  }
+  else if ($feed.nodeName == 'feed')
+  {
+    // ====== Atom ======
+    // $feed is <feed>...</feed>
+    log.info('atom');
+  }
+  else
+  {
+    ret.errorMsg = 'not a valid RSS feed XML (2)';
+  }
+
+  return ret;
+}
+
 // function fetchRss
 // HTTP GET of RSS url, parse it and invoke callback with ready RssHeader an error
 function fetchRss(urlRss, cb)
@@ -403,6 +566,8 @@ function fetchRss(urlRss, cb)
     {
       //
       // Parse the header of the RSS feed
+
+      parse(urlRss, xmlStr);
 
       if (jQuery('channel', xmlStr).length == 1)
       {
