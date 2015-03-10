@@ -417,6 +417,7 @@ function parse(feedUrl, xmlDoc)
   var errorXML = '';
   var item = null;
   var items = {};
+  var typeStr = '';
   if ($feed.nodeName == 'rss')
   {
     // ====== RSS ======
@@ -447,7 +448,7 @@ function parse(feedUrl, xmlDoc)
           // RSS Entry (inside tag <item>)
           // Each entry has <title>, <description>, etc.
           $itemTags = $entry.children;
-          item_link = '';
+          item_link = null;
           for (k = 0; k < $itemTags.length; ++k)
           {
             $tag = $itemTags[k];
@@ -478,10 +479,10 @@ function parse(feedUrl, xmlDoc)
           if (item_updated == null)
           {
             errorXML = jQuery($entry).prop('outerHTML').substr(0, 256);
-            errors.push(new RssError('lastBuildDate bad"', errorXML));
+            errors.push(new RssError('"lastBuildDate" bad', errorXML));
           }
 
-          if (item_link.length == 0)
+          if (item_link == null)
             item_link = item_href;
 
           item = new RssEntry(item_title, item_link, item_description, item_updated, item_id);
@@ -506,8 +507,6 @@ function parse(feedUrl, xmlDoc)
       }
 
       header_updated = utils_ns.parseDate(header_strTime);
-      if (header_updated == null)
-        errorsForHeader.push('lastBuildDate bad');
 
       ret.feed =
         new RssHeader('', header_title, header_link, header_description, 'no language', header_updated);
@@ -527,7 +526,84 @@ function parse(feedUrl, xmlDoc)
   {
     // ====== Atom ======
     // $feed is <feed>...</feed>
-    log.info('atom');
+
+    // We have header tags (<title>, <sutbtitle>, etc.) and feed entries (one or more <entry> tags)
+    for (j = 0; j < $feed.children.length; ++j)
+    {
+      $entry = $feed.children[j];
+
+      if ($entry.tagName == 'entry')
+      {
+          //
+          // Atom Entry (inside tag <entry>)
+          // Each entry has <title>, <content>, etc.
+          $itemTags = $entry.children;
+          item_description = null;
+          for (k = 0; k < $itemTags.length; ++k)
+          {
+            $tag = $itemTags[k];
+            tagContent = jQuery($tag).text();
+
+            if ($tag.tagName == 'title')
+              item_title = tagContent;
+            else if ($tag.tagName == 'link')
+              item_link = jQuery($entry).attr('href');
+            else if ($tag.tagName == 'content')
+              item_description = tagContent;
+            else if ($tag.tagName == 'summary')
+              item_description = tagContent;
+            else if ($tag.tagName == 'updated')
+              item_strTime = tagContent;
+            else if ($tag.tagName == 'id')
+              item_id = tagContent;
+          }
+
+          item_updated = utils_ns.parseDate(item_strTime);
+
+          if (item_title.length == 0 && item_description.length == 0)
+          {
+            errorXML = jQuery($entry).prop('outerHTML').substr(0, 256);
+            errors.push(new RssError('Item needs "title" or "description"', errorXML));
+          }
+
+          if (item_updated == null)
+          {
+            errorXML = jQuery($entry).prop('outerHTML').substr(0, 256);
+            errors.push(new RssError('"updated" bad', errorXML));
+          }
+
+          item = new RssEntry(item_title, item_link, item_description, item_updated, item_id);
+          items[item.m_hash] = item;
+      }
+      else
+      {
+        //
+        // Header elements of the Atom format feed
+        tagContent = jQuery($entry).text();
+        if ($entry.tagName == 'title')
+          header_title = tagContent;
+        else if ($entry.tagName == 'link')
+        {
+          typeStr = jQuery($entry).attr('type');
+          if (typeStr == 'text/html')
+            header_link = jQuery($entry).attr('href');
+        }
+        else if ($entry.tagName == 'subtitle')
+          header_description = tagContent;
+        else if ($entry.tagName == 'updated')
+          header_strTime = tagContent;
+      }
+    }
+
+    header_updated = utils_ns.parseDate(header_strTime);
+
+    ret.feed =
+      new RssHeader('', header_title, header_link, header_description, 'no language', header_updated);
+
+    ret.feed.m_rss_version = '1.0';
+    ret.feed.m_rss_type = 'Atom';
+    ret.feed.x_items = items;
+    ret.feed.x_errors = errors;
   }
   else
   {
