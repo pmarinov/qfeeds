@@ -644,7 +644,7 @@ function p_displayFeedErrors(feedHeader, displayNow)
   // Can the domList accomodate all error msg entries?
   if (feedHeader.x_errors.length > self.$d.errorsList.length)
   {
-    var maxNew = self.x_errors.length - self.$d.errorsList.length;
+    var maxNew = feedHeader.x_errors.length - self.$d.errorsList.length;
     for (i = 0; i < maxNew; ++i)
       self.$d.containerFeedErrors.append($(self.$d.errorsList[0]).clone());
   }

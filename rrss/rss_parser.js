@@ -90,7 +90,10 @@ function RssHeader(url, title, link, description, language, updated)
   // Feeds.p_feedUpdateHeader
   // Feeds.p_feedRecord
   this.m_url = url;
-  this.m_title = title;
+  if (title == null)
+    this.m_title = url;
+  else
+    this.m_title = title;
   this.m_link = link;  // Link to web site or page that is behind the feed m_url
   this.m_description = description;
   this.m_language = language;
@@ -178,202 +181,6 @@ function p_calcHash()
 }
 RssEntry.prototype.p_calcHash = p_calcHash;
 
-// Extracts an RSS header field
-function getField(channel, fieldName, errors)
-{
-  var field = jQuery(channel).find(fieldName).text();
-  var bad = false;
-  if (field === undefined)
-    bad = true;
-  else
-    if (field.length == 0)
-      bad = true;
-  if (bad && errors != null)
-    errors.push(fieldName + ' not found');
-
-  return field;
-}
-
-// Extracts an RSS item field
-function getItemField(xmlItem, fieldName, errors)
-{
-  var field = jQuery(xmlItem).find(fieldName).eq(0).text();
-  var bad = false;
-  if (field === undefined)
-    bad = true;
-  else
-    if (field.length == 0)
-      bad = true;
-  if (bad && errors != null)
-    errors.push(fieldName + ' not found');
-
-  return field;
-}
-
-// Extracts an Atom href field
-function getHrefField(channel, fieldName, errors)
-{
-  var field = jQuery(channel).find(fieldName).attr('href');
-  var bad = false;
-  if (field === undefined)
-    bad = true;
-  else
-    if (field.length == 0)
-      bad = true;
-  if (bad && errors != null)
-    errors.push(fieldName + ' not found');
-
-  return field;
-}
-
-// Extracts an Atom href item field
-function getHrefItemField(xmlItem, fieldName, errors)
-{
-  var field = jQuery(xmlItem).find(fieldName).eq(0).attr('href');
-  var bad = false;
-  if (field === undefined)
-    bad = true;
-  else
-    if (field.length == 0)
-      bad = true;
-  if (bad && errors != null)
-    errors.push(fieldName + ' not found');
-
-  return field;
-}
-
-// Parse RSS version 1.0 and 2.0
-function parseRss10(xmlStr)
-{
-  var ret =
-  {
-    feed: emptyRssHeader(),
-    errorMsg: null
-  };
-
-  var errors = [];
-
-  var channel = jQuery('channel', xmlStr).eq(0);
-  if (channel.length == 0)
-    errors.push('channel not found');
-  var title = getField(channel, 'title:first', errors);
-  // try jQuery(channel).find('link').eq(0).is('atom\\:link')
-  var link = getField(channel, 'link:first', null);
-  var href = getHrefField(channel, 'link', null);
-  if (link.length == 0)
-    link = href;
-  var description = getField(channel, 'encoded', null);  // content:encoded
-  if (description.length == 0)
-    description = getField(channel, 'description:first', null);
-  if (description.length == 0)
-    description = getField(channel, 'description', null);
-  var language = getField(channel, 'language:first', errors);
-  var strTime = getField(channel, 'lastBuildDate:first', null);
-  if (strTime.length == 0)
-    strTime = getField(channel, 'pubDate:first', errors);
-  var updated = utils_ns.parseDate(strTime);
-  if (updated == null)
-    errors.push('lastBuildDate bad');
-
-  ret.feed =
-    new RssHeader('', title, link, description, language, updated);
-
-  var errorXML = channel.prop('outerHTML');
-  ret.feed.x_errors.push(new RssError('error: ' + errors.join(', '), errorXML));
-
-  // The RSS 2.0 standard, see "Elements of <item>"
-  //
-  // An item may represent a "story" -- much like a story in a
-  // newspaper or magazine; if so its description is a synopsis of the
-  // story, and the link points to the full story. An item may also be
-  // complete in itself, if so, the description contains the text
-  // (entity-encoded HTML is allowed; see examples), and the link and
-  // title may be omitted. All elements of an item are optional,
-  // however at least one of title or description must be present.
-
-  var errorsEntries = [];
-  jQuery('item', xmlStr).each(function()
-    {
-      var title = getItemField(this, 'title', null);
-      var link = getItemField(this, 'link', null);
-      var href = getHrefItemField(channel, 'link', null);  // 2.0 style link
-      if (link.length == 0)
-        link = href;
-      var description = getItemField(this, 'description', errorsEntries);
-
-      if (title.length == 0 && description.length == 0)
-        errors.push('Needs "title" or "description"');
-
-      var strTimeEntry = getItemField(this, 'pubDate', errorsEntries);
-      var updated = utils_ns.parseDate(strTimeEntry);
-      if (updated == null)
-        errorsEntries.push('lastBuildDate bad');
-      var id = getItemField(this, 'guid', errorsEntries);
-      var item = new RssEntry(title, link, description, updated, id);
-
-      ret.feed.x_items[item.m_hash] = item;
-    });
-
-  if (errorsEntries.length != 0)
-    ret.errorMsg = 'rss parse error: item: ' + errorsEntries.join(', ');
-
-  return ret;
-}
-
-// Parse Atom 1.0
-function parseAtom(xmlStr)
-{
-  var ret =
-  {
-    feed: emptyRssHeader(),
-    errorMsg: null
-  };
-
-  var errors = [];
-
-  var channel = jQuery('feed', xmlStr).eq(0);
-  if (channel.length == 0)
-    errors.push('feed not found');
-  var title = getField(channel, 'title:first', errors);
-  var link = getHrefField(channel, 'link:first', errors);
-  var description = getField(channel, 'subtitle:first', errors);
-  var language = getField(channel, 'xml:lang', null);
-  var strTime = getField(channel, 'updated:first', errors);
-  var updated = utils_ns.parseDate(strTime);
-  if (updated == null)
-    errors.push('lastBuildDate bad');
-
-  ret.feed =
-    new RssHeader('', title, link, description, language, updated);
-
-  var errorXML = channel.prop('outerHTML');
-  ret.feed.x_errors.push(new RssError('error: ' + errors.join(', '), errorXML));
-
-  var errorsEntries = [];
-  jQuery('entry', xmlStr).each(function()
-    {
-      var title = getItemField(this, 'title', errors);
-      var link = getHrefItemField(this, 'link', errors);
-      var description = getItemField(this, 'content', null);
-      var summary = getItemField(this, 'summary', null);
-      if (description.length == 0)
-        description = summary;
-      var strTimeEntry = getItemField(this, 'updated', errorsEntries);
-      var updated = utils_ns.parseDate(strTimeEntry);
-      if (updated == null)
-        errorsEntries.push('lastBuildDate bad');
-      var id = getItemField(this, 'id', errorsEntries);
-      var item = new RssEntry(title, link, description, updated, id);
-
-      ret.feed.x_items[item.m_hash] = item;
-    });
-
-  if (errorsEntries.length != 0)
-    ret.errorMsg = 'rss parse error: item: ' + errorsEntries.join(', ');
-
-  return ret;
-}
-
 //
 // Parse RSS or Atom
 function parse(feedUrl, xmlDoc)
@@ -418,11 +225,24 @@ function parse(feedUrl, xmlDoc)
   var item = null;
   var items = {};
   var typeStr = '';
-  if ($feed.nodeName == 'rss')
+  var rssType = '';
+  if ($feed.nodeName == 'rss' || $feed.nodeName == 'rdf:RDF')
   {
     // ====== RSS ======
-    // $feed is <rss>...</rss>
-    version = $feed.attributes['version'];
+    // $feed is <rss>...</rss> or <rdf>...</rdf>
+    if($feed.nodeName == 'rss')
+    {
+      rssType = 'RSS';
+      version = jQuery($feed).attr('version');
+    }
+    else
+    {
+      rssType = 'rdf';
+      version = '1.0';
+      log.info('TODO: add RDF parser, ' + feedUrl);
+      errorXML = jQuery($feed).prop('outerHTML').substr(0, 256);
+      errors.push(new RssError('TODO: add parser for RDF (RSS v1.0)', errorXML));
+    }
 
     // In practice there should be only one entry <channel>...</channel>
     for (i = 0; i < $feed.children.length; ++i)
@@ -509,9 +329,9 @@ function parse(feedUrl, xmlDoc)
       header_updated = utils_ns.parseDate(header_strTime);
 
       ret.feed =
-        new RssHeader('', header_title, header_link, header_description, 'no language', header_updated);
+        new RssHeader(feedUrl, header_title, header_link, header_description, 'no language', header_updated);
       ret.feed.m_rss_version = version;
-      ret.feed.m_rss_type = 'RSS';
+      ret.feed.m_rss_type = rssType;
       ret.feed.x_items = items;
       ret.feed.x_errors = errors;
     }
@@ -598,7 +418,7 @@ function parse(feedUrl, xmlDoc)
     header_updated = utils_ns.parseDate(header_strTime);
 
     ret.feed =
-      new RssHeader('', header_title, header_link, header_description, 'no language', header_updated);
+      new RssHeader(feedUrl, header_title, header_link, header_description, 'no language', header_updated);
 
     ret.feed.m_rss_version = '1.0';
     ret.feed.m_rss_type = 'Atom';
@@ -640,49 +460,11 @@ function fetchRss(urlRss, cb)
     })
     .done(function (xmlStr)
     {
-      //
-      // Parse the header of the RSS feed
-
-      parse(urlRss, xmlStr);
-
-      if (jQuery('channel', xmlStr).length == 1)
-      {
-        var version = "";
-        if (jQuery('rss', xmlStr).length == 0)
-          version = '1.0';
-        else
-          version = jQuery('rss', xmlStr).eq(0).attr('version');
-
-        var r = parseRss10(xmlStr);
-        r.feed.m_url = urlRss;
-        r.feed.m_rss_type = 'RSS';
-        r.feed.m_rss_version = version;
-
-        if (r.errorMsg != null)
-          cb(1, r.feed, r.errorMsg);
-        else
-          cb(0, r.feed, null);
-      }
-      else if (jQuery('feed', xmlStr).length == 1)
-      {
-        var a = parseAtom(xmlStr);
-        a.feed.m_url = urlRss;
-        a.feed.m_rss_type = 'Atom';
-        a.feed.m_rss_version = '1.0';
-
-        if (a.errorMsg != null)
-          cb(1, a.feed, a.errorMsg);
-        else
-          cb(0, a.feed, null);
-      }
+      var r = parse(urlRss, xmlStr);
+      if (r.errorMsg != null)
+        cb(1, r.feed, r.errorMsg);
       else
-      {
-        var feed = emptyRssHeader();
-        feed.m_url = urlRss;
-        feed.m_title = urlRss;
-        errorMsg = 'Unrecognized RSS feed type';
-        cb(1, feed, new RssError('Content error', errorMsg));
-      }
+        cb(0, r.feed, null);
     })
     .fail(function ()
     {
