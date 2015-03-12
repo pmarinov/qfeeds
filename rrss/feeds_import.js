@@ -18,7 +18,7 @@ if (typeof feeds_ns === 'undefined')
 
 // object FeedsImport.FeedsImport [constructor]
 // Instantiate one per application
-function FeedsImport(feedsDB)
+function FeedsImport(feedsDB, feedsDir, panelMng)
 {
   var self = this;
 
@@ -26,6 +26,8 @@ function FeedsImport(feedsDB)
   var opmlWarning2TextDetailedContainer = utils_ns.domFind('#xopml_error_details');
 
   self.m_feedsDB = feedsDB;
+  self.m_feedsDir = feedsDir;
+  self.m_panelMng = panelMng;
   self.m_opmlFeeds = null;  // Array of FeedEntry, after parsing of OPML xml
   self.m_parsingErrorMsgs = [];  // Parsing errors text, array if OPMLError
 
@@ -33,6 +35,7 @@ function FeedsImport(feedsDB)
   {
     opmlStep1: utils_ns.domFind('#ximport_opml_step1_input_file'),
     opmlStep2: utils_ns.domFind('#ximport_opml_step2_display_file'),
+    opmlStep3: utils_ns.domFind('#ximport_opml_step3_importing'),
     opmlTitle: utils_ns.domFind('#opml_title'),
     opmlTotal: utils_ns.domFind('#opml_total'),
     opmlError1: utils_ns.domFind('#xopml_error1'),
@@ -53,7 +56,8 @@ function FeedsImport(feedsDB)
     btnNone1: utils_ns.domFind('#xopml_none1', -1),
     btnNone2: utils_ns.domFind('#xopml_none2', -1),
     btnImport: utils_ns.domFind('#xopml_import', -1),
-    btnCancel: utils_ns.domFind('#xopml_cancel', -1)
+    btnCancel: utils_ns.domFind('#xopml_cancel', -1),
+    importCounter: utils_ns.domFind('#ximport_counter')
   };
   // Help strict mode detect misstyped fields
   Object.preventExtensions(self.$d);
@@ -110,7 +114,7 @@ function FeedsImport(feedsDB)
   return this;
 }
 
-// Object FeedEntry.clearInputField
+// Object FeedsImport.clearInputField
 function clearInputField()
 {
   var self = this;
@@ -123,7 +127,7 @@ function clearInputField()
 }
 FeedsImport.prototype.clearInputField = clearInputField;
 
-// Object FeedEntry.showError1
+// Object FeedsImport.showError1
 // Show error for step 1
 function showError1(msg)
 {
@@ -134,7 +138,7 @@ function showError1(msg)
 }
 FeedsImport.prototype.showError1 = showError1;
 
-// Object FeedEntry.showWarning2
+// Object FeedsImport.showWarning2
 // Show a warning message while in step 2
 function showWarning2(msg)
 {
@@ -142,7 +146,7 @@ function showWarning2(msg)
 
   var i = 0;
 
-  self.$d.opmlWarning2Text.text(msg); // Hide the error msg area
+  self.$d.opmlWarning2Text.text(msg); // Show main error title
 
   // Can the domList accomodate all error msg entries?
   if (self.m_parsingErrorMsgs.length > self.$d.errorsList.length)
@@ -601,7 +605,7 @@ function handleOPMLFile(file)
 
           var i = 0;
           var $opml = null;
-          for(i = 0; i < $parsed.length; ++i)
+          for (i = 0; i < $parsed.length; ++i)
           {
             if($parsed[i].nodeName == 'OPML')
             {
@@ -640,6 +644,7 @@ function handleOPMLFile(file)
           // from the OPML file
           self.$d.opmlStep1.toggleClass('hide', true);
           self.$d.opmlStep2.toggleClass('hide', false);
+          self.$d.opmlStep3.toggleClass('hide', true);
 
           // Display the entries
           self.$d.opmlTotal.text(self.m_opmlFeeds.length + ' entries');
@@ -657,63 +662,84 @@ function handleImport()
 {
   var self = this;
 
-  var i = 0;
-  var x = null;
-  var $e = null;
-  var $rssEntry = null;
-  var $checkbox = null;
-  var cbox_val = false;
-  // Walk all m_opmlFeeds entries if checkbox is ON, then import
-  for (i = 0; i < self.m_opmlFeeds.length; ++i)
+  self.$d.importCounter.text('Importing...');
+
+  // Activate area for step3 -- imports counter
+  self.$d.opmlStep1.toggleClass('hide', true);
+  self.$d.opmlStep2.toggleClass('hide', true);
+  self.$d.opmlStep3.toggleClass('hide', false);
+
+  // Don't read any RSS feeds while we are adding to the list
+  // (add operation also includes initial fetch in it)
+  self.m_feedsDB.suspendFetchLoop(true);
+
+  // Yield to UI to display initial progress message (delay 0)
+  setTimeout(function ()
   {
-    x = self.m_opmlFeeds[i];
-    utils_ns.assert(x instanceof FeedEntry, 'opml: displayOPML: x instanceof FeedEntry');
-    if (x.m_isFolder)
-      continue;  // Process only the RSS entries, skip the folders
-    $e = jQuery(self.$d.list[i]);
-    $rssEntry = utils_ns.domFindInside($e, '.xopml_feed_entry');
-    $checkbox = utils_ns.domFindInside($rssEntry, '.xopml_checkbox');
-
-    cbox_val = $checkbox.prop('checked');
-    if (!cbox_val)  // Checkbox is OFF
+    var i = 0;
+    var x = null;
+    var $e = null;
+    var $rssEntry = null;
+    var $checkbox = null;
+    var cbox_val = false;
+    var importCnt = 0;
+    var requestCompleted = false;
+    // Walk all m_opmlFeeds entries if checkbox is ON, then import
+    for (i = 0; i < self.m_opmlFeeds.length; ++i)
     {
-      log.info('skip import for ' + x.m_feedUrl);
-      continue;
+      x = self.m_opmlFeeds[i];
+      utils_ns.assert(x instanceof FeedEntry, 'opml: displayOPML: x instanceof FeedEntry');
+      if (x.m_isFolder)
+        continue;  // Process only the RSS entries, skip the folders
+      $e = jQuery(self.$d.list[i]);
+      $rssEntry = utils_ns.domFindInside($e, '.xopml_feed_entry');
+      $checkbox = utils_ns.domFindInside($rssEntry, '.xopml_checkbox');
+
+      cbox_val = $checkbox.prop('checked');
+      if (!cbox_val)  // Checkbox is OFF
+      {
+        log.info('skip import for ' + x.m_feedUrl);
+        continue;
+      }
+
+      ++importCnt;
+      // Checkbox is ON = do import
+      self.$d.importCounter.text('Importing (' + importCnt + ')...');
+      log.info('handleImport: (' + importCnt + ') RSS import requested: ' + x.m_feedUrl);
+
+      (function ()  // Scope
+      {
+        var urlRss = x.m_feedUrl;
+        var tags = '';
+
+        if (x.m_folder != null)
+          tags = x.m_folder;
+
+        self.m_feedsDB.feedAddByUrl(urlRss, tags,
+            function()
+            {
+              // Feed's _add_ operation is complete
+              // (feed data is in the DB)
+              log.info('handleImport: (' + importCnt + ') RSS imported into DB: ' + urlRss);
+              self.$d.importCounter.text('Importing (' + importCnt + ')...');
+
+              --importCnt;
+
+              // Everything already imported?
+              if (requestCompleted && importCnt == 0)
+              {
+                // Resume fetch loop
+                self.m_feedsDB.suspendFetchLoop(false, -1);
+
+                // Display
+                self.m_feedsDir.p_activateDirEntry(0);
+                self.m_panelMng.p_activatePane(0);  // Activate feeds display
+              }
+            });
+      })();
     }
-
-    // Checkbox is ON = do import
-    (function()  // scope
-    {
-      var urlRss = x.m_feedUrl;
-      self.m_feedsDB.feedAddByUrl(x.m_feedUrl,
-          function()
-          {
-            // Feed's _add_ operation is complete
-            // (feed data is in the DB)
-            log.info("RSS imported into DB (completed): " + urlRss);
-
-            /*
-            // TODO: see how to activate the first entry, probably only if there were 0 feeds before this
-            // This function would activate an RSS feed as a result of Add operation
-            if (self.m_newFeedUrl == null)  // User already switched away to something else?
-              return;
-
-            var idx = self.p_findDirEntry(urlRss);
-            if (idx < 0)
-              return;
-
-            log.info('activate ' + idx);
-            self.p_activateDirEntry(idx);
-            */
-          });
-    })()
-
-    if (x.m_folder != null)
-    {
-      self.m_feedsDB.feedSetTags(x.m_feedUrl, x.m_folder);
-      log.info('import: in folder ' + x.m_folder + ' url:' + x.m_feedUrl);
-    }
-  }
+    requestCompleted = true;
+  }, 0);  // Delay 0, just yield
 }
 FeedsImport.prototype.handleImport = handleImport;
 
@@ -727,6 +753,7 @@ function activateStep1()
 
   self.$d.opmlStep1.toggleClass('hide', false);
   self.$d.opmlStep2.toggleClass('hide', true);
+  self.$d.opmlStep3.toggleClass('hide', true);
 }
 FeedsImport.prototype.activateStep1 = activateStep1;
 

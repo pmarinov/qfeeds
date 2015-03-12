@@ -281,9 +281,9 @@ function feedDisplay(items, dispContext)
 
     $d.snippet = utils_ns.domFindInside($d.bar, '.xsnippet');
     // concert snippet to text
-    rssDom = jQuery.parseHTML(e.m_description);
-    t = $(rssDom).text();
-    $d.snippet.text(t);
+    //rssDom = jQuery.parseHTML(e.m_description);
+    //t = $(rssDom).text();
+    $d.snippet.text(e.m_description.substr(0, 120));
 
     $d.marked_read = utils_ns.domFindInside($d.bar, '.xmarked_read');
     $d.marked_unread = utils_ns.domFindInside($d.bar, '.xmarked_unread');
@@ -333,6 +333,7 @@ function feedDisplay(items, dispContext)
     // t = $(rssDom).text();
     // TODO: replace with sanitized body 
     $d.bentry.html(e.m_description);
+    //$d.bentry.text(e.m_description);
 
     $rssEntry.toggleClass('hide', false);
 

@@ -71,7 +71,7 @@ function insert(entry, remoteId)
     if (self.m_key != '')  // Use own field as a primary key
     {
       key = entry[self.m_key];
-      // Avoid data duplication in remote ID and key as a field
+      // Avoid data duplication as both remote ID and key as fields contents are the same
       optimized = utils_ns.copyFields(entry, [ self.m_key ]);
       rec = self.m_table.getOrInsert(entry[self.m_key], optimized);
     }
@@ -332,7 +332,10 @@ function RTableAddListener(cbRecordsChanged)
 // Checks if Dropbox is still connected
 function RTableIsOnline()
 {
-  return g_client.isAuthenticated();
+  if (g_client == null)
+    return false;
+  else
+    return g_client.isAuthenticated();
 }
 
 // Call this once at init time to complete the initialization

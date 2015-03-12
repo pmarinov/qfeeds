@@ -33,6 +33,7 @@ function FeedsDir($dirPanel, feedDisp, panelMng)
 
   self.m_isOnFocus = false;
 
+  var $containerFeedErrors = utils_ns.domFind('#xfeed_error_details');
   self.$d =
   {
     panel: $dirPanel,
@@ -47,6 +48,8 @@ function FeedsDir($dirPanel, feedDisp, panelMng)
     titleTop: utils_ns.domFind('#xtitle_top', 1),
     titleLink: utils_ns.domFind('#xtitle_link', 1),
     addRss: utils_ns.domFind('#xadd_rss'),
+    fetchProgressHolder: utils_ns.domFind('#xrssfetch_progress_holder'),
+    fetchProgress: utils_ns.domFind('#xrssfetch_progress'),
     formNewRss: utils_ns.domFind('#xform_new_rss'),
     formFieldUrl: utils_ns.domFind('#xfield_input_url'),
     formCancel: utils_ns.domFind('#xform_cancel'),
@@ -60,6 +63,7 @@ function FeedsDir($dirPanel, feedDisp, panelMng)
     areaFolderSetBtn: utils_ns.domFind('#xset_btn_area'),
     areaUnsubscribeBtns: utils_ns.domFind('#xunsubscribe_btn_area'),
     areaUndo: utils_ns.domFind('#xfeed_unsub_undo_area'),
+    areaFeedErrors:  utils_ns.domFind('#xfeed_error_area'),
     iconSettings: utils_ns.domFind('#xsettings_icon'),
     iconLink: utils_ns.domFind('#xtitle_link'),
     menuSelectFolder: utils_ns.domFind('#xfolder_select_menu'),
@@ -68,6 +72,12 @@ function FeedsDir($dirPanel, feedDisp, panelMng)
     btnCancel: utils_ns.domFind('#xfeed_cancel'),
     btnUnsubscribe: utils_ns.domFind('#xfeed_unsubscribe'),
     btnUndo: utils_ns.domFind('#xfeed_unsub_undo'),
+    titleFeedErrors: utils_ns.domFind('#xfeed_error_text'),
+    areaFeedErrorDetails: utils_ns.domFind('#xfeed_error_details'),
+    containerFeedErrors: $containerFeedErrors,
+    errorsList: utils_ns.domFindInside($containerFeedErrors, '.xfeed_error_entry', -1),
+    btnShowErrorDetails: utils_ns.domFind('#xfeed_show_error_details'),
+    btnHideErrorDetails: utils_ns.domFind('#xfeed_hide_error_details'),
     popupNewFolder: utils_ns.domFind('#xnew_folder'),
     inputNewFolder: utils_ns.domFind('#xinput_new_folder'),
     btnNewFolderSubmit: utils_ns.domFind('#xbtn_new_folder_submit'),
@@ -164,7 +174,7 @@ function p_setFeedsDomHandlers()
         self.$d.areaLoadingMsg.toggleClass('hide', false);
 
         self.m_loadingInProgress = true;
-        self.m_feedsDB.feedAddByUrl(self.m_urlFirstTimeOffer,
+        self.m_feedsDB.feedAddByUrl(self.m_urlFirstTimeOffer, '',
             function()  // When feed is commited to the db, activate it
             {
               self.p_activateDirEntry(0);
@@ -188,7 +198,15 @@ function p_setFeedsDomHandlers()
   self.$d.formCancel.on('click', function(e)
       {
         self.m_newFeedUrl = null;
-        self.p_restoreCurrentFeed();
+        if (self.m_displayList.length == 0)
+        {
+          // Feeds list is empty, piggy back on onFocus()
+          self.onFocus();
+        }
+        else
+        {
+          self.p_restoreCurrentFeed();
+        }
       });
 
   self.$d.formCancelFolderRename.on('click', function(e)
@@ -236,27 +254,37 @@ function p_setFeedsDomHandlers()
         self.p_handleSubscribe(e);
       });
 
+  // Cancel screen "Add" (subscription of a new feed)
   self.$d.btnCancel.on('click', function(e)
       {
         self.m_newFeedUrl = null;
-        self.p_restoreCurrentFeed();
 
-        self.p_hideUnhideSections({
-            hideAddRss: true,
-            hideFeedContainer: false,
-            hideAreaRenameFolder: true,
-            hideAreaSelectFolder: true,
-            hideAreaSubscribeBtns: true,
-            hideAreaFolderSetBtn: true,
-            hideAreaUnsubscribeBtns: true,
-            hideUnsubscribeBtn: true,
-            hideUndoArea: true,
-            hideAreaInfoFeed: true,
-            hideAreaInfoFolder: true,
-            hideIconInfo: false,
-            hideIconSettings: false,
-            hideIconLink: false
-          });
+        if (self.m_displayList.length == 0)
+        {
+          // Feeds list is empty, piggy back on onFocus()
+          self.onFocus();
+        }
+        else
+        {
+          self.p_restoreCurrentFeed();
+
+          self.p_hideUnhideSections({
+              hideAddRss: true,
+              hideFeedContainer: false,
+              hideAreaRenameFolder: true,
+              hideAreaSelectFolder: true,
+              hideAreaSubscribeBtns: true,
+              hideAreaFolderSetBtn: true,
+              hideAreaUnsubscribeBtns: true,
+              hideUnsubscribeBtn: true,
+              hideUndoArea: true,
+              hideAreaInfoFeed: true,
+              hideAreaInfoFolder: true,
+              hideIconInfo: false,
+              hideIconSettings: false,
+              hideIconLink: false
+            });
+        }
       });
 
   self.$d.btnUnsubscribe.on('click', function (e)
@@ -267,6 +295,16 @@ function p_setFeedsDomHandlers()
   self.$d.btnUndo.on('click', function (e)
       {
         self.p_handleUndo(e);
+      });
+
+  self.$d.btnShowErrorDetails.on('click', function (e)
+      {
+        self.p_hideAreaErrorDetails(false);
+      });
+
+  self.$d.btnHideErrorDetails.on('click', function (e)
+      {
+        self.p_hideAreaErrorDetails(true); // Keep details area hidden in the beginning
       });
 }
 FeedsDir.prototype.p_setFeedsDomHandlers = p_setFeedsDomHandlers;
@@ -317,6 +355,23 @@ function p_getFeedsCBHandlers()
           self.p_displayFeedsList();
         },
 
+    onRssFetchProgress: function(percent)
+        {
+          if (percent == 0)  // start
+            self.$d.fetchProgressHolder.toggleClass('hide', false);
+
+          self.$d.fetchProgress.attr('style', 'width: ' + percent + '%;');
+
+          if (percent == 100)  // end
+          {
+            // Postglow for 1 second :-)
+            setTimeout(function ()
+                {
+                  self.$d.fetchProgressHolder.toggleClass('hide', true);
+                }, 1 * 1000);
+          }
+        },
+
     // Handle events generated from remote action. On another computer
     // user has marked something read or unread. If this is part of
     // the feed that is currently on display then reflect visually the
@@ -341,6 +396,7 @@ function p_getFeedsCBHandlers()
         {
           // The feed is already properly displayed
           // TODO: but if there is no other feed, activate this as current
+          log.warn('TODO: activate feed ' + urlNewFeed);
         }
   };
 
@@ -423,6 +479,8 @@ FeedsDir.prototype.p_saveCurrentFeed = p_saveCurrentFeed;
 function p_restoreCurrentFeed()
 {
   var self = this;
+
+  utils_ns.assert(self.m_displayList.length == 0, "p_restoreCurrentFeed: feeds list is empty");
 
   self.m_currentFeedName = self.m_saveCurrentFeedName;
   self.m_currentFeed = self.m_saveCurrentFeed;
@@ -538,6 +596,100 @@ function p_displayFeedTitle(titleInfo)
 }
 FeedsDir.prototype.p_displayFeedTitle = p_displayFeedTitle;
 
+// object FeedsDir.p_hideAreaErrors
+// Hide/Show details of feed errors. Show only if there are any errors.
+function p_hideAreaErrors(feedHeader, doHide)
+{
+  var self = this;
+
+  if (feedHeader.x_errors === undefined)
+    feedHeader.x_errors = [];
+
+  if (feedHeader.x_errors.length == 0)
+    doHide = true;
+
+  self.$d.areaFeedErrors.toggleClass('hide', doHide);  // Show the error msg area
+  self.p_hideAreaErrorDetails(true);  // Show only after click on button "Details"
+}
+FeedsDir.prototype.p_hideAreaErrors = p_hideAreaErrors;
+
+// object FeedsDir.p_hideAreaErrorDetails
+// Hide/Show details of feed errors
+function p_hideAreaErrorDetails(doHide)
+{
+  var self = this;
+
+  self.$d.areaFeedErrorDetails.toggleClass('hide', doHide);
+  self.$d.btnShowErrorDetails.toggleClass('hide', !doHide);
+  self.$d.btnHideErrorDetails.toggleClass('hide', doHide);
+}
+FeedsDir.prototype.p_hideAreaErrorDetails = p_hideAreaErrorDetails;
+
+// object FeedsDir.p_displayFeedErrors
+// Put any feed errors in the corresponding display area
+function p_displayFeedErrors(feedHeader, displayNow)
+{
+  var self = this;
+  var i = 0;
+
+  if (feedHeader.x_errors === undefined)
+    feedHeader.x_errors = [];
+
+  if (feedHeader.x_errors.length == 0)
+  {
+    self.$d.areaFeedErrors.toggleClass('hide', true);
+    return;  // No errors to display
+  }
+
+  // Can the domList accomodate all error msg entries?
+  if (feedHeader.x_errors.length > self.$d.errorsList.length)
+  {
+    var maxNew = feedHeader.x_errors.length - self.$d.errorsList.length;
+    for (i = 0; i < maxNew; ++i)
+      self.$d.containerFeedErrors.append($(self.$d.errorsList[0]).clone());
+  }
+  // Reacquire the expanded list
+  self.$d.errorsList = utils_ns.domFindInside(self.$d.containerFeedErrors, '.xfeed_error_entry', -1);
+
+  var x = 0;
+  var $e = null;
+  var $errorEntry = null;
+  var $errorTitle = null;
+  var $errorInfo = null;
+  var shortInfo = '';
+  for (i = 0; i < feedHeader.x_errors.length; ++i)
+  {
+    x = feedHeader.x_errors[i];
+    utils_ns.assert(x instanceof feeds_ns.RssError, 'p_displayFeedErrors: x instanceof RssError');
+    $e = jQuery(self.$d.errorsList[i]);
+
+    shortInfo = x.m_info;
+    if (shortInfo == null || shortInfo == '')
+      shortInfo = '[no extra info]'
+    if (shortInfo.length > 512)
+      shortInfo = shortInfo.substring(0, 512) + '...';
+
+    $errorTitle = utils_ns.domFindInside($e, '.xfeed_error_title');
+    $errorInfo = utils_ns.domFindInside($e, '.xfeed_error_info');
+
+    $errorTitle.text(x.m_title);
+    $errorInfo.text(shortInfo);
+
+    $e.toggleClass('hide', false);  // Make sure entry is not hidden
+  }
+
+  // Collapse all unused entries in self.$d.list
+  for (; i < self.$d.errorsList.length; ++i)
+  {
+    $e = jQuery(self.$d.errorsList[i]);
+    $e.toggleClass('hide', true);
+  }
+
+  self.p_hideAreaErrorDetails(true); // Keep details area hidden in the beginning
+  self.p_hideAreaErrors(feedHeader, !displayNow);
+}
+FeedsDir.prototype.p_displayFeedErrors = p_displayFeedErrors;
+
 // object FeedsDir.p_handleHideUnhideSettings
 // Handle click on the gear icon (for settings) that is next to the
 // feet or folder title in the right-side panel
@@ -590,6 +742,10 @@ function p_handleHideUnhideInfo(ev)
 
   self.m_settingsArea = false;  // State is "hidden"
 
+  var toShow = false;
+  if (self.$d.areaInfoFeed.hasClass('hide'))
+    toShow = true;  // Now it is hidden, so transition to stage "shown"
+
   // TODO: check if current element is a folder (then show "Folder info" section)
   self.$d.areaInfoFeed.toggleClass('hide');
   self.$d.areaRenameFolder.toggleClass('hide', true);
@@ -597,6 +753,10 @@ function p_handleHideUnhideInfo(ev)
   self.$d.areaUnsubscribeBtns.toggleClass('hide', true);
   self.$d.areaUndo.toggleClass('hide', true);
   self.$d.areaInfoFolder.toggleClass('hide', true);
+
+  // Display error info if this is an individual feed
+  if (!self.m_currentFeed.m_isFolder)
+    self.p_displayFeedErrors(self.m_currentFeed.m_header, toShow);  // Show error area if any errors
 }
 FeedsDir.prototype.p_handleHideUnhideInfo = p_handleHideUnhideInfo;
 
@@ -608,6 +768,8 @@ function p_handleAddRssButton(ev)
 
   self.p_onFocusLostFeed();
   self.p_saveCurrentFeed();
+
+  var newUrl = self.$d.formFieldUrl.val("");
 
   self.p_hideUnhideSections({
       hideAddRss: false,
@@ -824,7 +986,7 @@ FeedsDir.prototype.p_handleRecentlyViewedClick = p_handleRecentlyViewedClick;
 
 // object FeedsDir.p_feedView
 // Display a feed with buttons for Subscribe
-// Feed is fetched directly from the web site not from indexedDB
+// Feed is fetched directly from the web site, not from indexedDB
 // (it is a preview for subscription action by user)
 function p_feedView(newUrl)
 {
@@ -862,10 +1024,9 @@ function p_feedView(newUrl)
         {
           var shortMsg = errorMsg.substring(0, 80) + '...';
           console.warn('rss fetch, failed: ' + shortMsg + ', for: ' + newUrl);
-          return;
         }
-
-        console.log('success: ' + newUrl);
+        else
+          console.log('success: ' + newUrl);
 
         // Populate the list of folders in the folder selection drop-down
         self.p_generateFoldersDropDown();
@@ -915,6 +1076,9 @@ function p_feedView(newUrl)
             isFolder: false
           });
 
+        // Populate error information, if any
+        self.p_displayFeedErrors(feed, true);
+
         // Populate info area in case of "Info" button (info icon)
         self.$d.infoUrl.text(feed.m_url);
 
@@ -932,6 +1096,30 @@ function p_handleFormNewRss(ev)
 
   var newUrl = self.$d.formFieldUrl.val();
   log.info('new RSS URL: ' + newUrl);
+
+  // Check for empty
+  if (newUrl.length == 0)
+  {
+    log.info('empty');
+    return;
+  }
+
+  // Check for spaces
+  var i = 0;
+  var isSpacesOnly = true;
+  for (i = 0; i < newUrl.length; ++i)
+  {
+    if (newUrl[i] > ' ')
+    {
+      isSpacesOnly = false;
+      break;
+    }
+  }
+  if (isSpacesOnly)
+  {
+    log.info('spaces only');
+    return;
+  }
 
   self.p_feedView(newUrl);
 }
@@ -959,7 +1147,15 @@ function p_handleSubscribe(ev)
   }
 
   var urlRss = self.m_newFeedUrl;
-  self.m_feedsDB.feedAddByUrl(self.m_newFeedUrl,
+  var tags = '';
+  if (selectedFolder != null)
+  {
+    tags = selectedFolder;
+    log.info('subscribe: in folder ' + selectedFolder + ' url:' + self.m_newFeedUrl);
+  }
+  else
+    log.info('subscribe: url:' + self.p_newFeedUrl);
+  self.m_feedsDB.feedAddByUrl(self.m_newFeedUrl, tags,
       function()
       {
         // Feed's _add_ operation is complete
@@ -977,13 +1173,6 @@ function p_handleSubscribe(ev)
         log.info('activate ' + idx);
         self.p_activateDirEntry(idx);
       });
-  if (selectedFolder != null)
-  {
-    self.m_feedsDB.feedSetTags(self.m_newFeedUrl, selectedFolder);
-    log.info('subscribe: in folder ' + selectedFolder + ' url:' + self.m_newFeedUrl);
-  }
-  else
-    log.info('subscribe: url:' + self.p_newFeedUrl);
 }
 FeedsDir.prototype.p_handleSubscribe = p_handleSubscribe;
 
@@ -1224,6 +1413,14 @@ function p_displayFeedAndTitle(f, entries)
         tooltip: f.m_header.m_description,
         isFolder: false
       });
+
+    // Pull error info from m_feeds
+    // f.m_header comes from the IndexedDB where error info is not stored
+    var key = f.m_header.m_url;
+    f.m_header.x_errors = self.m_feeds[key].m_header.x_errors;
+
+    // Populate error information, if any
+    self.p_displayFeedErrors(f.m_header);
 
     // Populate info area in case of "Info" button (info icon)
     self.$d.infoUrl.text(f.m_header.m_url);
@@ -1745,6 +1942,9 @@ function p_updateFeeds(updates)
       // TODO: check what changed, flag that the feed changed
       // self.m_feeds[key] = v;
       log.trace("possible new content");
+
+      // Transfer error info from updates[] to m_feeds
+      self.m_feeds[key].m_header.x_errors = v.x_errors;
     }
   }
 }

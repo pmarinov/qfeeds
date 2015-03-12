@@ -35,18 +35,26 @@
   <script src="app.js" type="text/javascript"></script>
 </head>
 <body>
-  <div class="container-fluid">
-  <div class="row" style="cursor: default;">
-  <div class="col-sm-3 col-md-3 left_pane" id="xleft_pane">
+  <div class='container-fluid'>
+  <div class='row' style='cursor: default;'>
+  <div class='col-sm-3 col-md-3 left_pane' id='xleft_pane'>
     <!--Sidebar content-->
     <!-- Section: Feeds -->
-    <div id="xcmd_pane_feeds_dir" style="width: 100%; float:left;">
-    <div class="submenu_title_holder">
-        <span class="indent1"></span>
-        <span class="submenu_title" style="cursor: pointer;">Feeds</span>
-        <span class="add_btn_holder">
-          <button class="btn btn-primary btn-xs" title="Subscribe to a new RSS feed" id="xadd_rss">Add</button>
-        </span>
+    <div id='xcmd_pane_feeds_dir' style='width: 100%; float:left;'>
+    <div class='submenu_title_holder'>
+      <span class='indent1'></span>
+      <span class='submenu_title' style='cursor: pointer;'>Feeds</span>
+      <span class='add_btn_holder'>
+        <button class='btn btn-primary btn-xs' title='Subscribe to a new RSS feed' id='xadd_rss'>Add</button>
+      </span>
+    </div>
+    <!-- Progress line for the RSS fetch loop -->
+    <div id='xrssfetch_progress_holder' style='padding-bottom: 1px; width: 100%; float: left;' class='hide'>
+      <div class='progress' style='height: 2px; margin-bottom: 2px;'>
+        <div id='xrssfetch_progress' class='progress-bar' style='width: 5%;'>
+          <span class='sr-only'>(invisible progress text)</span>
+        </div>
+      </div>
     </div>
     <!-- container for left-pane rss/folder entries (feeds directory navigation) -->
     <div id='xfeeds_list'>
@@ -57,11 +65,11 @@
         <!-- icon (folder or feed) -->
         <span class='xdir_icon_holder icon_holder'>
           <img src='images/icon_folder_open.svg' alt='fo'
-               title="Click to close folder" class='ximg_folder_open hide icon unselected'>
+               title='Click to close folder' class='ximg_folder_open hide icon unselected'>
           <img src='images/icon_folder_closed.svg' alt='fo'
-               title="Click to open folder" class='ximg_folder_closed hide icon unselected'>
+               title='Click to open folder' class='ximg_folder_closed hide icon unselected'>
           <img src='images/icon_rss.svg' alt='rss'
-               title="Click to display feed" class='ximg_rss hide icon unselected'>
+               title='Click to display feed' class='ximg_rss hide icon unselected'>
         </span>
         <!-- RSS feed title -->
         <span class='xentry_text entry_text'>
@@ -73,26 +81,26 @@
     </div>  <!-- #xcmd_pane_feeds_dir -->
 
     <!-- Section: Menu for feeds related operations -->
-    <div class="submenu_entry_holder" style="height: 100%; margin-top: 5px;">
-      <span class="indent1"></span>
-      <span class="submenu_entry_inline disabled" id="ximport_opml"
-            title="Import OPML">
+    <div class='submenu_entry_holder' style='height: 100%; margin-top: 5px;'>
+      <span class='indent1'></span>
+      <span class='submenu_entry_inline disabled' id='ximport_opml'
+            title='Import OPML'>
         Import
       </span>
       <span>&nbsp;&nbsp;&#8226&nbsp;&nbsp;</span>
-      <span class="submenu_entry_inline disabled" id="xexport_opml"
-            title="Export OPML [not yet implemented]">
+      <span class='submenu_entry_inline disabled' id='xexport_opml'
+            title='Export OPML [not yet implemented]'>
         Export
       </span>
       <!--
       <span>&nbsp;&nbsp;&#8226&nbsp;&nbsp;</span>
-      <span class="submenu_entry_inline disabled" id="xexport_opml"
-            title="Save complete state to a file [not yet implemented]">
+      <span class='submenu_entry_inline disabled' id='xexport_opml'
+            title='Save complete state to a file [not yet implemented]'>
         Backup
       </span>
       <span>&nbsp;&nbsp;&#8226&nbsp;&nbsp;</span>
-      <span class="submenu_entry_inline disabled" id="xexport_opml"
-            title="Restore complete state from a file [not yet implemented]">
+      <span class='submenu_entry_inline disabled' id='xexport_opml'
+            title='Restore complete state from a file [not yet implemented]'>
         Restore
       </span>
       -->
@@ -204,28 +212,29 @@
     <!-- Everything above #xdisplay_feed_container are activities that take place -->
     <!-- on the right side pane with the feed contents entirely hidden            -->
 
-    <div id="xdisplay_feed_container" class="hide">
-    <div class="rss_title_area">
-        <span class="icon_holder_folder">
-          <img src="images/icon_folder.svg" alt="fo" id="ximg_folder" title="A folder this is."
-               class="hide icon unselected">
+    <div id='xdisplay_feed_container' class='hide'>
+    <div class='rss_title_area'>
+        <span class='icon_holder_folder'>
+          <img src='images/icon_folder.svg' alt='fo' id='ximg_folder' title='A folder this is.'
+               class='hide icon unselected'>
         </span>
-        <span class="icon_holder_rss">
-          <img src="images/icon_rss.svg" alt="rss" id="ximg_rss" title="Drag to move this feed into a folder"
-               style="cursor: move;" class="icon unselected">
+        <span class='icon_holder_rss'>
+          <img src='images/icon_rss.svg' alt='rss' id='ximg_rss'
+               title='Drag to move this feed into a folder [not yet implemented]'
+               style='cursor: move;' class='icon unselected'>
         </span>
-        <span id="xtitle_top" title="zzz" class="title">Feeds</span>
-        <span id="xtitle_settings" class="icon_settings">
-        <img id="xsettings_icon" src="images/icon_gear.svg" class="icon" title="Open settings for this RSS feed"/>
+        <span id='xtitle_top' title='zzz' class='title'>Feeds</span>
+        <span id='xtitle_settings' class='icon_settings'>
+        <img id='xsettings_icon' src='images/icon_gear.svg' class='icon' title='Open settings for this RSS feed'/>
         </span>
-        <span id="xtitle_info" class="icon_settings">
-        <img id="xfeed_icon" src="images/icon_info.svg" class="icon" title="Info"/>
+        <span id='xtitle_info' class='icon_settings'>
+        <img id='xfeed_icon' src='images/icon_info.svg' class='icon' title='Info'/>
         </span>
-        <span class="icon_link_holder">
-        <a id="xtitle_link" class="icon_link"
-           href="http://www.ft.com/rss/comment/columnist/martinwolf"
-           target="_blank">
-        <img src="images/icon_arrow_goto.svg" class="icon icon_link_pos" alt="An awesome image"/>
+        <span class='icon_link_holder'>
+        <a id='xtitle_link' class='icon_link'
+           href='http://www.ft.com/rss/comment/columnist/martinwolf'
+           target='_blank'>
+        <img src='images/icon_arrow_goto.svg' class='icon icon_link_pos' alt='An awesome image'/>
         </a>
         </span>
     </div>  <!-- .rss_title_area -->
@@ -238,68 +247,95 @@
         <button type='button' id='xform_cancel_folder_name' class='btn btn-sm ren_btn_pos'>
           Cancel
         </button>
-        <div style="margin-top: 8px">
+        <div style='margin-top: 8px'>
           <i>note: The feature 'Folder rename' is not yet ready, we apologize for that.</i>
         </div>
       </form>
     </div>  <!-- #xrename_folder_area -->
 
-    <div id="xselect_folder_area" class="select_folder_area">
-      <span class="label_folder">
+    <div id='xselect_folder_area' class='select_folder_area'>
+      <span class='label_folder'>
       Folder:
       </span>
-      <span class="folder_dropdown_holder">
-      <select id="xfolder_select_menu" class="folder_dropdown">
-        <option value="xnone">None</option>
-        <option value="xnew">Create new...</option>
+      <span class='folder_dropdown_holder'>
+      <select id='xfolder_select_menu' class='folder_dropdown'>
+        <option value='xnone'>None</option>
+        <option value='xnew'>Create new...</option>
       </select>
       </span>
-      <span id="xsubscribe_btns_area" class="subscribe_btns_area">
-        <button type="button" id="xfeed_subscribe" class="btn btn-sm">Subscribe</button>
-        <button type="button" id="xfeed_cancel" class="btn btn-sm">Cancel</button>
+      <span id='xsubscribe_btns_area' class='subscribe_btns_area'>
+        <button type='button' id='xfeed_subscribe' class='btn btn-sm'>Subscribe</button>
+        <button type='button' id='xfeed_cancel' class='btn btn-sm'>Cancel</button>
       </span>
-      <span id="xset_btn_area" class="set_btn_area">
-        <button type="button" id="xfeed_setfolder" class="btn btn-sm">Set</button>
+      <span id='xset_btn_area' class='set_btn_area'>
+        <button type='button' id='xfeed_setfolder' class='btn btn-sm'>Set</button>
       </span>
-      <div class="clearfix">
+      <div class='clearfix'>
       </div>
     </div>  <!-- #xselect_folder_area -->
 
-    <div id="xunsubscribe_btn_area" class="unsubscribe_btn_area">
-      <span class="label_folder" style="padding-right: 16px;">
+    <div id='xunsubscribe_btn_area' class='unsubscribe_btn_area'>
+      <span class='label_folder' style='padding-right: 16px;'>
       Feed:
       </span>
-      <button type="button" id="xfeed_unsubscribe" class="btn btn-sm">Unsubscribe</button>
-      <div class="clearfix">
+      <button type='button' id='xfeed_unsubscribe' class='btn btn-sm'>Unsubscribe</button>
+      <div class='clearfix'>
       </div>
     </div>
 
-    <div id="xfeed_unsub_undo_area" class="unsubscribe_undo_btn_area hide">
+    <div id='xfeed_unsub_undo_area' class='unsubscribe_undo_btn_area hide'>
       <span>
       Unsubscribed!
       </span>
       <span>
-        <button type="button" id="xfeed_unsub_undo" class="btn btn-sm">Undo</button>
+        <button type='button' id='xfeed_unsub_undo' class='btn btn-sm'>Undo</button>
       </span>
-      <div class="clearfix">
+      <div class='clearfix'>
       </div>
     </div>
 
-    <div id="xfeed_info_area" class="feed_info_area">
+    <div id='xfeed_info_area' class='feed_info_area'>
       <div>
-        <span>URL: </span><span id="xfeed_info_url"></span>
+        <span>URL: </span><span id='xfeed_info_url'></span>
       </div>
-      <div class="clearfix">
+      <div class='clearfix'>
       </div>
     </div>
 
-    <div id="xfolder_info_area" class="feed_info_area">
+    <div id='xfolder_info_area' class='feed_info_area'>
       <div>
         <span>Feeds: </span><span>2 (Demo)</span>
       </div>
-      <div class="clearfix">
+      <div class='clearfix'>
       </div>
     </div>
+
+    <div id='xfeed_error_area' class='hide'>
+      <div class='alert alert-warning' role='alert'>
+        <span id='xfeed_error_text'>This RSS feed has one or more errors</span>
+        <span>
+        <button id='xfeed_show_error_details' type='button' class='btn btn-sm'>
+          Details
+        </button>
+        </span>
+        <span>
+        <button id='xfeed_hide_error_details' type='button' class='btn btn-sm'>
+          Close
+        </button>
+        </span>
+        <div id='xfeed_error_details' class='hide' style='padding-top: 10px'>
+          <div class='xfeed_error_entry'>
+            <div class='xfeed_error_title'>
+            </div>
+            <div class='xfeed_error_info' style='font-style: italic'>
+            </div>
+            <br/>
+          </div>
+        </div>  <!-- #xopml_error_details -->
+      </div>  <!-- #xopml_warning2 -->
+      <div class='clearfix'>
+      </div>
+    </div>  <!-- #xfeed_error_area -->
 
     <!-- Everything above #xrss_container are activities that take place -->
     <!-- on the right side pane with the feed contents presnet           -->
@@ -396,6 +432,7 @@
     <!-- IMPORT OPML screens -->
     <div id='xdisp_pane_import_opml' class='opml_pane_area hide'>
       <div style='font-weight: bold; font-size: 120%; margin-bottom: 12px;'>Import feeds via OPML</div>
+
       <div id='ximport_opml_step1_input_file' class='hide'>
         <div style='font-size: 85%' id='ximport_input_opml_file_area'>
           Select an OPML file to see a preview
@@ -404,6 +441,7 @@
         <div class='alert alert-danger opml_error' role='alert' id='xopml_error1'>
         </div>
       </div>  <!-- #ximport_opml_step1_input_file -->
+
       <div id='ximport_opml_step2_display_file' class='hide'>
         <!-- List of OPML FOLDERS AND RSS ENTRIES -->
         <div id='opml_title' class='title'>
@@ -428,8 +466,8 @@
               </div>
               <br/>
             </div>
-          </div>
-        </div>
+          </div>  <!-- #xopml_error_details -->
+        </div>  <!-- #xopml_warning2 -->
 
         <!-- Top line buttons All/None -->
         <div class='opmlvw_button_bar'>
@@ -499,6 +537,13 @@
         </div>
 
       </div>  <!-- #ximport_opml_step2_display_file -->
+
+      <div id='ximport_opml_step3_importing' class='hide'>
+        <div style='font-size: 85%' id='ximport_counter'>
+          Importing (N)...
+        </div>
+      </div> <!-- #ximport_opml_step3_importing -->
+
     </div>  <!-- #xdisp_pane_import_opml -->
 
     <!-- About screen display -->
@@ -525,9 +570,13 @@ color: #999999; font-weight: bold; padding-top: 10px; padding-bottom: 8px;">Abou
       <br/>
       <div>
         <span>
-          'rrss' is <a href='http://www.gnu.org/philosophy/free-sw.html'>free software</a> --
-          this means that everyone may use it, redistribute it, and/or
-          modify it under the terms of the BSD (FreeBSD) License.
+          'rrss' is
+          <a href='http://www.gnu.org/philosophy/free-sw.html' target='_blank'>
+            free software
+          </a>
+          -- this means that everyone may use it, redistribute it,
+          and/or modify it under the terms of the BSD (FreeBSD)
+          License.
         </span>
         <span>
           <button type="button" id="xsee_license" class="btn btn-sm">See license</button>
@@ -618,6 +667,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
           <img src='images/icon_folder_closed.svg' title='open/closed' style='width: 12px;'/>
         </a>]: <a href="http://thenounproject.com/informationarchitect" target="_blank">CD</a>, CC BY 3.0
       </div>
+      <div>Crash [
+        <a href="http://thenounproject.com/term/bicycle-accident/11183" target="_blank">
+          <img src='images/icon_bike_crash.svg' title='bicycle accident' style='width: 12px;'/>
+        </a>]: <a href="http://thenounproject.com/jmkeuning" target="_blank">James Keuning</a>, CC0
+      </div>
       <br/>
       <div>ASCII Art [
         <a href="http://patorjk.com/software/taag/#p=display&f=Big&t=rrss" target="_blank">
@@ -652,8 +706,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       </div>
       <div>
         <span>
-          <a href="http://www.gnu.org/software/emacs" target="_blank" class="pull-left">GNU Emacs</a>,
-          <i>"Free as in Freedom"</i>
+          <a href="http://www.gnu.org/software/emacs" target="_blank" class="pull-left">GNU Emacs</a>
         </span>
       <br/>
       <br/>
@@ -686,6 +739,41 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       <div class='modal-footer'>
         <button class='btn' data-dismiss='modal' aria-hidden='true'>Cancel</button>
         <button id='xbtn_new_folder_submit' class='btn btn-primary'>Create</button>
+      </div>
+
+    </div> <!-- .modal-content -->
+    </div> <!-- .modal-dialog -->
+  </div>  <!-- #xnew_folder -->
+
+  <!-- Fatal error pop-up -->
+  <div id='xerror_popup' class='modal'>
+    <div class='modal-dialog'>
+    <div class='modal-content'>
+
+      <div class='modal-header'>
+        <div>
+        <button type='button' class='close' data-dismiss='modal' aria-hidden='true'>
+          <span aria-hidden="true">&times;</span><span class="sr-only">Close</span>
+        </button>
+        </div>
+        <div class='clearfix'>
+        </div>
+        <span style='width: 70%; float: left;'>
+            <h3 id='myModalLabel'>Unfortunatelly the program "rrss" crashed</h3>
+        </span>
+        <span style='width: 30%; float: left;'>
+          <img src='images/icon_bike_crash.svg' alt='fo' style='width: 85px' title='Bicycle accident'>
+        </span>
+        <div class='clearfix'>
+        </div>
+      </div>
+      <div class='modal-body'>
+        <span id='xerror_pop_msg' style='width: 60%;'>
+        Fatal error
+        </span>
+      </div>
+      <div class='modal-footer'>
+        <button class='btn' data-dismiss='modal' aria-hidden='true'>Close</button>
       </div>
 
     </div> <!-- .modal-content -->

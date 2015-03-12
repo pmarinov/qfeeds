@@ -19,20 +19,28 @@ if (typeof feeds_ns === 'undefined')
 function App()
 {
   var self = this;
+  var $popupErrorDlg = utils_ns.domFind('#xerror_popup');
+  var $popupErrorMsg = utils_ns.domFind('#xerror_pop_msg');
 
   var m_oldOnError = window.onerror;
   // Override previous handler.
-  window.onerror = function(errorMsg, url, lineNumber)
+  window.onerror = function(errorMsg, url, lineNumber, column, errorObj)
       {
-        var stripRe = new RegExp('(chrome-extension:..[a-z]*\/)(.*)');
+        var stripRe = new RegExp('(chrome-extension:..[a-z]*\/)(.*)', 'g');
         var strippedUrl = url.replace(stripRe, '$2');
-        alert('Unfortunatelly the program "rrss" crashed.\n' +
-              'Plase consider making a bug report together with this information.\n' +
-              '------\n\n' +
-              errorMsg +
-              '\n\n' +
-              'source file: ' + strippedUrl + '\n' +
-              'line: ' + lineNumber);
+        var strippedStack = errorObj.stack.toString().replace(stripRe, '$2');
+        var errorMsgHTML = '<i>Plase consider making a bug report together with this information.</i><br/>' +
+              '<hr>' +
+              '<span id="xerror_msg_text"></span>' +
+              '<br/><br/>' +
+              '<b>source file:</b> ' + strippedUrl + ':' + lineNumber + ':' + column + '<br/>' +
+              '<b>stack:</b> ' + '<br/>' +
+              '<pre style="font-size: 80%">' + strippedStack + '</pre>';
+
+        $popupErrorMsg.html(errorMsgHTML);
+        $('#xerror_msg_text').text(errorMsg);
+
+        $popupErrorDlg.modal('show');
 
         if (self.m_oldOnError)  // Call previous handler
           return m_oldOnError(errorMsg, url, lineNumber);
@@ -75,7 +83,7 @@ function App()
 
   self.m_panelAbout = new feeds_ns.PanelAbout();
   var feedsDB = self.m_feedsDir.getFeedsDbObj();
-  self.m_panelImportOpml = new feeds_ns.FeedsImport(feedsDB);
+  self.m_panelImportOpml = new feeds_ns.FeedsImport(feedsDB, self.m_feedsDir, self.m_panelMng);
 
   self.m_panelMng.setMenuEntryHandler('xcmd_pane_feeds_dir', self.m_feedsDir);
   self.m_panelMng.setMenuEntryHandler('ximport_opml', self.m_panelImportOpml);
