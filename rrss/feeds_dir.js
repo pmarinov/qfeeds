@@ -2203,6 +2203,29 @@ function p_displayFeedsList()
     isCurrent = false;
   }
 
+  // Directory empty?
+  if (i == 0)
+  {
+    $e = $(self.$d.list[0]);
+    $a = utils_ns.domFindInside($e, '.xentry_text');
+    $unread = utils_ns.domFindInside($e, '.xentry_unread');
+    $ico_fo_open = utils_ns.domFindInside($e, '.ximg_folder_open');
+    $ico_fo_closed = utils_ns.domFindInside($e, '.ximg_folder_closed');
+    $ico_rss = utils_ns.domFindInside($e, '.ximg_rss');
+
+    // Display text "None"
+    $a.text('(None)');
+    $unread.text('');
+
+    // Hide all icons
+    $ico_rss.toggleClass('hide', true);
+    $ico_fo_closed.toggleClass('hide', true);
+    $ico_fo_open.toggleClass('hide', true);
+
+    $e.toggleClass('hide', false);  // Make sure entry is not hidden
+    ++i;
+  }
+
   // Collapse all unused entries in self.$d.list
   for (; i < self.$d.list.length; ++i)
   {
