@@ -687,6 +687,7 @@ function handleImport()
     // Walk all m_opmlFeeds entries if checkbox is ON, then import
     for (i = 0; i < self.m_opmlFeeds.length; ++i)
     {
+      self.m_feedsDB.suspendFetchLoop(true);  // Obey your superstitions...
       x = self.m_opmlFeeds[i];
       utils_ns.assert(x instanceof FeedEntry, 'opml: displayOPML: x instanceof FeedEntry');
       if (x.m_isFolder)

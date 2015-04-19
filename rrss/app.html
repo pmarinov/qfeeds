@@ -22,6 +22,11 @@
   <script src="../lib/components/core.js"></script>
   <script src="../lib/components/sha1.js"></script>
 
+  <!-- Sanitize.js from Google, and its helper modules -->
+  <script src="../lib/uri.js" type="text/javascript"></script>
+  <script src="../lib/html4.js" type="text/javascript"></script>
+  <script src="../lib/sanitizer.js" type="text/javascript"></script>
+
   <!-- app's css and js -->
   <link href="style.css" rel="stylesheet" type="text/css">
   <script src="utils.js" type="text/javascript"></script>
@@ -541,6 +546,10 @@
       <div id='ximport_opml_step3_importing' class='hide'>
         <div style='font-size: 85%' id='ximport_counter'>
           Importing (N)...
+        </div>
+        <div style='font-size: 85%'>
+          <i>Please wait, it may take a few minutes to import all the feeds,
+             fetch their data and store it in the database on disk.</i>
         </div>
       </div> <!-- #ximport_opml_step3_importing -->
 

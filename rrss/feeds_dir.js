@@ -357,6 +357,9 @@ function p_getFeedsCBHandlers()
 
     onRssFetchProgress: function(percent)
         {
+          if (percent == -1)  // Goes into disabled state
+            self.$d.fetchProgressHolder.toggleClass('hide', true);
+
           if (percent == 0)  // start
             self.$d.fetchProgressHolder.toggleClass('hide', false);
 
