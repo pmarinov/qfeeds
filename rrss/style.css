@@ -497,16 +497,16 @@
 
 .rss_entry .icon_read
 {
-  width: 24px;
-  zoom: 1.5;
-  margin-top: -4px;
+  width: 21px;
+  zoom: 1.8;
+  margin-top: -2px;
 }
 
 .rss_entry .icon_unread
 {
   width: 24px;
   zoom: 1.6;
-  margin-top: -4px;
+  margin-top: -3px;
 }
 
 .rss_entry .unread
