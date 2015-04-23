@@ -989,7 +989,7 @@ FeedsDir.prototype.p_handleRecentlyViewedClick = p_handleRecentlyViewedClick;
 
 // object FeedsDir.p_feedView
 // Display a feed with buttons for Subscribe
-// Feed is fetched directly from the web site, not from indexedDB
+// Feed is fetched directly from the web site, not from IndexedDB
 // (it is a preview for subscription action by user)
 function p_feedView(newUrl)
 {
@@ -1060,6 +1060,16 @@ function p_feedView(newUrl)
           t = feed.x_items[keys[j]];
           // For each item fill in the header back reference (x_header)
           t.x_header = feed;
+
+          // Sanitize
+          t.m_description = Sanitizer.sanitize(t.m_description, function (s)
+              {
+                // A naive URL rewriter
+                log.info('sanitizer URL: ' + s);
+                return s;
+              });
+
+          // Ready for display
           entries.push(t);
         }
         feed.x_items = null;  // no longer needed
