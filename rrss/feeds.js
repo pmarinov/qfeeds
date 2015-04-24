@@ -1305,7 +1305,7 @@ function p_feedRecordEntry(feedUrl, newEntry, cbWriteDone)
   var newEntry2 = feeds_ns.copyRssEntry(newEntry);
   var s = self.m_rss_entry_cnt;
 
-  // Insert entry in m_dbSubscriptions
+  // Insert entry in table 'rss_data'
   var tran = self.m_db.transaction(['rss_data'], 'readwrite');
   tran.oncomplete = function (event)
       {
@@ -1340,6 +1340,15 @@ function p_feedRecordEntry(feedUrl, newEntry, cbWriteDone)
         if (needsWrite)
         {
           log.trace('db: write entry (' + s + '): [' + newEntry2.m_link + ']');
+
+          // Sanitize
+          newEntry2.m_description = Sanitizer.sanitize(newEntry2.m_description, function (s)
+              {
+                // A naive URL rewriter
+                log.info('sanitizer URL: ' + s);
+                return s;
+              });
+
           var reqAdd = store.put(utils_ns.marshal(newEntry2, 'm_'));
           reqAdd.onsuccess = function(event)
               {
@@ -2012,7 +2021,8 @@ function suspendFetchLoop(flag, fetchWhen)
 
   if (flag)
   {
-    self.m_loopIsSuspended = false;
+    self.m_loopIsSuspended = true;
+    self.m_feedsCB.onRssFetchProgress(-1); // In case there was any progress indicator on display
     log.info('fatch loop SUSPENDED');
   }
   else

@@ -357,6 +357,9 @@ function p_getFeedsCBHandlers()
 
     onRssFetchProgress: function(percent)
         {
+          if (percent == -1)  // Goes into disabled state
+            self.$d.fetchProgressHolder.toggleClass('hide', true);
+
           if (percent == 0)  // start
             self.$d.fetchProgressHolder.toggleClass('hide', false);
 
@@ -986,7 +989,7 @@ FeedsDir.prototype.p_handleRecentlyViewedClick = p_handleRecentlyViewedClick;
 
 // object FeedsDir.p_feedView
 // Display a feed with buttons for Subscribe
-// Feed is fetched directly from the web site, not from indexedDB
+// Feed is fetched directly from the web site, not from IndexedDB
 // (it is a preview for subscription action by user)
 function p_feedView(newUrl)
 {
@@ -1011,10 +1014,16 @@ function p_feedView(newUrl)
 
   self.m_newFeedUrl = newUrl;
 
+  // Show "Loading..."
+  self.$d.areaLoadingMsg.toggleClass('hide', false);
+
   // Read the feed and display it
   feeds_ns.fetchRss(newUrl,
       function(c, feed, errorMsg)
       {
+        // Hide "Loading..."
+        self.$d.areaLoadingMsg.toggleClass('hide', true);
+
         var j = 0;
         var t = '';
         var keys = [];
@@ -1057,6 +1066,16 @@ function p_feedView(newUrl)
           t = feed.x_items[keys[j]];
           // For each item fill in the header back reference (x_header)
           t.x_header = feed;
+
+          // Sanitize
+          t.m_description = Sanitizer.sanitize(t.m_description, function (s)
+              {
+                // A naive URL rewriter
+                log.info('sanitizer URL: ' + s);
+                return s;
+              });
+
+          // Ready for display
           entries.push(t);
         }
         feed.x_items = null;  // no longer needed

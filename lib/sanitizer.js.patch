@@ -1,0 +1,10 @@
+--- sanitizer.orig.js	2015-04-20 20:32:46.929690567 -0700
++++ sanitizer.js	2015-04-14 20:55:14.103572226 -0700
+@@ -1,5 +1,5 @@
+-var html4 = require("./lib/html4.js");
+-var URI = require("./lib/uri.js");
++//var html4 = require("./lib/html4.js");
++//var URI = require("./lib/uri.js");
+ 
+ // Copyright (C) 2006 Google Inc.
+ //
