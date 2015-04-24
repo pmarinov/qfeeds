@@ -1014,10 +1014,16 @@ function p_feedView(newUrl)
 
   self.m_newFeedUrl = newUrl;
 
+  // Show "Loading..."
+  self.$d.areaLoadingMsg.toggleClass('hide', false);
+
   // Read the feed and display it
   feeds_ns.fetchRss(newUrl,
       function(c, feed, errorMsg)
       {
+        // Hide "Loading..."
+        self.$d.areaLoadingMsg.toggleClass('hide', true);
+
         var j = 0;
         var t = '';
         var keys = [];
