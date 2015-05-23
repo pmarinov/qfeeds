@@ -92,7 +92,19 @@ function App()
   self.m_panelMng.p_activatePane(0);  // Activate feeds display
 
   // Now connect to Dropbox
-  self.m_connectDropbox = new feeds_ns.ConnectDBox(self.p_getConnectDBoxCBHandlers());
+  // self.m_connectDropbox = new feeds_ns.ConnectDBox(self.p_getConnectDBoxCBHandlers());
+  gapi.load("drive-realtime,drive-share", function()
+      {
+        // callback: API Done Loading
+        $('#xgdrive').on('click', function ()
+            {
+              chrome.identity.getAuthToken({ 'interactive': true }, function(accessToken)
+                  {
+                    log.info('Google API Access token: ' + accessToken);
+                    feeds_ns.RTableInit(accessToken);
+                  });
+            });
+      });
 
   Object.preventExtensions(this);
 

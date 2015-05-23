@@ -7,7 +7,7 @@
 
 "oauth2":
 {
-  "client_id": "696763237280-bkfouv0030la6l9t2g1elim04no836fq.apps.googleusercontent.com",
+  "client_id": "1043072112628-tbg2533tg0vts1ihq5c9m12m2b9kk9cs.apps.googleusercontent.com",
   "scopes":
   [
     "https://www.googleapis.com/auth/drive"
@@ -27,10 +27,13 @@
   "storage",
   "https://ssl.gstatic.com/",
   "https://www.googleapis.com/",
+  "https://www.google.com/",
   "https://accounts.google.com/",
   "http://*/",
   "https://*/"
 ],
+
+"content_security_policy": "script-src 'self' https://apis.google.com https://drive.google.com; object-src 'self'",
 
 "browser_action" :
 {
