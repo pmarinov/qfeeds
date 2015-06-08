@@ -24,6 +24,7 @@
 "permissions":
 [
   "identity",
+  "identity.email",
   "storage",
   "https://ssl.gstatic.com/",
   "https://www.googleapis.com/",

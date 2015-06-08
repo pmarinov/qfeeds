@@ -256,7 +256,22 @@ function assert(must_be_true, message)
 {
   if (!must_be_true)
   {
-    throw "ASSERT: " + message || "Assertion failed";
+    try
+    {
+      i.dont.exist += 0;
+    }
+    catch (e)  // Catch a simulated error just to obtain the stack
+    {
+      var e2 =
+      {
+        message: "ASSERT: " + message || "Assertion failed",
+        stack: e.stack
+      }
+    }
+    if (window.onerror != null)
+      window.onerror(e2.message, 'chrome-extension:mumbojumbo/app.html', 0, 0, e2);
+    else
+      throw e;
   }
 }
 

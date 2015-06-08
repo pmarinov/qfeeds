@@ -78,7 +78,9 @@ function App()
   self.$d =
   {
     syncProgress: utils_ns.domFind('#xsync_progress'),
-    syncProgressHolder: utils_ns.domFind('#xsync_progress_holder')
+    syncProgressHolder: utils_ns.domFind('#xsync_progress_holder'),
+    btnGDrive: utils_ns.domFind('#xgdrive'),
+    userGDrive: utils_ns.domFind('#xgoogle_user')
   }
 
   self.m_panelAbout = new feeds_ns.PanelAbout();
@@ -100,8 +102,22 @@ function App()
             {
               chrome.identity.getAuthToken({ 'interactive': true }, function(accessToken)
                   {
+                    if (chrome.runtime.lastError)
+                    {
+                      //callback(chrome.runtime.lastError);
+                      log.error(chrome.runtime.lastError);
+                      return;
+                    }
+                    chrome.identity.getProfileUserInfo(function(profileInfo)
+                        {
+                          self.$d.btnGDrive.text('Logout \u2192');
+                          self.$d.userGDrive.text(profileInfo.email)
+                        });
                     log.info('Google API Access token: ' + accessToken);
-                    feeds_ns.RTableInit(accessToken);
+                    feeds_ns.RTablesInit(accessToken, function()
+                        {
+                          self.m_feedsDir.remoteStoreConnected();
+                        });
                   });
             });
       });

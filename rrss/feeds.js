@@ -44,15 +44,21 @@ function Feeds(feedsCB)
   // Set to true if Dropbox status is logged in
   self.m_remote_is_connected = false;
 
-  // Subscribed RSS feeds stored in Dropbox (RTableDBox)
-  self.m_remote_subscriptions = null;
+  // Subscribed RSS feeds stored in Dropbox (rtable ID)
+  self.m_remote_subscriptions_id = -1;
 
   // RSS entries that are marked as read stored in Dropbox
-  // (RTableDBox)
-  self.m_remote_read = null;
+  // (rtable ID)
+  self.m_remote_read_id = -1;
+
+  // (object RTablesGDrive)
+  self.m_rtGDrive = null;
 
   // Start the poll loop
   self.m_timeoutID = setTimeout(p_poll, 1, self);
+
+  // Help strict mode detect miss-typed fields
+  Object.preventExtensions(this);
 
   return this;
 }
@@ -252,7 +258,6 @@ function p_rtableRemoteFeedsListener(records)
       newFeed.m_title = r.data.m_rss_feed_url;  // Display URL for title before first fetch
       newFeed.m_tags = r.data.m_tags;
       newFeed.m_remote_state = feeds_ns.RssSyncState.IS_SYNCED;
-      newFeed.m_remote_id = r.data.m_rss_feed_hash;
 
       // Put into local list of RSS subscriptions (self.m_rssFeeds)
       self.p_feedInsert(newFeed);
@@ -312,12 +317,11 @@ function p_rtableSyncEntry(rssEntry)
   var remoteEntry = null;
   var remoteId = null;
 
-  if (feeds_ns.RTableIsOnline())
+  if (feeds_ns.RTablesIsOnline())
   {
     remoteEntry = new RemoteEntryRead(rssEntry);
-    remoteId = self.m_remote_read.insert(remoteEntry, rssEntry.m_remote_id);
+    self.m_rtGDrive.insert(self.m_remote_read_id, remoteEntry);
     rssEntry.m_remote_state = feeds_ns.RssSyncState.IS_SYNCED;
-    rssEntry.m_remote_id = remoteId;
     log.trace('rtableSyncEntry: remote OK (' + rssEntry.m_hash + ')');
   }
   else
@@ -341,7 +345,6 @@ function p_rtableSyncFeedEntry(feed)
 
   var localFeed = null;
   var remoteFeed = null;
-  var remoteId = null;
   var m = 0;
 
   m = self.p_feedFindByUrl(feed.m_url);
@@ -350,21 +353,14 @@ function p_rtableSyncFeedEntry(feed)
   else
     localFeed = null;
 
-  if (feeds_ns.RTableIsOnline())
+  if (feeds_ns.RTablesIsOnline())
   {
     remoteFeed = new RemoteFeedUrl(feed);
-    remoteId = self.m_remote_subscriptions.insert(remoteFeed, feed.m_remote_id);
-
-    // Reflect in the local entry (m_rssFeeds)
-    if (localFeed != null)
-    {
-      localFeed.m_remote_state = feeds_ns.RssSyncState.IS_SYNCED;
-      localFeed.m_remote_id = remoteId;
-    }
+    self.m_rtGDrive.insert(self.m_remote_subscriptions_id, remoteFeed);
+    localFeed.m_remote_state = feeds_ns.RssSyncState.IS_SYNCED;
 
     // Reflect in feed copy which will be recorded back into the IndexedDB
     feed.m_remote_state = feeds_ns.RssSyncState.IS_SYNCED;
-    feed.m_remote_id = remoteId;
 
     log.trace('p_rtableSyncFeedEntry: remote OK (' + remoteFeed.m_rss_feed_url + ')');
   }
@@ -460,23 +456,20 @@ Feeds.prototype.p_rtableSyncRemoteSubscriptions = p_rtableSyncRemoteSubscription
 
 // object Feeds.p_rtableInitRemoteEntryRead
 // Initialize remote table (rtable) that stores status_read for RSS entries
-function p_rtableInitRemoteEntryRead()
+function p_rtableInitRemoteEntryRead(cbDone)
 {
   var self = this;
 
-  // To obtain the list of fields:
-  // 1. A new empty RemoteEntryRead
-  // 2. Enumerate fields that start with 'm_'
-  var dummy = new RemoteEntryRead(null);
-  var fields = utils_ns.listOfFields(dummy, 'm_');
-
-  self.m_remote_read = new feeds_ns.RTableDBox('rss_entries_read', fields, 'm_rss_entry_hash');
+  if (false)
+  {
+  // TODO: figure out the listener API
   // NOTE: !!! one listener handles all tables !!!
-  feeds_ns.RTableAddListener(
+  feeds_ns.RTablesAddListener(
       function (table, records)
       {
         self.p_rtableListener(table, records);
       });
+  }
 
   // There are two ways for getting data from Dropbox's datastore
   // 1. Listen to events: these changes are reflected into the local
@@ -488,7 +481,7 @@ function p_rtableInitRemoteEntryRead()
   // updated remotely but doesn't generate corresponding
   // events. Unfortunately, we have to do a full datastore query that
   // walks all entries only to discover what changed remotely.
-  self.m_remote_read.initialSync();
+  self.m_rtGDrive.initialSync(self.m_remote_read_id, null);
 
   // Walk over all RSS entry records in the local DB and send to
   // remote table all that were marked as read
@@ -501,11 +494,6 @@ Feeds.prototype.p_rtableInitRemoteEntryRead = p_rtableInitRemoteEntryRead;
 function p_rtableInitRemoteFeedUrl()
 {
   var self = this;
-
-  var dummy = new RemoteFeedUrl(null);
-  var fields = utils_ns.listOfFields(dummy, 'm_');
-
-  self.m_remote_subscriptions = new feeds_ns.RTableDBox('rss_subscriptions', fields, 'm_rss_feed_hash');
 
   // Prepare a map of all subscriptions from the local list
   var k = 0;
@@ -545,10 +533,34 @@ function rtableConnect()
   // IS_SYNCED)
   self.p_feedPendingDeleteDB(true);
 
-  self.p_rtableInitRemoteEntryRead();
-  self.p_rtableInitRemoteFeedUrl();
+  var tables =
+  [
+    {name: 'rss_subscriptions', key: 'm_rss_feed_hash'},
+    {name: 'rss_entries_read', key: 'm_rss_entry_hash'}
+  ];
+  self.m_remote_subscriptions_id = 0;
+  self.m_remote_read_id = 1;
+  self.m_rtGDrive = new feeds_ns.RTablesGDrive(tables, function (code)
+      {
+        self.p_rtableInitRemoteEntryRead(function (code)
+            {
+              if (code == 0)  // Error in the first table?
+              {
+                log.info('rtableConnect(), failed. (1)');
+                return;  // Don't even attempt table #2
+              }
 
-  log.info('rtableConnect(), done.');
+              self.p_rtableInitRemoteFeedUrl(function (code)
+                  {
+                    if (code == 0)  // Error in the first table?
+                    {
+                      log.info('rtableConnect(), failed. (2)');
+                      return;  // Don't even attempt table #2
+                    }
+                    log.info('rtableConnect(), done.');
+                  });
+            });
+      });
 }
 Feeds.prototype.rtableConnect = rtableConnect;
 
@@ -611,7 +623,7 @@ Feeds.prototype.p_feedReadAll = p_feedReadAll;
 
 // object Feeds.p_feedPendingDeleteDB
 // Delete permanently from IndexedDB the feeds marked as m_is_unsubscribed
-function p_feedPendingDeleteDB(needsRTableSync, cbDone)
+function p_feedPendingDeleteDB(needsRTableSync)
 {
   var self = this;
   var listToRemove = [];
@@ -706,18 +718,12 @@ function p_dbOpen()
         var s = db.createObjectStore('rss_subscriptions', { keyPath: 'm_url' });
         log.info('db: table "rss_subscriptions" created');
 
-        s.createIndex('remote_id', 'm_remote_id', { unique: false });
-        log.info('db: index "remote_id" created');
-
         // Records of type RssEntry
         var d = db.createObjectStore('rss_data', { keyPath: 'm_hash' });
         log.info('db: table "rss_data" created');
 
         d.createIndex('rssurl_date', 'm_rssurl_date', { unique: false });
         log.info('db: index "rssurl_date" created');
-
-        d.createIndex('remote_id', 'm_remote_id', { unique: false });
-        log.info('db: index "remote_id" created');
 
         // Records of pref=value: store user preferences as k/v pairs
         var d = db.createObjectStore('preferences', { keyPath: 'm_pref' });
@@ -1102,7 +1108,7 @@ function p_feedRemoveDB(feedUrl, needsRTableSync)
           if (data.m_remote_state == feeds_ns.RssSyncState.IS_SYNCED)
           {
             log.info('p_feedRemoveDB: delete from remote table, feed: ' + feedUrl);
-            self.m_remote_subscriptions.deleteRec(data.m_hash);  // delete by hash of feed url
+            self.m_remote_subscriptions_id.deleteRec(data.m_hash);  // delete by hash of feed url
           }
         }
         else
@@ -1565,7 +1571,6 @@ function p_feedUpdate(feedHeaderNew, cbWriteDone)
   feedHeaderNew.m_is_unsubscribed = target.m_is_unsubscribed;
   feedHeaderNew.m_tags = target.m_tags;
   feedHeaderNew.m_remote_state = target.m_remote_state;
-  feedHeaderNew.m_remote_id = target.m_remote_id;
   feedHeaderNew.x_pending_db = target.x_pending_db;
 
   // Transfer any accumulated error info during RSS fetching
