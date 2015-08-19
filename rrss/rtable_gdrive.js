@@ -22,6 +22,29 @@ if (typeof feeds_ns === 'undefined')
 
 var g_documentName = 'rtables.rrss';
 var g_authenticated = false;
+var g_cbRecordsChanged = null;
+
+// object RTableGDrive.p_recordsChanged
+// Invoked to handle all operations that signal changes on records
+// (deletion, insertion or value changes)
+function p_recordsChanged(tableId, isDeleted, isLocal, key, newValue)
+{
+  var self = this;
+
+  var rtable = self.m_tables[tableId];
+  var objList = [];
+  var updatedObj =
+          {
+            id: key, // Property of this record
+            isLocal: isLocal,  // Feeedback from locally initiated operation
+            isDeleted: isDeleted,  // The record was deletd, data is null
+            data: utils_ns.copyFields(newValue, [])  // record data
+          };
+  updatedObj.data[rtable.key] = key;  // Add the key_name:key_valye as a field
+  objList.push(updatedObj);
+  g_cbRecordsChanged(tableId, objList);
+}
+RTablesGDrive.prototype.p_recordsChanged = p_recordsChanged;
 
 // object RTableGDrive.p_loadRTFile
 function p_loadRTFile(rtFileID, cbDone)
@@ -43,32 +66,38 @@ function p_loadRTFile(rtFileID, cbDone)
 
           for (i = 0; i < self.m_tables.length; ++i)
           {
-            // Create a map
-            self.m_tables[i].map = rtModel.getRoot().get(self.m_tables[i].name);
-            log.info('RTableGDriveTables: table ' + self.m_tables[i].name + ': ' +
-                     self.m_tables[i].map.size + ' records');
+            (function ()  // closure for rtable
+            {
+              // Create a map
+              var tableId = i;
+              var rtable = self.m_tables[i];
+              rtable.map = rtModel.getRoot().get(rtable.name);
+              log.info('RTableGDriveTables: table ' + rtable.name + ': ' +
+                       rtable.map.size + ' records');
 
-            // Attach listeners
-            self.m_tables[i].map.addEventListener(gapi.drive.realtime.EventType.VALUES_ADDED,
-                function (event, i)
-                {
-                    console.info('RTableGDriveTables: ' + self.m_tables[i].name + ', event: added ' + event.values);
-                });
-            self.m_tables[i].map.addEventListener(gapi.drive.realtime.EventType.VALUE_CHANGED,
-                function (event, i)
-                {
-                    console.info('RTableGDriveTables: ' + self.m_tables[i].name + ', event: changed ' + event.values);
-                });
-            self.m_tables[i].map.addEventListener(gapi.drive.realtime.EventType.VALUES_SET,
-                function (event, i)
-                {
-                    console.info('RTableGDriveTables: ' + self.m_tables[i].name + ', event: set ' + event.values);
-                });
-            self.m_tables[i].map.addEventListener(gapi.drive.realtime.EventType.VALUES_REMOVED,
-                function (event, i)
-                {
-                    console.info('RTableGDriveTables: ' + self.m_tables[i].name + ', event: removed ' + event.values);
-                });
+              // Attach listeners
+              rtable.map.addEventListener(gapi.drive.realtime.EventType.VALUES_ADDED,
+                  function (event)
+                  {
+                      console.info('RTableGDriveTables: ' + rtable.name + ', event: added ' + event.values);
+                  });
+              rtable.map.addEventListener(gapi.drive.realtime.EventType.VALUE_CHANGED,
+                  function (event)
+                  {
+                      self.p_recordsChanged(tableId, false, event.isLocal, event.property, event.newValue);
+                      console.info('RTableGDriveTables: ' + rtable.name + ', event: changed ' + event.values);
+                  });
+              rtable.map.addEventListener(gapi.drive.realtime.EventType.VALUES_SET,
+                  function (event)
+                  {
+                      console.info('RTableGDriveTables: ' + rtable.name + ', event: set ' + event.values);
+                  });
+              rtable.map.addEventListener(gapi.drive.realtime.EventType.VALUES_REMOVED,
+                  function (event)
+                  {
+                      console.info('RTableGDriveTables: ' + rtable.name + ', event: removed ' + event.values);
+                  });
+            })();
           }
           cbDone(1);
         }
@@ -196,6 +225,7 @@ function RTablesGDrive(rtables, cbDone)
 RTableGDrive.prototype.p_createAndLoadRTFile = p_createAndLoadRTFile;
 
 // object RTableGDrive.RTableGDrive [constructor]
+// TODO: remove this is leftover from Dropbox
 // Used for access of remote table stored in Dropbox
 // _fields_ is the list of all fields of objects inserted in the table
 // _key_ name of primary key, used as Dropbox ID

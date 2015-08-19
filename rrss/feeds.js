@@ -460,16 +460,11 @@ function p_rtableInitRemoteEntryRead(cbDone)
 {
   var self = this;
 
-  if (false)
-  {
-  // TODO: figure out the listener API
-  // NOTE: !!! one listener handles all tables !!!
   feeds_ns.RTablesAddListener(
       function (table, records)
       {
         self.p_rtableListener(table, records);
       });
-  }
 
   // There are two ways for getting data from Dropbox's datastore
   // 1. Listen to events: these changes are reflected into the local
