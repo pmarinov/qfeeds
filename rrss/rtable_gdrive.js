@@ -29,20 +29,33 @@ var g_cbRecordsChanged = null;
 // (deletion, insertion or value changes)
 function p_recordsChanged(tableId, isDeleted, isLocal, key, newValue)
 {
-  var self = this;
+  try  // GDrive swallows all errors, install my own catchers for displahy of my own errors
+  {
+    var self = this;
 
-  var rtable = self.m_tables[tableId];
-  var objList = [];
-  var updatedObj =
-          {
-            id: key, // Property of this record
-            isLocal: isLocal,  // Feeedback from locally initiated operation
-            isDeleted: isDeleted,  // The record was deletd, data is null
-            data: utils_ns.copyFields(newValue, [])  // record data
-          };
-  updatedObj.data[rtable.key] = key;  // Add the key_name:key_valye as a field
-  objList.push(updatedObj);
-  g_cbRecordsChanged(tableId, objList);
+    var rtable = self.m_tables[tableId];
+    var objList = [];
+    var updatedObj =
+            {
+              id: key, // Property of this record
+              isLocal: isLocal,  // Feeedback from locally initiated operation
+              isDeleted: isDeleted,  // The record was deletd, data is null
+              data: utils_ns.copyFields(newValue, [])  // record data
+            };
+    updatedObj.data[rtable.key] = key;  // Add the key_name:key_valye as a field
+    objList.push(updatedObj);
+    g_cbRecordsChanged(tableId, objList);
+  }
+  catch (e)  // Error in my code, display it, then re-throw
+  {
+    log.error('Ooops!');
+    var errorObj =
+    {
+      stack: e.stack
+    };
+    window.onerror(e.message, 'chrome-extension:mumbojumbo/app.html', 0, 0, errorObj);
+    throw e;
+  }
 }
 RTablesGDrive.prototype.p_recordsChanged = p_recordsChanged;
 
@@ -56,7 +69,7 @@ function p_loadRTFile(rtFileID, cbDone)
   gapi.drive.realtime.load(rtFileID,
       function (rtDocument) // onFileLoaded
       {
-        try  // GDrive swallows all errors, install my own catchers for displahy of my own errors
+        try  // GDrive swallows all errors, install my own catchers for display of my own errors
         {
           log.info('onFileLoaded for ' + g_documentName);
 
@@ -114,7 +127,7 @@ function p_loadRTFile(rtFileID, cbDone)
       },
       function (rtModel) // initializerFn
       {
-        try  // GDrive swallows all errors, install my own catchers for displahy of my own errors
+        try  // GDrive swallows all errors, install my own catchers for display of my own errors
         {
           log.info('initializerFn for ' + g_documentName);
 
@@ -144,7 +157,7 @@ function p_loadRTFile(rtFileID, cbDone)
       },
       function (rtError) // errorFn
       {
-        try  // GDrive swallows all errors, install my own catchers for displahy of my own errors
+        try  // GDrive swallows all errors, install my own catchers for display of my own errors
         {
           log.info('errorFn ' + rtError +  'for ' +  + g_documentName);
           cbDone(0);
