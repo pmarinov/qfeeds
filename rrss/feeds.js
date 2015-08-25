@@ -285,18 +285,17 @@ Feeds.prototype.p_rtableRemoteFeedsListener = p_rtableRemoteFeedsListener;
 
 // object Feeds.p_rtableListener
 // Handle updates from the remote tables
-function p_rtableListener(table, records)
+function p_rtableListener(table_id, records)
 {
   var self = this;
 
-  // Listener for 'rss_subscriptions' not yet ready
-  if (table == 'rss_subscriptions')
+  if (table_id == self.m_remote_subscriptions_id)  // 'rss_subscriptions'
   {
     self.p_rtableRemoteFeedsListener(records);
     return;
   }
 
-  if (table == 'rss_entries_read')
+  if (table_id == self.m_remote_read_id) // 'rss_entries_read'
   {
     self.p_rtableRemoteEntryReadListener(records);
     return;
