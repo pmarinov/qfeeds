@@ -92,23 +92,26 @@ function p_loadRTFile(rtFileID, cbDone)
               rtable.map.addEventListener(gapi.drive.realtime.EventType.VALUES_ADDED,
                   function (event)
                   {
-                      console.info('RTableGDriveTables: ' + rtable.name + ', event: added ' + event.values);
+                      self.p_recordsChanged(tableId, false, event.isLocal, event.property, event.newValue);
+                      console.trace('RTableGDriveTables: ' + rtable.name + ', event: added ' + event.values);
                   });
               rtable.map.addEventListener(gapi.drive.realtime.EventType.VALUE_CHANGED,
                   function (event)
                   {
                       self.p_recordsChanged(tableId, false, event.isLocal, event.property, event.newValue);
-                      console.info('RTableGDriveTables: ' + rtable.name + ', event: changed ' + event.values);
+                      console.trace('RTableGDriveTables: ' + rtable.name + ', event: changed ' + event.values);
                   });
               rtable.map.addEventListener(gapi.drive.realtime.EventType.VALUES_SET,
                   function (event)
                   {
-                      console.info('RTableGDriveTables: ' + rtable.name + ', event: set ' + event.values);
+                      self.p_recordsChanged(tableId, false, event.isLocal, event.property, event.newValue);
+                      console.trace('RTableGDriveTables: ' + rtable.name + ', event: set ' + event.values);
                   });
               rtable.map.addEventListener(gapi.drive.realtime.EventType.VALUES_REMOVED,
                   function (event)
                   {
-                      console.info('RTableGDriveTables: ' + rtable.name + ', event: removed ' + event.values);
+                      self.p_recordsChanged(tableId, true, event.isLocal, event.property, event.newValue);
+                      console.trace('RTableGDriveTables: ' + rtable.name + ', event: removed ' + event.values);
                   });
             })();
           }
@@ -229,55 +232,9 @@ function RTablesGDrive(rtables, cbDone)
           }
         });
 
-  // Record status for listeners
-  self.RECORD_UPDATED = 1;
-  self.RECORD_DELETED = 2;
-  self.RECORD_LOCAL = 3;  // feedback from local RTable.insert/delete actions
   return self;
 }
-RTableGDrive.prototype.p_createAndLoadRTFile = p_createAndLoadRTFile;
-
-// object RTableGDrive.RTableGDrive [constructor]
-// TODO: remove this is leftover from Dropbox
-// Used for access of remote table stored in Dropbox
-// _fields_ is the list of all fields of objects inserted in the table
-// _key_ name of primary key, used as Dropbox ID
-// Set _key_ to '' to activate automatically generated IDs by Dropbox
-function RTableGDrive(name, fields, key, cbDone)
-{
-  var self = this;
-
-  self.m_map = null;
-  self.m_title = name + '.rtable.rrss';
-  self.m_key = key;
-
-  var query = 'title=' + "'" + self.m_title + "'" + " and not trashed"
-  gapi.client.drive.files.list(
-        {
-          // TODO: add mimeType for short cut file as part of the query
-          'q': query
-        }).execute(function (results)
-        {
-          if (results.items !== undefined && results.items.length > 0)
-          {
-            log.info('RTableGDrive: Opening ' + self.m_title + '...')
-            self.p_loadRTFile(results.items[0].id, cbDone);
-            if (results.items.length > 1)
-              log.warning('RTableGDrive: more than one short cut file for ' + self.m_title);
-          }
-          else
-          {
-            log.info('RTableGDrive: ' + self.m_title + ' is new')
-            self.p_createAndLoadRTFile(cbDone);
-          }
-        });
-
-  // Record status for listeners
-  self.RECORD_UPDATED = 1;
-  self.RECORD_DELETED = 2;
-  self.RECORD_LOCAL = 3;  // feedback from local RTable.insert/delete actions
-  return self;
-}
+RTablesGDrive.prototype.p_createAndLoadRTFile = p_createAndLoadRTFile;
 
 // object RTableGDrive.insert
 // Records an entry into the remote table
@@ -326,16 +283,78 @@ RTablesGDrive.prototype.deleteRec = deleteRec;
 // local -- dictionary of keys of local entries this way initialSync()
 //          can generate events for all that were deleted remotely too
 // local = null, won't generate delete events
-function initialSync(local)
+function initialSync(tableID, local)
 {
   var self = this;
+
+  utils_ns.assert(tableID < self.m_tables.length, 'RTableGDrive: "tableId" out of range');
+  utils_ns.assert(tableID >= 0, 'RTableGDrive: "tableId" is negative');
+  var rtable = self.m_tables[tableID].map;
+
+  var allKeys = rtable.keys();
+  log.info('initialSync: for \'' +  self.m_tables[tableID].name + '\': total number of keys ' + allKeys.length);
+
+  var x = 0;
+  var objlist = [];
+  var rec = null;
+  var updateObj = null;
+  var key = null;
+  var keyName = null;
+
+  for (x = 0; x < allKeys.length; ++x)
+  {
+    // One key/value pair
+    key = allKeys[x];  // Key
+    rec = rtable.get(key);  // Value
+
+    // Imitate generation of an updated obj
+    updateObj =
+      {
+        isLocal: false,  // Feeedback from locally initiated operation
+        isDeleted: false,  // The record was deletd, data is null
+        data: utils_ns.copyFields(rec, [])  // record data
+      };
+    keyName = self.m_tables[tableID].key; 
+    updateObj.data[keyName] = key;  // Add the key_name:key_valye as a field
+    objlist.push(updateObj);
+
+    if (local == null)
+      continue;
+
+    if (local[key] === undefined)
+      continue;
+
+    local[key] = 1;
+  }
+  g_cbRecordsChanged(tableID, objlist);
+
+  if (local == null)
+    return;
+
+  // Generate event _deleted_ for all that were in local but
+  // not in the remote table
+  var keys = Object.keys(local);
+  objlist = [];
+  for (x = 0; x < keys.length; ++x)
+  {
+    key = keys[x];
+    if (local[key] == 1)  // In local AND in remote
+      continue;
+
+    // local[key] is only in local, needs to be deleted
+    updateObj =
+      {
+        id: key, // Id of this record, created by Dropbox
+        isLocal: false,  // Feeedback from locally initiated operation
+        isDeleted: true,  // The record was deletd, data is null
+        data: null  // record data, no data needed for delete operation
+      };
+    objlist.push(updateObj);
+  }
+  log.info('rtable.initialSync: ' + objlist.length + ' record(s) not in remote table that will be deleted');
+  g_cbRecordsChanged(tableID, objlist);
 }
 RTablesGDrive.prototype.initialSync = initialSync;
-
-// Invoke registered listeners once per remote table to notify of changed records
-function recordsChanged(dstoreEvent)
-{
-}
 
 // Attach one global listener to handle the datastore
 function RTablesAddListener(cbRecordsChanged)

@@ -455,7 +455,7 @@ Feeds.prototype.p_rtableSyncRemoteSubscriptions = p_rtableSyncRemoteSubscription
 
 // object Feeds.p_rtableInitRemoteEntryRead
 // Initialize remote table (rtable) that stores status_read for RSS entries
-function p_rtableInitRemoteEntryRead(cbDone)
+function p_rtableInitRemoteEntryRead()
 {
   var self = this;
 
@@ -499,7 +499,7 @@ function p_rtableInitRemoteFeedUrl()
     localEntries[entry.m_hash] = 0;
   }
 
-  // First any unsyched local to remote
+  // First any unsynched local to remote
   log.info('feeds: send unsynched RSS subscriptions to remote table rss_subscriptions');
   self.p_rtableSyncRemoteSubscriptions(
     function()  // Done sending unsynched elements from local DB to remote table 'rss_subscriptions'
@@ -507,7 +507,7 @@ function p_rtableInitRemoteFeedUrl()
       log.info('feeds: done, unsynched -> remote table rss_subscriptions');
       // Now bring any unknown remote locally, delete any that remain local only
       log.info('feeds: bring any new entries from remote table rss_subscriptions to local DB');
-      self.m_remote_subscriptions.initialSync(localEntries);
+      self.m_rtGDrive.initialSync(self.m_remote_subscriptions_id, localEntries);
     });
 }
 Feeds.prototype.p_rtableInitRemoteFeedUrl = p_rtableInitRemoteFeedUrl;
@@ -536,24 +536,8 @@ function rtableConnect()
   self.m_remote_read_id = 1;
   self.m_rtGDrive = new feeds_ns.RTablesGDrive(tables, function (code)
       {
-        self.p_rtableInitRemoteEntryRead(function (code)
-            {
-              if (code == 0)  // Error in the first table?
-              {
-                log.info('rtableConnect(), failed. (1)');
-                return;  // Don't even attempt table #2
-              }
-
-              self.p_rtableInitRemoteFeedUrl(function (code)
-                  {
-                    if (code == 0)  // Error in the first table?
-                    {
-                      log.info('rtableConnect(), failed. (2)');
-                      return;  // Don't even attempt table #2
-                    }
-                    log.info('rtableConnect(), done.');
-                  });
-            });
+        self.p_rtableInitRemoteEntryRead();
+        self.p_rtableInitRemoteFeedUrl();
       });
 }
 Feeds.prototype.rtableConnect = rtableConnect;
