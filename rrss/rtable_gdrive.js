@@ -33,6 +33,11 @@ function p_recordsChanged(tableId, isDeleted, isLocal, key, newValue)
   {
     var self = this;
 
+    if (newValue == null)  // Deleting a record is equivalent of setting it to null
+    {
+      log.info('RTableGDriveTables: ' + key + ' was deleted')
+      isDeleted = true;
+    }
     var rtable = self.m_tables[tableId];
     var objList = [];
     var updatedObj =
@@ -40,8 +45,12 @@ function p_recordsChanged(tableId, isDeleted, isLocal, key, newValue)
               id: key, // Property of this record
               isLocal: isLocal,  // Feeedback from locally initiated operation
               isDeleted: isDeleted,  // The record was deletd, data is null
-              data: utils_ns.copyFields(newValue, [])  // record data
+              data: null
             };
+    if (newValue != null)
+      updatedObj.data = utils_ns.copyFields(newValue, [])  // record data
+    else
+      updatedObj.data = {};  // We still need a object even of only to convey the field that is the key
     updatedObj.data[rtable.key] = key;  // Add the key_name:key_valye as a field
     objList.push(updatedObj);
     g_cbRecordsChanged(tableId, objList);
@@ -273,9 +282,19 @@ function deleteAll()
 RTablesGDrive.prototype.deleteAll = deleteAll;
 
 // object RTableGDrive.deleteRec
-function deleteRec(entryKey)
+function deleteRec(tableID, entryKey)
 {
   var self = this;
+
+  utils_ns.assert(tableID < self.m_tables.length, 'RTableGDrive: "tableId" out of range');
+  utils_ns.assert(tableID >= 0, 'RTableGDrive: "tableId" is negative');
+  var rtable = self.m_tables[tableID].map;
+
+  var value = rtable.delete(entryKey);
+  var result_str = 'OK';
+  if (value == null)
+    result_str = 'no existing value';
+  log.info('RTableGDrive: deleting Id ' + entryKey + '...' + result_str);
 }
 RTablesGDrive.prototype.deleteRec = deleteRec;
 

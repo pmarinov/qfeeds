@@ -57,7 +57,6 @@ function RssEntry(title, link, description, updated, id)
   this.m_rssurl_date = '';  // computed before recorded in database
   this.m_is_read = false;
   this.m_remote_state = RssSyncState.IS_LOCAL_ONLY;
-  this.m_remote_id = '';  // This ID is created by remote table DB manager
 
   // meta (stored in db)
   this.x_header = null; // back-ref to header
@@ -78,7 +77,6 @@ function copyRssEntry(from)
   x.m_rssurl_date = from.m_rssurl_date;
   x.m_is_read = from.m_is_read;
   x.m_remote_state = from.m_remote_state;
-  x.m_remote_id = from.m_remote_id;
   return x;
 }
 
@@ -111,7 +109,6 @@ function RssHeader(url, title, link, description, language, updated)
     this.m_hash = sha1.toString();
   }
   this.m_remote_state = RssSyncState.IS_LOCAL_ONLY;
-  this.m_remote_id = '';  // This ID is created by remote table DB manager
 
   // meta (not stored in db)
   // x_items are extacted from database or fetched from the source web site

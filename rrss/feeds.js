@@ -316,7 +316,7 @@ function p_rtableSyncEntry(rssEntry)
   var remoteEntry = null;
   var remoteId = null;
 
-  if (feeds_ns.RTablesIsOnline())
+  if (self.m_remote_is_connected)
   {
     remoteEntry = new RemoteEntryRead(rssEntry);
     self.m_rtGDrive.insert(self.m_remote_read_id, remoteEntry);
@@ -352,7 +352,7 @@ function p_rtableSyncFeedEntry(feed)
   else
     localFeed = null;
 
-  if (feeds_ns.RTablesIsOnline())
+  if (self.m_remote_is_connected)
   {
     remoteFeed = new RemoteFeedUrl(feed);
     self.m_rtGDrive.insert(self.m_remote_subscriptions_id, remoteFeed);
@@ -1086,7 +1086,7 @@ function p_feedRemoveDB(feedUrl, needsRTableSync)
           if (data.m_remote_state == feeds_ns.RssSyncState.IS_SYNCED)
           {
             log.info('p_feedRemoveDB: delete from remote table, feed: ' + feedUrl);
-            self.m_remote_subscriptions_id.deleteRec(data.m_hash);  // delete by hash of feed url
+            self.m_rtGDrive.deleteRec(self.m_remote_subscriptions_id, data.m_hash);  // delete by hash of feed url
           }
         }
         else
