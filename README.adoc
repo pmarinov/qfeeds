@@ -19,10 +19,10 @@ Features::
 * Local storage is used to keep feed subscriptions and metadata
   (IndexedDB)
 * Displays feeds alone or grouped into folders
-* Uses Dropbox, optionally, for synchronization between
+* Uses Google Drive, optionally, for synchronization between
   computers (list of subscriptions and what was marked as read)
 
-*Version:* 0.4.0 +
+*Version:* 0.4.1 +
 *Status:* Suitable only for potential developers
 
 == License
@@ -31,7 +31,7 @@ Features::
 use it, redistribute it, and/or modify it under the terms of the BSD
 (FreeBSD) License.
 
-Copyright (c) 2014, Peter Marinov and Contributors. All rights reserved. +
+Copyright (c) 2015, Peter Marinov and Contributors. All rights reserved. +
 See LICENSE.txt, see CONTRIBUTORS.txt
 
 
