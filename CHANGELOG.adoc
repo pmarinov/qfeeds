@@ -1,20 +1,25 @@
 == CHANGELOG.txt, 'rrss' - R is a reader of RSS feeds
 
-=== 2015-01-14, v0.4.0.0, pmarinov
+=== 2015-10-12, v0.4.1, pmarinov
+
+* Switch to Google Drive
+* Sanitize HTML before display of feeds data
+
+=== 2015-01-14, v0.4.0, pmarinov
 
 * Importing of feeds via OPML file from disk
 
-=== 2014-10-18, v0.3.0.0, pmarinov
+=== 2014-10-18, v0.3.0, pmarinov
 
 * Dropbox syncronization for list of RSS subscriptions and
   state of entries marked as read
 
-=== 2014-07-12, v0.2.0.0, pmarinov
+=== 2014-07-12, v0.2.0, pmarinov
 
 * Main features of a standalone RSS reader are functional: subscribe,
   unsubscribe, folders, feed settings
 * Published on github
 
-=== 2013-07-01, v0.0.1.0, pmarinov
+=== 2013-07-01, v0.0.1, pmarinov
 
 * First primitively usable version
