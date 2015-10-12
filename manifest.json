@@ -3,32 +3,49 @@
 
 "name": "rrss",
 "description": "R is a reader of RSS feeds",
-"version": "0.4.0",
+"version": "0.5.0",
 
-"icons": { "128": "chrome/icon_rss.png" },
-
-// Permissions:
-// "storage" is for IndexedDB;
-// "http" and "https" are needed to permit fetching via HTTP GET of
-// feeds from any sources, otherwise we get
-// 'Access-Control-Allow-Origin' failure (Chrome browser blocks the
-// extension) when fetching from sites that don't have
-// 'Allow-Origin: *' header
-"permissions": [ "storage", "http://*/", "https://*/" ],
-
-"web_accessible_resources": ["rrss/chrome_oauth_receiver.js", "rrss/chrome_oauth_receiver.html"],
-
-"app":
+"oauth2":
 {
-  "launch":
-  {
-    "local_path": "rrss/app.html"
-  }
+  "client_id": "1043072112628-tbg2533tg0vts1ihq5c9m12m2b9kk9cs.apps.googleusercontent.com",
+  "scopes":
+  [
+    "https://www.googleapis.com/auth/drive"
+  ]
+},
+
+"key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAoO1iZCU5dZ5caHyxNF/zD7tfLvmoehEu2xMeqDyQM+Fvo4mf2zVTedCQF1QusbwserLP64qij402L29EiUBAk8Qyh/3qUEAvkyD0Ep3L51P9IQdmk77f6SY+kKztxyV3hU269jV7ftzJ5G2qv7D2F/l5HJaOrLRV8ndBvLfAEo8qi8bMCGjV30lmR1zogSgMA92KJwy6DxFME3gPBTycjAkffgNdRdnoIiS8bngNPat+h/QWFnsHaRRXDNkBorfdhM0bptwqAuQ8X1AZBDqS9k7amYw1PRBJlRsOTqJ2ilshKO/OSIF8iPlIOB9tJoVYkv8GnqovcbYV5IGv3mSXVQIDAQAB",
+
+"icons":
+{
+  "128": "chrome/icon_rss.png"
+},
+
+"permissions":
+[
+  "identity",
+  "identity.email",
+  "storage",
+  "https://ssl.gstatic.com/",
+  "https://www.googleapis.com/",
+  "https://www.google.com/",
+  "https://accounts.google.com/",
+  "http://*/",
+  "https://*/"
+],
+
+"content_security_policy": "script-src 'self' https://apis.google.com https://drive.google.com; object-src 'self'",
+
+"browser_action" :
+{
+  "default_title": "rrss (devel)",
+  "default_icon" : "chrome/icon_rss.png"
 },
 
 "background":
 {
-  "page": "chrome/background.html"
+   "persistent": false,
+   "scripts": [ "chrome/background.js" ]
 }
 
 }
