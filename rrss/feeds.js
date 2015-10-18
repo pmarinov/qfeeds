@@ -65,20 +65,20 @@ function Feeds(feedsCB)
   return this;
 }
 
-// object Feeds.setPref
+// object Feeds.prefSet
 // Sets a key, stores in the IndexedDB, sends it to remote table
 // Sends only keys that start with "m_"
-function setPref(key, value)
+function prefSet(key, value)
 {
 }
-Feeds.prototype.setPref = setPref;
+Feeds.prototype.prefSet = prefSet;
 
-// object Feeds.getPref
+// object Feeds.prefGet
 // Reads a pref value from the cached map
-function getPref(key)
+function prefGet(key)
 {
 }
-Feeds.prototype.getPref = getPref;
+Feeds.prototype.prefGet = prefGet;
 
 // object Feeds.p_dbSetTranErrorLogging
 // Logs error or info for transactions in IndexedDB
@@ -92,11 +92,23 @@ function p_dbSetTranErrorLogging(tran, tableName, operation)
       };
   tran.onabort = function (event)
       {
-        log.error('db: (' + tableName + ', ' + operation + ') transaction aborted');
+        var msg = 'db: (' + tableName + ', ' + operation + ') transaction aborted';
+        log.error(msg);
+        var errorObj =
+        {
+          stack: e.stack
+        };
+        window.onerror(msg, 'chrome-extension:mumbojumbo/app.html', 0, 0, errorObj);
       };
   tran.onerror = function (event)
       {
-        log.error('db: (' + tableName + ', ' + operation + ') transaction error');
+        var msg = 'db: (' + tableName + ', ' + operation + ') transaction error';
+        log.error(msg);
+        var errorObj =
+        {
+          stack: e.stack
+        };
+        window.onerror(msg, 'chrome-extension:mumbojumbo/app.html', 0, 0, errorObj);
       };
 }
 Feeds.prototype.p_dbSetTranErrorLogging = p_dbSetTranErrorLogging;
@@ -106,7 +118,6 @@ Feeds.prototype.p_dbSetTranErrorLogging = p_dbSetTranErrorLogging;
 function p_dbReadAll(tableName, cb_processEntry)
 {
   var self = this;
-  var feeds = [];
 
   // Read the list of RSS subscriptions from IndexDB
   var cnt = 0;
@@ -134,19 +145,33 @@ function p_dbReadAll(tableName, cb_processEntry)
 }
 Feeds.prototype.p_dbReadAll = p_dbReadAll;
 
-// object Feeds.p_loadAllPrefs
+// object Feeds.p_prefReadAll
 // Reads keys from indexedDB into local cache
-function p_loadAllPrefs()
+function p_prefReadAll(cbDone)
 {
-}
-Feeds.prototype.p_loadAllPrefs = p_loadAllPrefs;
+  var self = this;
 
-// object Feeds.getPref
+  self.p_dbReadAll('rss_subscriptions',
+      function(dbCursor)
+      {
+        if (!dbCursor)
+        {
+          if (cbDone != null)
+            cbDone();
+          return;  // no more entries
+        }
+        var hdr = dbCursor.value;
+        self.m_prefs[hdr.m_key] = hdr.m_value
+      });
+}
+Feeds.prototype.p_prefReadAll = p_prefReadAll;
+
+// object Feeds.p_prefSetListener
 // A key was changed remotely
-function setListener(cbUpdates)
+function p_prefSetListener(cbUpdates)
 {
 }
-Feeds.prototype.setListener = setListener;
+Feeds.prototype.p_prefSetListener = p_prefSetListener;
 
 // object RemoteEntryRead [constructor]
 // From an RssEntry constructs a RemoteEntryRead record
@@ -642,7 +667,6 @@ function p_feedReadAll(cbDone)
   var self = this;
   var feeds = [];
 
-  // function p_dbReadAll(tableName, cb_processEntry)
   self.p_dbReadAll('rss_subscriptions',
       function(dbCursor)
       {
