@@ -78,13 +78,34 @@ function dateToStrStrict(x)
   return d;
 }
 
+function domError(msg)
+{
+  log.error(msg);
+  try
+  {
+    i.dont.exist += 0;
+  }
+  catch (e)  // Catch a simulated error just to obtain the stack
+  {
+    var e2 =
+    {
+      message: msg,
+      stack: e.stack
+    }
+  }
+  if (window.onerror != null)
+    window.onerror(e2.message, 'chrome-extension:mumbojumbo/app.html', 0, 0, e2);
+  else
+    throw e;
+}
+
 // safe jQuery find under arbitrary DOM element
 // tag: '.class', '#id', 'element'
 function domFindInside(domRoot, tag, max)
 {
   if (domRoot === undefined || domRoot == null)
   {
-    alert("DOM: bad domRoot");
+    domError("DOM: bad domRoot");
     return null;
   }
 
@@ -96,7 +117,7 @@ function domFindInside(domRoot, tag, max)
   // not found?
   if (z == null || z.length == 0)
   {
-    alert("DOM: '" + tag + "' not found");
+    domError("DOM: '" + tag + "' not found");
     return null;
   }
 
@@ -107,7 +128,7 @@ function domFindInside(domRoot, tag, max)
   // more than needed?
   if (z.length > max)
   {
-    alert("DOM: there should be only " + max + " of type '" + id + "'");
+    domError("DOM: there should be only " + max + " of type '" + id + "'");
     return null;
   }
 
@@ -291,6 +312,7 @@ utils_ns.hasFields = hasFields;
 utils_ns.parseDate = parseDate;
 utils_ns.dateToStr = dateToStr;
 utils_ns.dateToStrStrict = dateToStrStrict;
+utils_ns.domError = domError;
 utils_ns.domFindInside = domFindInside;
 utils_ns.domFind = domFind;
 utils_ns.clickIsInside = clickIsInside;

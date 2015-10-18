@@ -19,11 +19,11 @@ if (typeof feeds_ns === 'undefined')
 
 // object Feeds.Feeds [constructor]
 // Instantiate one per application
-function Feeds(feedsCB)
+function Feeds()
 {
   var self = this;
 
-  self.m_feedsCB = feedsCB;  // call-backs
+  self.m_feedsCB = null;  // call-backs
 
   self.m_rssFeeds = [];  // array of RssHeader, sorted by url
   self.m_listNotify = [];
@@ -37,11 +37,6 @@ function Feeds(feedsCB)
 
   self.m_db = null;
   self.m_rss_entry_cnt = 0;
-
-  // Open IndexedDB and load all feeds (object type RSSHeader) in memory
-  // Via call-backs this will also list the feeds and folders in
-  // the panel for feeds navigation (left-hand-side)
-  self.p_dbOpen();
 
   // Set to true if Dropbox status is logged in
   self.m_remote_is_connected = false;
@@ -64,6 +59,16 @@ function Feeds(feedsCB)
 
   return this;
 }
+
+// object Feeds.setCbHandlers
+// Sets the set of callbacks for laod events from IndexedDB
+// (This connects to the display methods in FeedsDir)
+function setCbHandlers(feedsCB)
+{
+  var self = this;
+  self.m_feedsCB = feedsCB;  // call-backs
+}
+Feeds.prototype.setCbHandlers = setCbHandlers;
 
 // object Feeds.prefSet
 // Sets a key, stores in the IndexedDB, sends it to remote table
@@ -134,7 +139,7 @@ function p_dbReadAll(tableName, cb_processEntry)
         var cursor = event.target.result;
         if (!cursor)
         {
-          console.log('db: (' + tableName + ') ' + cnt + ' entries retrieved');
+          console.log("db: ('" + tableName + "') " + cnt + ' entries retrieved');
           cb_processEntry(cursor);
           return;  // no more entries
         }
@@ -708,7 +713,7 @@ function p_feedPendingDeleteDB(needsRTableSync)
         if (!cursor)
         {
           // `cursor' is null when `cursor.continue()' reaches end of DB index
-          log.info("db: ('rss_subscriptions')" + listToRemove.length + ' subscriptions marked as unsubscribed');
+          log.info("db: ('rss_subscriptions') " + listToRemove.length + ' subscriptions marked as unsubscribed');
           self.p_feedRemoveList(listToRemove, needsRTableSync);
           return;  // no more entries
         }
@@ -721,9 +726,9 @@ function p_feedPendingDeleteDB(needsRTableSync)
 }
 Feeds.prototype.p_feedPendingDeleteDB = p_feedPendingDeleteDB;
 
-// object Feeds.p_dbOpen
+// object Feeds.dbOpen
 // This completes the initialization of the Feeds object
-function p_dbOpen()
+function dbOpen(cbDone)
 {
   var self = this;
 
@@ -733,12 +738,11 @@ function p_dbOpen()
       {
         // Global error handler for all database errors
         // TODO: formulate a message and pass this to callback for display outside Feeds
-        log.error("db: ('rrss', 'open') error: " + req.errorCode);
-        alert("db: ('rrss', 'open') error, check Console");
+        utils_ns.domError("db: ('rrss', 'open') error: " + req.errorCode);
       };
   req.onblocked = function (event)
       {
-        log.error("db: ('rrss', 'open') Feeds database is still in use by another instance");
+        utils_ns.domError("db: ('rrss', 'open') Feeds database is still in use by another instance");
       }
   req.onsuccess = function (event)
       {
@@ -752,15 +756,7 @@ function p_dbOpen()
         // you've never logged into Dropbox all entries are
         // LOCAL_ONLY)
         self.p_feedPendingDeleteDB(false);
-
-        // Load all entries into memory for display and for fetch loop
-        self.p_feedReadAll(
-            function()
-            {
-              log.info('p_dbOpen: all feeds loaded from IndexedDB, start the RSS fetch loop');
-              self.suspendFetchLoop(false, 1);  // Resume fetch loop, start fetching now
-              self.m_feedsCB.onDbInitDone();
-            });
+        cbDone();
       };
   req.onupgradeneeded = function(event)
       {
@@ -791,9 +787,28 @@ function p_dbOpen()
         // on 'IDBDatabase': A version change transaction is running.
         // Q: But how we'll re-read any old data when we upgrade tables?!
         // self.p_feedReadAll();  // From any previous version of the db
+        cbDone();
       };
 }
-Feeds.prototype.p_dbOpen = p_dbOpen;
+Feeds.prototype.dbOpen = dbOpen;
+
+// object Feeds.dbLoad
+// Load data that is permanently in memory
+function dbLoad(cbDone)
+{
+  var self = this;
+
+  // Load all entries into memory for display and for fetch loop
+  self.p_feedReadAll(
+      function()
+      {
+        log.info('db: all feeds loaded from IndexedDB, start the RSS fetch loop');
+        self.suspendFetchLoop(false, 1);  // Resume fetch loop, start fetching now
+        self.m_feedsCB.onDbInitDone();
+        cbDone();
+      });
+}
+Feeds.prototype.dbLoad = dbLoad;
 
 // function compareRssHeadersByUrl
 // for binarySearch()

@@ -35,7 +35,7 @@ function p_recordsChanged(tableId, isDeleted, isLocal, key, newValue)
 
     if (newValue == null)  // Deleting a record is equivalent of setting it to null
     {
-      log.info('RTableGDriveTables: ' + key + ' was deleted')
+      log.info('rtable: ' + key + ' was deleted')
       isDeleted = true;
     }
     var rtable = self.m_tables[tableId];
@@ -84,7 +84,7 @@ function p_loadRTFile(rtFileID, cbDone)
 
           var i = 0;
           var rtModel = rtDocument.getModel();
-          log.info('RTableGDriveTables: bytes used ' + rtModel.bytesUsed);
+          log.info('rtable: bytes used ' + rtModel.bytesUsed);
 
           for (i = 0; i < self.m_tables.length; ++i)
           {
@@ -94,7 +94,7 @@ function p_loadRTFile(rtFileID, cbDone)
               var tableId = i;
               var rtable = self.m_tables[i];
               rtable.map = rtModel.getRoot().get(rtable.name);
-              log.info('RTableGDriveTables: table ' + rtable.name + ': ' +
+              log.info('rtable: table ' + rtable.name + ': ' +
                        rtable.map.size + ' records');
 
               // Attach listeners
@@ -102,25 +102,25 @@ function p_loadRTFile(rtFileID, cbDone)
                   function (event)
                   {
                       self.p_recordsChanged(tableId, false, event.isLocal, event.property, event.newValue);
-                      console.trace('RTableGDriveTables: ' + rtable.name + ', event: added ' + event.values);
+                      console.trace('rtable: ' + rtable.name + ', event: added ' + event.values);
                   });
               rtable.map.addEventListener(gapi.drive.realtime.EventType.VALUE_CHANGED,
                   function (event)
                   {
                       self.p_recordsChanged(tableId, false, event.isLocal, event.property, event.newValue);
-                      console.trace('RTableGDriveTables: ' + rtable.name + ', event: changed ' + event.values);
+                      console.trace('rtable: ' + rtable.name + ', event: changed ' + event.values);
                   });
               rtable.map.addEventListener(gapi.drive.realtime.EventType.VALUES_SET,
                   function (event)
                   {
                       self.p_recordsChanged(tableId, false, event.isLocal, event.property, event.newValue);
-                      console.trace('RTableGDriveTables: ' + rtable.name + ', event: set ' + event.values);
+                      console.trace('rtable: ' + rtable.name + ', event: set ' + event.values);
                   });
               rtable.map.addEventListener(gapi.drive.realtime.EventType.VALUES_REMOVED,
                   function (event)
                   {
                       self.p_recordsChanged(tableId, true, event.isLocal, event.property, event.newValue);
-                      console.trace('RTableGDriveTables: ' + rtable.name + ', event: removed ' + event.values);
+                      console.trace('rtable: ' + rtable.name + ', event: removed ' + event.values);
                   });
             })();
           }

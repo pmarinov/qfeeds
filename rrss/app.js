@@ -51,7 +51,7 @@ function App()
 
   // Establish compatible indexDB based on the browser
   log.setLevel('info');
-  log.info("Obtaining indexDB handler...");
+  log.info("app: Obtaining indexDB handler...");
 
   // TODO: move this into object Feeds!
   // In the following line, you should include the prefixes of implementations you want to test.
@@ -66,66 +66,132 @@ function App()
       window.alert("Your browser doesn't support a stable version of IndexedDB.");
   }
 
-  self.m_panelMng = new feeds_ns.PanelMng();
-
-  // $feedDisp is the right-hand side panel that displays the contents of rss entries
-  var $feedDisp = utils_ns.domFind('#xrss_container');
-  self.m_feedDisp = new feeds_ns.FeedDisp($feedDisp);
-  // $feedsPanel is the left-hand side panel that display folders and feed titles
-  var $feedsPanel = utils_ns.domFind('#xfeeds_list');
-  self.m_feedsDir = new feeds_ns.FeedsDir($feedsPanel, self.m_feedDisp, self.m_panelMng);
-
   self.$d =
   {
+    // feedDisp is the right-hand side panel that displays the contents of rss entries
+    feedDisp: utils_ns.domFind('#xrss_container'),
+    // feedsPanel is the left-hand side panel that display folders and feed titles
+    feedsPanel: utils_ns.domFind('#xfeeds_list'),
+    // DOM elements fro GDrive operations and status
     syncProgress: utils_ns.domFind('#xsync_progress'),
     syncProgressHolder: utils_ns.domFind('#xsync_progress_holder'),
     btnGDrive: utils_ns.domFind('#xgdrive'),
     userGDrive: utils_ns.domFind('#xgoogle_user')
   }
 
-  self.m_panelAbout = new feeds_ns.PanelAbout();
-  var feedsDB = self.m_feedsDir.getFeedsDbObj();
-  self.m_panelImportOpml = new feeds_ns.FeedsImport(feedsDB, self.m_feedsDir, self.m_panelMng);
+  self.m_feedDisp = null;
+  self.m_feedsDir = null;
+  self.m_feedsDB = null;
 
-  self.m_panelMng.setMenuEntryHandler('xcmd_pane_feeds_dir', self.m_feedsDir);
-  self.m_panelMng.setMenuEntryHandler('ximport_opml', self.m_panelImportOpml);
-  self.m_panelMng.setMenuEntryHandler('xcmd_pane_about', self.m_panelAbout);
-
-  self.m_panelMng.p_activatePane(0);  // Activate feeds display
-
-  // Now connect to Dropbox
-  // self.m_connectDropbox = new feeds_ns.ConnectDBox(self.p_getConnectDBoxCBHandlers());
-  gapi.load("drive-realtime,drive-share", function()
+  self.m_initSeq = [];
+  self.m_initCnt = 0;
+  self.m_initSeq.push(function()
       {
-        // callback: API Done Loading
-        $('#xgdrive').on('click', function ()
+          self.m_panelMng = new feeds_ns.PanelMng();
+
+          self.m_feedDisp = new feeds_ns.FeedDisp(self.$d.feedDisp);
+          self.m_feedsDir = new feeds_ns.FeedsDir(self.$d.feedsPanel, self.m_feedDisp, self.m_panelMng);
+          self.p_initSeqNext();
+      });
+  self.m_initSeq.push(function()
+      {
+          // Setup object for work on IndexedDB
+          self.m_feedsDB = new feeds_ns.Feeds();
+          // Connect feedsDir callbacks into feedsDB so that data can be displayed via these callback
+          self.m_feedsDir.connectToFeedsDb(self.m_feedsDB);
+          // Open IndexedDB and load all feeds (object type RSSHeader) in memory
+          // Via call-backs this will also list the feeds and folders in
+          // the panel for feeds navigation (left-hand-side)
+          self.m_feedsDB.dbOpen(function ()
+              {
+                  self.p_initSeqNext();
+              });
+      });
+  self.m_initSeq.push(function()
+      {
+          // Now load all feeds data from the IndexedDB
+          self.m_feedsDB.dbLoad(function ()
+              {
+                  self.p_initSeqNext();
+              });
+      });
+  self.m_initSeq.push(function()
+      {
+          self.m_panelAbout = new feeds_ns.PanelAbout();
+          self.m_panelImportOpml = new feeds_ns.FeedsImport(self.m_feedsDB, self.m_feedsDir, self.m_panelMng);
+
+          self.m_panelMng.setMenuEntryHandler('xcmd_pane_feeds_dir', self.m_feedsDir);
+          self.m_panelMng.setMenuEntryHandler('ximport_opml', self.m_panelImportOpml);
+          self.m_panelMng.setMenuEntryHandler('xcmd_pane_about', self.m_panelAbout);
+
+          self.m_panelMng.p_activatePane(0);  // Activate feeds display
+
+          self.p_initSeqNext();
+      });
+  self.m_initSeq.push(function()
+      {
+        // Now connect to Dropbox
+        // self.m_connectDropbox = new feeds_ns.ConnectDBox(self.p_getConnectDBoxCBHandlers());
+        // Now connect to Google Drive
+        gapi.load("drive-realtime,drive-share", function()
             {
-              chrome.identity.getAuthToken({ 'interactive': true }, function(accessToken)
+              // callback: API Done Loading
+              $('#xgdrive').on('click', function ()
                   {
-                    if (chrome.runtime.lastError)
-                    {
-                      //callback(chrome.runtime.lastError);
-                      log.error(chrome.runtime.lastError);
-                      return;
-                    }
-                    chrome.identity.getProfileUserInfo(function(profileInfo)
+                    chrome.identity.getAuthToken({ 'interactive': true }, function(accessToken)
                         {
-                          self.$d.btnGDrive.text('Logout \u2192');
-                          self.$d.userGDrive.text(profileInfo.email)
-                        });
-                    log.info('Google API Access token: ' + accessToken);
-                    feeds_ns.RTablesInit(accessToken, function()
-                        {
-                          self.m_feedsDir.remoteStoreConnected();
+                          if (chrome.runtime.lastError)
+                          {
+                            //callback(chrome.runtime.lastError);
+                            log.error(chrome.runtime.lastError);
+                            return;
+                          }
+                          chrome.identity.getProfileUserInfo(function(profileInfo)
+                              {
+                                self.$d.btnGDrive.text('Logout \u2192');
+                                self.$d.userGDrive.text(profileInfo.email)
+                              });
+                          log.info('Google API Access token: ' + accessToken);
+                          feeds_ns.RTablesInit(accessToken, function()
+                              {
+                                self.m_feedsDir.remoteStoreConnected();
+                              });
                         });
                   });
             });
+          self.p_initSeqNext();
+      });
+  self.m_initSeq.push(function()
+      {
+          Object.preventExtensions(this);
+          self.p_initSeqNext();
       });
 
-  Object.preventExtensions(this);
+  // Kick off the init steps
+  self.p_initSeqNext();
 
   return this;
 }
+
+// object App.p_initSeqNext
+function p_initSeqNext()
+{
+  var self = this;
+
+  if (self.m_initCnt > 0)
+    log.info('app: end of init step ' + (self.m_initCnt - 1));
+
+  if (self.m_initCnt >= self.m_initSeq.length)
+    return;  // All init steps are done
+
+  setTimeout(function ()
+  {
+      log.info('app: start of init step ' + self.m_initCnt);
+      ++self.m_initCnt;
+      self.m_initSeq[self.m_initCnt - 1]();
+  }, 0);  // Delay 0, just yield
+}
+App.prototype.p_initSeqNext = p_initSeqNext;
 
 // object App.p_getConnectDBoxCBHandlers()
 function p_getConnectDBoxCBHandlers()
@@ -184,7 +250,7 @@ function p_activatePane(index)
 
   if (self.m_commandPaneMap[index].isActive)
   {
-    log.info('pane area ' + index + ': already active');
+    log.info('app: pane area ' + index + ': already active');
     return;
   }
 
@@ -204,7 +270,7 @@ function p_activatePane(index)
   self.m_commandPaneMap[index].$rightPaneDispArea.toggleClass('hide', false);
   self.m_commandPaneMap[index].handler.onFocus();
   self.m_commandPaneMap[index].isActive = true;
-  log.info('activate pane area ' + index);
+  log.info('app: activate pane area ' + index);
 }
 PanelMng.prototype.p_activatePane = p_activatePane;
 
@@ -224,7 +290,7 @@ function p_handleLeftPaneClick(ev)
     if (self.m_commandPaneMap[i].isEnabled)
     {
       self.p_activatePane(i);
-      log.info('pane area ' + i);
+      log.info('app: pane area ' + i + ' is enabled');
     }
 
     return true;
@@ -255,7 +321,7 @@ function enableMenuEntry(entryDomId, isEnabled)
     jQuery(e.$leftPaneTriggerArea).toggleClass('disabled', !isEnabled);
     e.isEnabled = isEnabled;
 
-    log.info(actionStr + ' pane area ' + entryDomId);
+    log.info('app: ' + actionStr + ' pane area ' + entryDomId);
     return;
   }
 
@@ -279,7 +345,7 @@ function setMenuEntryHandler(entryDomId, handler)
       continue;
 
     e.handler = handler;
-    log.info('Set handler for pane area ' + entryDomId);
+    log.info('app: Set handler for pane area ' + entryDomId);
     return;
   }
 

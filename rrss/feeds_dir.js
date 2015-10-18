@@ -97,9 +97,7 @@ function FeedsDir($dirPanel, feedDisp, panelMng)
   self.m_isFirstPrefetched = false;  // Is the offered feed prefetched
   self.m_urlFirstTimeOffer = 'http://feeds.theguardian.com/theguardian/books/rss';
 
-  var feedsCB = self.p_getFeedsCBHandlers();
-
-  self.m_feedsDB = new feeds_ns.Feeds(feedsCB);
+  self.m_feedsDB = null;
   self.m_folders = []; // array of DirEntryFolder
   self.m_feeds = {};  // map of DirEntryFeed
   self.m_recentlyViewed = []; // array of RssHeaders, feeds accessed via the "Add" button
@@ -121,6 +119,17 @@ function FeedsDir($dirPanel, feedDisp, panelMng)
 
   return this;
 }
+
+// object FeedsDir.connectToFeedsDb
+function connectToFeedsDb(feedsDB)
+{
+  var self = this;
+
+  var feedsCB = self.p_getFeedsCBHandlers();
+  self.m_feedsDB = feedsDB;
+  self.m_feedsDB.setCbHandlers(feedsCB);
+}
+FeedsDir.prototype.connectToFeedsDb = connectToFeedsDb;
 
 // object FeedsDir.remoteStoreConnected
 function remoteStoreConnected()
