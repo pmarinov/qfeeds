@@ -28,6 +28,8 @@ function Feeds(feedsCB)
   self.m_rssFeeds = [];  // array of RssHeader, sorted by url
   self.m_listNotify = [];
 
+  self.m_prefs = {};  // App's preferences
+
   // Poll loop
   self.m_pollIndex = 0;
   self.m_timeoutID = null;
@@ -62,6 +64,89 @@ function Feeds(feedsCB)
 
   return this;
 }
+
+// object Feeds.setPref
+// Sets a key, stores in the IndexedDB, sends it to remote table
+// Sends only keys that start with "m_"
+function setPref(key, value)
+{
+}
+Feeds.prototype.setPref = setPref;
+
+// object Feeds.getPref
+// Reads a pref value from the cached map
+function getPref(key)
+{
+}
+Feeds.prototype.getPref = getPref;
+
+// object Feeds.p_dbSetTranErrorLogging
+// Logs error or info for transactions in IndexedDB
+function p_dbSetTranErrorLogging(tran, tableName, operation)
+{
+  var self = this;
+
+  tran.oncomplete = function (event)
+      {
+        log.trace('db: (' + tableName + ', ' + operation + ') transaction completed');
+      };
+  tran.onabort = function (event)
+      {
+        log.error('db: (' + tableName + ', ' + operation + ') transaction aborted');
+      };
+  tran.onerror = function (event)
+      {
+        log.error('db: (' + tableName + ', ' + operation + ') transaction error');
+      };
+}
+Feeds.prototype.p_dbSetTranErrorLogging = p_dbSetTranErrorLogging;
+
+// object Feeds.p_dbReadAll
+// Read all entries from a table in IndexedDB
+function p_dbReadAll(tableName, cb_processEntry)
+{
+  var self = this;
+  var feeds = [];
+
+  // Read the list of RSS subscriptions from IndexDB
+  var cnt = 0;
+  var tran = self.m_db.transaction(tableName, 'readonly');
+  self.p_dbSetTranErrorLogging(tran, tableName, 'read');
+  var s = tran.objectStore('rss_subscriptions');
+  var c = s.openCursor();
+  c.onerror = function (event)
+      {
+        log.error('db: (' + tableName + ') cursor error');
+      };
+  c.onsuccess = function(event)
+      {
+        var cursor = event.target.result;
+        if (!cursor)
+        {
+          console.log('db: (' + tableName + ') ' + cnt + ' entries retrieved');
+          cb_processEntry(cursor);
+          return;  // no more entries
+        }
+        cb_processEntry(cursor);
+        ++cnt;
+        cursor.continue();
+      };
+}
+Feeds.prototype.p_dbReadAll = p_dbReadAll;
+
+// object Feeds.p_loadAllPrefs
+// Reads keys from indexedDB into local cache
+function p_loadAllPrefs()
+{
+}
+Feeds.prototype.p_loadAllPrefs = p_loadAllPrefs;
+
+// object Feeds.getPref
+// A key was changed remotely
+function setListener(cbUpdates)
+{
+}
+Feeds.prototype.setListener = setListener;
 
 // object RemoteEntryRead [constructor]
 // From an RssEntry constructs a RemoteEntryRead record
@@ -141,7 +226,7 @@ function p_rtableRemoteEntryReadListener(records)
 
               if (dbEntry.m_is_read == is_read)  // Nothing changed?
               {
-                log.trace('db: update entry (' + rss_entry_hash + '): is_read = ' + is_read);
+                log.trace("db: ('rss_data') update entry (" + rss_entry_hash + '): is_read = ' + is_read);
                 return 1;  // Don't record in the DB
               }
               else
@@ -153,7 +238,7 @@ function p_rtableRemoteEntryReadListener(records)
             }
             else if (state == 1)
             {
-              log.trace('db: update entry (' + rss_entry_hash + '): not found: put local placeholder');
+              log.trace("db: ('rss_data') update entry (" + rss_entry_hash + '): not found: put local placeholder');
               // Create a pseudo entry -- only hash, date, m_remote_state and is_read are valid
               dbEntry.m_hash = rss_entry_hash;
               dbEntry.m_date = entry_date;
@@ -557,45 +642,22 @@ function p_feedReadAll(cbDone)
   var self = this;
   var feeds = [];
 
-  // Read the list of RSS subscriptions from IndexDB
-  var cnt = 0;
-  var tran = self.m_db.transaction('rss_subscriptions', 'readonly');
-  tran.oncomplete = function (event)
+  // function p_dbReadAll(tableName, cb_processEntry)
+  self.p_dbReadAll('rss_subscriptions',
+      function(dbCursor)
       {
-        log.info('db: transaction completed');
-      };
-  tran.onabort = function (event)
-      {
-        log.error('db: transaction aborted');
-      };
-  tran.onerror = function (event)
-      {
-        log.error('db: transaction error');
-      };
-  var s = tran.objectStore('rss_subscriptions');
-  var c = s.openCursor();
-  c.onerror = function (event)
-      {
-        log.error('db: cursor error');
-      };
-  c.onsuccess = function(event)
-      {
-        var cursor = event.target.result;
-        if (!cursor)
+        if (!dbCursor)
         {
-          console.log('db: ' + cnt + ' subscriptions retrieved');
           self.p_feedInsertBatch(feeds);
           if (cbDone != null)
             cbDone();
           return;  // no more entries
         }
-        var hdr = cursor.value;
+        var hdr = dbCursor.value;
         // Just collect and insert in a batch at the end
         if (!hdr.m_is_unsubscribed)
           feeds.push(feeds_ns.copyRssHeader(hdr));
-        ++cnt;
-        cursor.continue();
-      };
+      });
 }
 Feeds.prototype.p_feedReadAll = p_feedReadAll;
 
@@ -609,23 +671,12 @@ function p_feedPendingDeleteDB(needsRTableSync)
   // Read the list of RSS subscriptions from IndexDB
   var cnt = 0;
   var tran = self.m_db.transaction('rss_subscriptions', 'readonly');
-  tran.oncomplete = function (event)
-      {
-        log.info('db: transaction completed');
-      };
-  tran.onabort = function (event)
-      {
-        log.error('db: transaction aborted');
-      };
-  tran.onerror = function (event)
-      {
-        log.error('db: transaction error');
-      };
+  self.p_dbSetTranErrorLogging(tran, 'rss_subscriptions', 'read');
   var s = tran.objectStore('rss_subscriptions');
   var c = s.openCursor();
   c.onerror = function (event)
       {
-        log.error('db: cursor error');
+        log.error("db: ('rss_subscriptions', 'read') cursor error");
       };
   c.onsuccess = function(event)
       {
@@ -633,7 +684,7 @@ function p_feedPendingDeleteDB(needsRTableSync)
         if (!cursor)
         {
           // `cursor' is null when `cursor.continue()' reaches end of DB index
-          console.log('db: ' + listToRemove.length + ' subscriptions marked as unsubscribed');
+          log.info("db: ('rss_subscriptions')" + listToRemove.length + ' subscriptions marked as unsubscribed');
           self.p_feedRemoveList(listToRemove, needsRTableSync);
           return;  // no more entries
         }
@@ -652,22 +703,22 @@ function p_dbOpen()
 {
   var self = this;
 
-  log.info('db: connect to Feeds database...');
+  log.info("db: ('rrss', 'open') connect to Feeds database...");
   var req = window.indexedDB.open('rrss', 1);
   req.onerror = function (event)
       {
         // Global error handler for all database errors
         // TODO: formulate a message and pass this to callback for display outside Feeds
-        log.error('db: error: ' + req.errorCode);
-        alert('db: error, check Console');
+        log.error("db: ('rrss', 'open') error: " + req.errorCode);
+        alert("db: ('rrss', 'open') error, check Console");
       };
   req.onblocked = function (event)
       {
-        log.error("db: Feeds database is still in use by another instance");
+        log.error("db: ('rrss', 'open') Feeds database is still in use by another instance");
       }
   req.onsuccess = function (event)
       {
-        log.info("db: Feeds database already exists");
+        log.info("db: ('rrss', 'open') Feeds database already exists");
         var db = req.result;
         log.info(db.objectStoreNames);
 
@@ -689,26 +740,26 @@ function p_dbOpen()
       };
   req.onupgradeneeded = function(event)
       {
-        log.info('db: first time, create tables of Feeds DB...');
+        log.info("db: ('rrss', 'open') first time, create tables of Feeds DB...");
         var db = event.target.result;
 
         // Records of type RssHeader 
         var s = db.createObjectStore('rss_subscriptions', { keyPath: 'm_url' });
-        log.info('db: table "rss_subscriptions" created');
+        log.info("db: ('rrss', 'open') table 'rss_subscriptions' created");
 
         // Records of type RssEntry
         var d = db.createObjectStore('rss_data', { keyPath: 'm_hash' });
-        log.info('db: table "rss_data" created');
+        log.info("db: ('rrss', 'open') table 'rss_data' created");
 
         d.createIndex('rssurl_date', 'm_rssurl_date', { unique: false });
-        log.info('db: index "rssurl_date" created');
+        log.info("db: ('rrss', 'open') index 'rssurl_date' created");
 
         // Records of pref=value: store user preferences as k/v pairs
         var d = db.createObjectStore('preferences', { keyPath: 'm_pref' });
-        log.info('db: table "preferences" created');
+        log.info("db: ('rrss', 'open') table 'preferences' created");
 
         self.m_db = db;
-        log.info('db: tables and indexes of Feeds DB created');
+        log.info("db: ('rrss', 'open') all tables and indexes of Feeds DB created");
 
         self.m_feedsCB.onDbCreated();
 
@@ -804,15 +855,15 @@ function p_feedInsertBatch(feeds)
 Feeds.prototype.p_feedInsertBatch = p_feedInsertBatch;
 
 // object Feeds.p_feedOnDbError1
-function p_feedOnDbError1(msg, url, cbResult, r)
+function p_feedOnDbError1(msg, tableName, url, cbResult, r)
 {
   var self = this;
 
   var m = -1;
   var feed = null;
 
-  log.error(msg);
-  
+  log.error('db: (' + tableName + ') ' + msg);
+
   if (url != null)
   {
     m = self.p_feedFindByUrl(url);
@@ -939,11 +990,11 @@ function p_feedRecord(feed, syncRTable, cbResult)
       };
   tran.onabort = function (event)
       {
-        self.p_feedOnDbError1('db: write transaction aborted', null, cbResult, 0);
+        self.p_feedOnDbError1('write transaction aborted', 'rss_subscriptions', null, cbResult, 0);
       };
   tran.onerror = function (event)
       {
-        self.p_feedOnDbError1('db: write transaction error', null, cbResult, 0);
+        self.p_feedOnDbError1('write transaction error', 'rss_subscriptions', null, cbResult, 0);
       };
   var store = tran.objectStore('rss_subscriptions');
 
@@ -952,18 +1003,18 @@ function p_feedRecord(feed, syncRTable, cbResult)
   var req = store.get(feed.m_url);
   req.onerror = function(event)
       {
-        self.p_feedOnDbError1('db: read transaction error', feedUrl, cbResult, 0);
+        self.p_feedOnDbError1('read transaction error', 'rss_subscriptions', feedUrl, cbResult, 0);
       };
   req.onabort = function (event)
       {
-        self.p_feedOnDbError1('db: read transaction aborted', feedUrl, cbResult, 0);
+        self.p_feedOnDbError1('read transaction aborted', 'rss_subscriptions', feedUrl, cbResult, 0);
       };
   req.onsuccess = function(event)
       {
         m = self.p_feedFindByUrl(feedUrl);
         if (m < 0)
         {
-          self.p_feedOnDbError1('db: feed already deleted', feedUrl, cbResult, 0);
+          self.p_feedOnDbError1('feed already deleted', 'rss_subscriptions', feedUrl, cbResult, 0);
           return;
         }
         feed = self.m_rssFeeds[m];
@@ -1011,8 +1062,8 @@ function p_feedRecord(feed, syncRTable, cbResult)
         reqAdd.onerror = function(event)
             {
               // cbResult: Notify that update was needed followed by an error
-              self.p_feedOnDbError1('db: write error msg: ' + reqAdd.error.message + ' url: ' + feed.m_url,
-                                   feed.m_url, cbResult, 2);
+              self.p_feedOnDbError1('write error msg: ' + reqAdd.error.message + ' url: ' + feed.m_url,
+                                   'rss_subscriptions', feed.m_url, cbResult, 2);
             }
       } // req.onsuccess()
 }
@@ -1052,18 +1103,7 @@ function p_feedRemoveDB(feedUrl, needsRTableSync)
 
   // Find entry in m_dbSubscriptions
   var tran = self.m_db.transaction(['rss_subscriptions'], 'readwrite');
-  tran.oncomplete = function (event)
-      {
-        log.info('db: delete transaction completed');
-      };
-  tran.onabort = function (event)
-      {
-        log.error('db: delete transaction aborted');
-      };
-  tran.onerror = function (event)
-      {
-        log.error('db: delete transaction error');
-      };
+  self.p_dbSetTranErrorLogging(tran, 'rss_subscriptions', 'delete');
   var store = tran.objectStore('rss_subscriptions');
 
   // IndexedDB documentation states that direct call to
@@ -1291,17 +1331,7 @@ function p_feedRecordEntry(feedUrl, newEntry, cbWriteDone)
 
   // Insert entry in table 'rss_data'
   var tran = self.m_db.transaction(['rss_data'], 'readwrite');
-  tran.oncomplete = function (event)
-      {
-        log.trace('db: update transaction completed');
-      };
-  tran.onabort = function (event)
-      {
-        log.error('db: update transaction aborted (' + s + ')');
-      };
-  tran.onerror = function (event) {
-        log.error('db: update transaction error');
-      };
+  self.p_dbSetTranErrorLogging(tran, 'rss_data', 'update.1');
   var store = tran.objectStore('rss_data');
   log.trace('db check for hash (' + self.m_rss_entry_cnt + '): ' + newEntry2.m_hash);
   var req = store.get(newEntry2.m_hash);
@@ -1369,17 +1399,7 @@ function feedUpdateEntry(entryHash, cbUpdate)
 
   // Entry goes into table 'rss_data'
   var tran = self.m_db.transaction(['rss_data'], 'readwrite');
-  tran.oncomplete = function (event)
-      {
-        log.trace('db: update transaction completed');
-      };
-  tran.onabort = function (event)
-      {
-        log.error('db: update transaction aborted (' + s + ')');
-      };
-  tran.onerror = function (event) {
-        log.error('db: update transaction error');
-      };
+  self.p_dbSetTranErrorLogging(tran, 'rss_data', 'update.2');
   var store = tran.objectStore('rss_data');
   log.trace('db: check for hash (' + self.m_rss_entry_cnt + '): ' + entryHash);
   var req = store.get(entryHash);
@@ -1470,18 +1490,7 @@ function updateEntriesAll(cbUpdate)
   log.info('db: update all...');
   // Insert entry in m_dbSubscriptions
   var tran = self.m_db.transaction(['rss_data'], 'readwrite');
-  tran.oncomplete = function (event)
-      {
-        log.trace('db: read transaction completed');
-      };
-  tran.onabort = function (event)
-      {
-        log.error('db: read transaction aborted');
-      };
-  tran.onerror = function (event)
-      {
-        log.error('db: read transaction error');
-      };
+  self.p_dbSetTranErrorLogging(tran, 'rss_data', 'update.3');
   var store = tran.objectStore('rss_data');
   var cursor = store.openCursor();  // navigate all entries
   cursor.onsuccess = function(event)
@@ -1591,7 +1600,7 @@ function p_feedUpdate(feedHeaderNew, cbWriteDone)
            if (cbWriteDone != null)
            {
              if (totalCnt > 0)
-               log.info(totalCnt + ' new entries recorded in table rss_data, ' + unchangedCnt + ' unchanged');
+               log.info(totalCnt + " new entries recorded in table 'rss_data', " + unchangedCnt + ' unchanged');
              cbWriteDone();
            }
          }
@@ -1603,7 +1612,7 @@ function p_feedUpdate(feedHeaderNew, cbWriteDone)
   {
     if (cbWriteDone != null)
     {
-      log.info('0 new entries recorded in table rss_data, 0 unchanged');
+      log.info("0 new entries recorded in table 'rss_data', 0 unchanged");
       cbWriteDone();
     }
   }
@@ -1622,18 +1631,7 @@ function p_feedsUpdateAll(cbUpdate)
   log.info('db: feeds update all...');
   // Insert entry in m_dbSubscriptions
   var tran = self.m_db.transaction(['rss_subscriptions'], 'readwrite');
-  tran.oncomplete = function (event)
-      {
-        log.trace('db: read transaction completed');
-      };
-  tran.onabort = function (event)
-      {
-        log.error('db: read transaction aborted');
-      };
-  tran.onerror = function (event)
-      {
-        log.error('db: read transaction error');
-      };
+  self.p_dbSetTranErrorLogging(tran, 'rss_subscriptions', 'update');
   var store = tran.objectStore('rss_subscriptions');
   var cursor = store.openCursor();  // navigate all entries
   cursor.onsuccess = function(event)
@@ -1687,18 +1685,7 @@ function feedReadEntriesAll(cbFilter)
   log.info('db: read all...');
   // Insert entry in m_dbSubscriptions
   var tran = self.m_db.transaction(['rss_data'], 'readonly');
-  tran.oncomplete = function (event)
-      {
-        log.trace('db: read transaction completed');
-      };
-  tran.onabort = function (event)
-      {
-        log.error('db: read transaction aborted');
-      };
-  tran.onerror = function (event)
-      {
-        log.error('db: read transaction error');
-      };
+  self.p_dbSetTranErrorLogging(tran, 'rss_data', 'read.1');
   var store = tran.objectStore('rss_data');
   var cursor = store.openCursor();  // navigate all entries
   cursor.onsuccess = function(event)
@@ -1743,18 +1730,7 @@ function feedReadEntries(feedUrl, startTime, isDescending, cbFilter)
 
   // Insert entry in m_dbSubscriptions
   var tran = self.m_db.transaction(['rss_data'], 'readonly');
-  tran.oncomplete = function (event)
-      {
-        log.trace('db: read transaction completed');
-      };
-  tran.onabort = function (event)
-      {
-        log.error('db: read transaction aborted');
-      };
-  tran.onerror = function (event)
-      {
-        log.error('db: read transaction error');
-      };
+  self.p_dbSetTranErrorLogging(tran, 'rss_data', 'read.2');
   var store = tran.objectStore('rss_data');
   var index = store.index('rssurl_date');
   var range = IDBKeyRange.bound(key_rssurl_oldestdate, key_rssurl_curdate);
