@@ -128,7 +128,7 @@ function p_dbReadAll(tableName, cb_processEntry)
   var cnt = 0;
   var tran = self.m_db.transaction(tableName, 'readonly');
   self.p_dbSetTranErrorLogging(tran, tableName, 'read');
-  var s = tran.objectStore('rss_subscriptions');
+  var s = tran.objectStore(tableName);
   var c = s.openCursor();
   c.onerror = function (event)
       {
@@ -150,13 +150,13 @@ function p_dbReadAll(tableName, cb_processEntry)
 }
 Feeds.prototype.p_dbReadAll = p_dbReadAll;
 
-// object Feeds.p_prefReadAll
+// object Feeds.prefReadAll
 // Reads keys from indexedDB into local cache
-function p_prefReadAll(cbDone)
+function prefReadAll(cbDone)
 {
   var self = this;
 
-  self.p_dbReadAll('rss_subscriptions',
+  self.p_dbReadAll('preferences',
       function(dbCursor)
       {
         if (!dbCursor)
@@ -169,7 +169,7 @@ function p_prefReadAll(cbDone)
         self.m_prefs[hdr.m_key] = hdr.m_value
       });
 }
-Feeds.prototype.p_prefReadAll = p_prefReadAll;
+Feeds.prototype.prefReadAll = prefReadAll;
 
 // object Feeds.p_prefSetListener
 // A key was changed remotely

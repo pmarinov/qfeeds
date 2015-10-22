@@ -109,7 +109,15 @@ function App()
       });
   self.m_initSeq.push(function()
       {
-          // Now load all feeds data from the IndexedDB
+          // Load all preferences from the IndexedDB into cache
+          self.m_feedsDB.prefReadAll(function ()
+              {
+                  self.p_initSeqNext();
+              });
+      });
+  self.m_initSeq.push(function()
+      {
+          // Load all feeds data from the IndexedDB
           self.m_feedsDB.dbLoad(function ()
               {
                   self.p_initSeqNext();
