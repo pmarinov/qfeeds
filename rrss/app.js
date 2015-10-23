@@ -112,6 +112,7 @@ function App()
           // Load all preferences from the IndexedDB into cache
           self.m_feedsDB.prefReadAll(function ()
               {
+                  self.p_setDefaultPref();  // Set default values for preferences (if this is first load)
                   self.p_initSeqNext();
               });
       });
@@ -200,6 +201,17 @@ function p_initSeqNext()
   }, 0);  // Delay 0, just yield
 }
 App.prototype.p_initSeqNext = p_initSeqNext;
+
+// object App.p_setDefaultPref()
+function p_setDefaultPref()
+{
+  var self = this;
+  var prefs = self.m_feedsDB.prefGetAll();
+
+  if (prefs["x_loggedIn"] === undefined)
+    self.m_feedsDB.prefSet("x_loggerIn", false);
+}
+App.prototype.p_setDefaultPref = p_setDefaultPref;
 
 // object App.p_getConnectDBoxCBHandlers()
 function p_getConnectDBoxCBHandlers()

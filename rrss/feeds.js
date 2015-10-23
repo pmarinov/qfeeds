@@ -75,6 +75,47 @@ Feeds.prototype.setCbHandlers = setCbHandlers;
 // Sends only keys that start with "m_"
 function prefSet(key, value)
 {
+  var self = this;
+  self.m_prefs[key] = value;
+
+  // Write the value in table 'preferences'
+  // only if the new value is different
+  var tran = self.m_db.transaction(['preferences'], 'readwrite');
+  self.p_dbSetTranErrorLogging(tran, 'preferences', 'update.1');
+  var store = tran.objectStore('preferences');
+  log.trace("db: ('preferences') check for key: " + key);
+  var req = store.get(key);
+  req.onsuccess = function(event)
+      {
+        var newEntry2 = { m_pref: key, m_value: value };
+        var data = req.result;
+        var needsWrite = false;
+        if (data === undefined)
+          needsWrite = true;
+        else
+        {
+          utils_ns.assert(data.m_pref == key, "prefSet: Wrong key extracted");
+          if (data.m_value != value)
+            needsWrite = true;
+        }
+        if (needsWrite)
+        {
+          log.info("db: ('preferences', 'write') entry " + key + ' = ' + value);
+
+          var reqAdd = store.put(utils_ns.marshal(newEntry2, 'm_'));
+          reqAdd.onsuccess = function(event)
+              {
+                var data = reqAdd.result;
+                log.trace("db: ('preferences', 'write') done: " + newEntry2.m_pref);
+              }
+          reqAdd.onerror = function(event)
+              {
+                log.errror("db: ('preferences', 'write') error for: " + newEntry2.m_pref);
+                var error_msg = "db: ('preference', 'open') error: " + reqAdd.error.message;
+                utils_ns.domError(error_msg);
+              }
+        }
+      }
 }
 Feeds.prototype.prefSet = prefSet;
 
@@ -84,6 +125,15 @@ function prefGet(key)
 {
 }
 Feeds.prototype.prefGet = prefGet;
+
+// object Feeds.prefGetAll
+// Reads a pref value from the cached map
+function prefGetAll()
+{
+  var self = this;
+  return self.m_prefs;
+}
+Feeds.prototype.prefGetAll = prefGetAll;
 
 // object Feeds.p_dbSetTranErrorLogging
 // Logs error or info for transactions in IndexedDB
@@ -98,22 +148,12 @@ function p_dbSetTranErrorLogging(tran, tableName, operation)
   tran.onabort = function (event)
       {
         var msg = 'db: (' + tableName + ', ' + operation + ') transaction aborted';
-        log.error(msg);
-        var errorObj =
-        {
-          stack: e.stack
-        };
-        window.onerror(msg, 'chrome-extension:mumbojumbo/app.html', 0, 0, errorObj);
+        utils_ns.domError(msg);
       };
   tran.onerror = function (event)
       {
         var msg = 'db: (' + tableName + ', ' + operation + ') transaction error';
-        log.error(msg);
-        var errorObj =
-        {
-          stack: e.stack
-        };
-        window.onerror(msg, 'chrome-extension:mumbojumbo/app.html', 0, 0, errorObj);
+        utils_ns.domError(msg);
       };
 }
 Feeds.prototype.p_dbSetTranErrorLogging = p_dbSetTranErrorLogging;
@@ -737,7 +777,6 @@ function dbOpen(cbDone)
   req.onerror = function (event)
       {
         // Global error handler for all database errors
-        // TODO: formulate a message and pass this to callback for display outside Feeds
         utils_ns.domError("db: ('rrss', 'open') error: " + req.errorCode);
       };
   req.onblocked = function (event)
