@@ -208,8 +208,9 @@ function p_setDefaultPref()
   var self = this;
   var prefs = self.m_feedsDB.prefGetAll();
 
-  if (prefs["x_loggedIn"] === undefined)
-    self.m_feedsDB.prefSet("x_loggerIn", false);
+  // Keys that start with m_local stay only on the local machine
+  if (prefs["m_local.app.logged_in"] === undefined)
+    self.m_feedsDB.prefSet("m_local.app.logged_in", false);
 }
 App.prototype.p_setDefaultPref = p_setDefaultPref;
 
