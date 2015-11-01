@@ -74,14 +74,13 @@ function App()
     feedsPanel: utils_ns.domFind('#xfeeds_list'),
     // DOM elements fro GDrive operations and status
     syncProgress: utils_ns.domFind('#xsync_progress'),
-    syncProgressHolder: utils_ns.domFind('#xsync_progress_holder'),
-    btnGDrive: utils_ns.domFind('#xgdrive'),
-    userGDrive: utils_ns.domFind('#xgoogle_user')
+    syncProgressHolder: utils_ns.domFind('#xsync_progress_holder')
   }
 
   self.m_feedDisp = null;
   self.m_feedsDir = null;
   self.m_feedsDB = null;
+  self.m_gdriveConnect = null;
 
   self.m_initSeq = [];
   self.m_initCnt = 0;
@@ -142,33 +141,9 @@ function App()
         // Now connect to Dropbox
         // self.m_connectDropbox = new feeds_ns.ConnectDBox(self.p_getConnectDBoxCBHandlers());
         // Now connect to Google Drive
-        gapi.load("drive-realtime,drive-share", function()
-            {
-              // callback: API Done Loading
-              $('#xgdrive').on('click', function ()
-                  {
-                    chrome.identity.getAuthToken({ 'interactive': true }, function(accessToken)
-                        {
-                          if (chrome.runtime.lastError)
-                          {
-                            //callback(chrome.runtime.lastError);
-                            log.error(chrome.runtime.lastError);
-                            return;
-                          }
-                          chrome.identity.getProfileUserInfo(function(profileInfo)
-                              {
-                                self.$d.btnGDrive.text('Logout \u2192');
-                                self.$d.userGDrive.text(profileInfo.email)
-                              });
-                          log.info('Google API Access token: ' + accessToken);
-                          feeds_ns.RTablesInit(accessToken, function()
-                              {
-                                self.m_feedsDir.remoteStoreConnected();
-                              });
-                        });
-                  });
-            });
-          self.p_initSeqNext();
+        var cb = self.p_getConnectGDriveHandlers();
+        self.m_gdriveConnect = new feeds_ns.ConnectGDrive(cb);
+        self.p_initSeqNext();
       });
   self.m_initSeq.push(function()
       {
@@ -214,34 +189,28 @@ function p_setDefaultPref()
 }
 App.prototype.p_setDefaultPref = p_setDefaultPref;
 
-// object App.p_getConnectDBoxCBHandlers()
-function p_getConnectDBoxCBHandlers()
+// object App.p_getConnectGDriveHandlers()
+// A bridge between GDrive status and other elements (UI or Database)
+function p_getConnectGDriveHandlers()
 {
   var self = this;
 
-  var connectDBoxCB =
+  var connectGDriveCB =
   {
     // If user logins into Dropbox this function is called
     // when access object is ready
-    onDBoxClientReady: function(clientDBox)
+    onClientReady: function(code, accessToken)
         {
-          feeds_ns.RTableInit(clientDBox,
-            function(code)
-            {
-              if (code == 0)  // RTable init ok
-              {
-                console.log("RTable init OK");
-                self.m_feedsDir.remoteStoreConnected();
-              }
-              else
-              {
-                console.log("RTable init failed");
-                self.m_connectDropbox.dboxLoginLogout();  // Logout
-              }
-            });
+          if (code == 0)
+          {
+            feeds_ns.RTablesInit(accessToken, function()
+                {
+                  self.m_feedsDir.remoteStoreConnected();
+                });
+          }
         },
 
-    onDBoxProgress: function(percent)
+    onProgress: function(percent)
         {
           if (percent == 0)  // start
             self.$d.syncProgressHolder.toggleClass('hide', false);
@@ -259,9 +228,9 @@ function p_getConnectDBoxCBHandlers()
         }
   };
 
-  return connectDBoxCB;
+  return connectGDriveCB;
 }
-App.prototype.p_getConnectDBoxCBHandlers = p_getConnectDBoxCBHandlers;
+App.prototype.p_getConnectGDriveHandlers = p_getConnectGDriveHandlers;
 
 // object PanelMng.p_activatePane()
 // Activate one object into the right-hand side area (Feeds, About, etc.)

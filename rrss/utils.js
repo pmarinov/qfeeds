@@ -94,7 +94,10 @@ function domError(msg)
     }
   }
   if (window.onerror != null)
+  {
+    log.error(e2.message);
     window.onerror(e2.message, 'chrome-extension:mumbojumbo/app.html', 0, 0, e2);
+  }
   else
     throw e;
 }

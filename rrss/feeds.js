@@ -1064,7 +1064,7 @@ function p_feedRecord(feed, syncRTable, cbResult)
   var tran = self.m_db.transaction(['rss_subscriptions'], 'readwrite');
   tran.oncomplete = function (event)
       {
-        log.info('db: update transaction transaction completed');
+        log.trace('db: update transaction transaction completed');
       };
   tran.onabort = function (event)
       {
