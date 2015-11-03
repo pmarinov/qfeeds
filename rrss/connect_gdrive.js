@@ -23,7 +23,7 @@ if (typeof feeds_ns === 'undefined')
 // - Connects to Google Drive if user is already authenticated
 // - Handle Login/Logout button
 // - Shows user info and progress
-function ConnectGDrive(cb)
+function ConnectGDrive(cb, startWithLoggedIn)
 {
   var self = this;
 
@@ -48,15 +48,18 @@ function ConnectGDrive(cb)
       {
         // callback: API Done Loading
 
+        self.$d.btnGDrive.on('click', function (e)
+            {
+              self.p_gdriveLoginLogout(true);
+            });
+
+        if (!startWithLoggedIn)
+          return;
+
         try  // GDrive swallows all errors, install my own catchers for displahy of my own errors
         {
           // Try to obtain access token if user was already logged in the last time
           self.p_gdriveLoginLogout(false);
-
-          self.$d.btnGDrive.on('click', function (e)
-              {
-                self.p_gdriveLoginLogout(true);
-              });
         }
         catch (e)  // Error in my code, display it, then re-throw
         {
@@ -84,6 +87,8 @@ function p_gdriveLoginLogout(isInteractive)
     self.m_user_email = '';
     self.p_gdriveSetLoginButton();
 
+    self.m_cb.setPref("m_local.app.logged_in", false);
+
     var token =
     {
       token: self.m_accessToken
@@ -96,6 +101,7 @@ function p_gdriveLoginLogout(isInteractive)
   }
   else
   {
+    self.m_cb.setPref("m_local.app.logged_in", true);
     chrome.identity.getAuthToken({ 'interactive': isInteractive }, function(accessToken)
         {
           try  // GDrive swallows all errors, install my own catchers for displahy of my own errors

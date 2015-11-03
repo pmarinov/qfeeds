@@ -77,6 +77,7 @@ function prefSet(key, value)
 {
   var self = this;
   self.m_prefs[key] = value;
+  var newEntry2 = { m_pref: key, m_value: value };
 
   // Write the value in table 'preferences'
   // only if the new value is different
@@ -87,20 +88,19 @@ function prefSet(key, value)
   var req = store.get(key);
   req.onsuccess = function(event)
       {
-        var newEntry2 = { m_pref: key, m_value: value };
         var data = req.result;
         var needsWrite = false;
         if (data === undefined)
           needsWrite = true;
         else
         {
-          utils_ns.assert(data.m_pref == key, "prefSet: Wrong key extracted");
-          if (data.m_value != value)
+          utils_ns.assert(data.m_pref == newEntry2.m_pref, "prefSet: Wrong key extracted");
+          if (data.m_value != newEntry2.m_value)
             needsWrite = true;
         }
         if (needsWrite)
         {
-          log.info("db: ('preferences', 'write') entry " + key + ' = ' + value);
+          log.info("db: ('preferences', 'write') entry " + newEntry2.m_pref + ' = ' + newEntry2.m_value);
 
           var reqAdd = store.put(utils_ns.marshal(newEntry2, 'm_'));
           reqAdd.onsuccess = function(event)
@@ -123,6 +123,8 @@ Feeds.prototype.prefSet = prefSet;
 // Reads a pref value from the cached map
 function prefGet(key)
 {
+  var self = this;
+  return self.m_prefs[key];
 }
 Feeds.prototype.prefGet = prefGet;
 
@@ -206,7 +208,7 @@ function prefReadAll(cbDone)
           return;  // no more entries
         }
         var hdr = dbCursor.value;
-        self.m_prefs[hdr.m_key] = hdr.m_value
+        self.m_prefs[hdr.m_pref] = hdr.m_value
       });
 }
 Feeds.prototype.prefReadAll = prefReadAll;

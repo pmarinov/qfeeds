@@ -142,7 +142,9 @@ function App()
         // self.m_connectDropbox = new feeds_ns.ConnectDBox(self.p_getConnectDBoxCBHandlers());
         // Now connect to Google Drive
         var cb = self.p_getConnectGDriveHandlers();
-        self.m_gdriveConnect = new feeds_ns.ConnectGDrive(cb);
+        var startWithLoggedIn = self.m_feedsDB.prefGet("m_local.app.logged_in");
+        log.info('app: startWithLoggedIn = ' + startWithLoggedIn);
+        self.m_gdriveConnect = new feeds_ns.ConnectGDrive(cb, startWithLoggedIn);
         self.p_initSeqNext();
       });
   self.m_initSeq.push(function()
@@ -210,6 +212,7 @@ function p_getConnectGDriveHandlers()
           }
         },
 
+    // Display login progress indicator
     onProgress: function(percent)
         {
           if (percent == 0)  // start
@@ -225,7 +228,13 @@ function p_getConnectGDriveHandlers()
                   self.$d.syncProgressHolder.toggleClass('hide', true);
                 }, 1 * 1000);
           }
-        }
+        },
+
+    // Store preferences
+    setPref: function(pref, value)
+        {
+          self.m_feedsDB.prefSet("m_local.app.logged_in", value);
+        },
   };
 
   return connectGDriveCB;
