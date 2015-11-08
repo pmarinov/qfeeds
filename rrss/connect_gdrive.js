@@ -53,6 +53,22 @@ function ConnectGDrive(cb, startWithLoggedIn)
               self.p_gdriveLoginLogout(true);
             });
 
+        // Listen for a signal that user has logged out from Chrome browsers UI
+        // (not via our "Logout" button)
+        chrome.identity.onSignInChanged.addListener(function (AccountInfo account, boolean signedIn)
+            {
+               log.info('connect_drive: onSignInChanged')
+               // We only care for Logout events
+               if (!self.m_authenticated)
+                 return;  // The extension is in Logged-out mode already
+
+               if (!signedIn)
+               {
+                 log.info('connet_drive: onSignInChange -- logged out');
+                 self.p_gdriveLogout();
+               }
+            });
+
         if (!startWithLoggedIn)
           return;
 
@@ -74,6 +90,31 @@ function ConnectGDrive(cb, startWithLoggedIn)
       });
 }
 
+// object ConnectGDrive.p_gdriveLogout()
+// Action Logout
+function p_gdriveLogout()
+{
+  var self = this;
+
+  self.m_authenticated = false;
+  self.m_user_name = '';
+  self.m_user_email = '';
+  self.p_gdriveSetLoginButton();
+
+  self.m_cb.setPref("m_local.app.logged_in", false);
+
+  var token =
+  {
+    token: self.m_accessToken
+  };
+
+  chrome.identity.removeCachedAuthToken(token, function ()
+      {
+          console.log('sign_out1: OK');
+      });
+}
+ConnectGDrive.prototype.p_gdriveLogout = p_gdriveLogout;
+
 // object ConnectGDrive.p_gdriveLoginLogout()
 // Handle pressing of Login/Logout button
 function p_gdriveLoginLogout(isInteractive)
@@ -82,22 +123,7 @@ function p_gdriveLoginLogout(isInteractive)
 
   if (self.m_authenticated)
   {
-    self.m_authenticated = false;
-    self.m_user_name = '';
-    self.m_user_email = '';
-    self.p_gdriveSetLoginButton();
-
-    self.m_cb.setPref("m_local.app.logged_in", false);
-
-    var token =
-    {
-      token: self.m_accessToken
-    };
-
-    chrome.identity.removeCachedAuthToken(token, function ()
-        {
-            console.log('sign_out1: OK');
-        });
+    self.p_gdriveLogout();
   }
   else
   {
@@ -115,6 +141,7 @@ function p_gdriveLoginLogout(isInteractive)
               return;
             }
             self.m_accessToken = accessToken;
+
             chrome.identity.getProfileUserInfo(function(profileInfo)
                 {
                   self.m_user_email = profileInfo.email;
