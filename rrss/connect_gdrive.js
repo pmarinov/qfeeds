@@ -55,7 +55,7 @@ function ConnectGDrive(cb, startWithLoggedIn)
 
         // Listen for a signal that user has logged out from Chrome browsers UI
         // (not via our "Logout" button)
-        chrome.identity.onSignInChanged.addListener(function (AccountInfo account, boolean signedIn)
+        chrome.identity.onSignInChanged.addListener(function (account, signedIn)
             {
                log.info('connect_drive: onSignInChanged')
                // We only care for Logout events
