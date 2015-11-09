@@ -263,6 +263,12 @@
   opacity: 1.0;
 }
 
+.rss_title_area .icon_prevnext_holder
+{
+  width: 25px;
+  float: right;
+}
+
 /* icon for link needs special offset to fit in the line */
 .rss_title_area .icon_link_pos
 {
