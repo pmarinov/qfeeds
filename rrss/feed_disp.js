@@ -344,7 +344,6 @@ FeedDisp.prototype.feedDisplay = feedDisplay;
 
 // object FeedDisp.computePageRequest
 // Advance by a page, -1, 0, -1
-// NOTE: paging was deprecated, for now the entire feed is displayed
 function computePageRequest(advance, dispContext)
 {
   utils_ns.assert(dispContext instanceof DispContext, "p_displayFeedsList: x instanceof DispContext");

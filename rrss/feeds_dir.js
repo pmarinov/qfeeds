@@ -85,6 +85,12 @@ function FeedsDir($dirPanel, feedDisp, panelMng)
     areaInfoFolder: utils_ns.domFind('#xfolder_info_area'),
     iconInfo: utils_ns.domFind('#xfeed_icon'),
     infoUrl: utils_ns.domFind('#xfeed_info_url'),
+    btnNewerBtn1: utils_ns.domFind('#ximg_btn_next1'),
+    btnOlderBtn1: utils_ns.domFind('#ximg_btn_prev1'),
+    totalPg1: utils_ns.domFind('#xtitle_total_pg1'),
+    btnNewerBtn2: utils_ns.domFind('#ximg_btn_next2'),
+    btnOlderBtn2: utils_ns.domFind('#ximg_btn_prev2'),
+    totalPg2: utils_ns.domFind('#xtitle_total_pg2'),
     list: utils_ns.domFindInside($dirPanel, '.xentry', -1)
   };
   self.$d.listRecent = utils_ns.domFindInside(self.$d.containerRecentlyViwed, '.xrecent_entry', -1);
@@ -1500,15 +1506,12 @@ function p_addEntrySorted(entries, newEntry, max)
 }
 FeedsDir.prototype.p_addEntrySorted = p_addEntrySorted;
 
-// object FeedsDir.p_putCurrentFeed
-// current feed is m_currentFeed, it is an individual feed or a folder
-// Read contents of the feed from the database
-// Mark it as current on left pane, dipslay feed on the right pane
-function p_putCurrentFeed()
+// object FeedsDir.p_advanceToPage
+// Advance to older page (nav = -1), newer page (nav = 1),
+// or display current page (nav = 0)
+function p_advanceToPage(nav, cbDone)
 {
   var self = this;
-
-  utils_ns.assert(self.m_currentFeed != null, "m_putCurrentFeed: m_currentFeed is 'null'");
 
   var j = 0;
   var req = null;
@@ -1523,6 +1526,7 @@ function p_putCurrentFeed()
   var shouldCancel = false;
   var numDone = 0;
 
+  // Set feeds[] to one or, in case of a folder, more feeds
   f = self.m_currentFeed;
   var hideIconLink = false;
   if (f.m_isFolder)
@@ -1532,6 +1536,82 @@ function p_putCurrentFeed()
   }
   else
     feeds.push(self.m_currentFeedName);
+
+  var req = null;
+
+  // Compute request start point
+  req = self.m_feedDisp.computePageRequest(0, f.m_dispContext);
+
+  // TODO: Now we start a number of parallel requests for the IndexedDB
+  //       It is probably better to start one after the completion of the last
+
+  // Read entries from the DB for all the feeds that were lined up
+  // (one individual feed or all feeds in a folder)
+  for (k = 0; k < feeds.length; ++k)
+  {
+    (function ()  // Each read request needs its own closure for the feed back-ref
+    {
+      var feedUrl = feeds[k];
+      var feed = self.m_feeds[feedUrl];  // Prepare for the back-ref
+      self.m_feedsDB.feedReadEntries(feeds[k],
+          req.m_startDate, req.m_isDescending,
+          function (entry)  // cbFilter
+          {
+            if (entry != null)  // No more entries?
+            {
+              // Put back-ref link (entry -> rss_header)
+              // Needed for display which feed the entry belongs
+              entry.x_header = feed.m_header;
+
+              self.p_addEntrySorted(entries, entry, req.m_num);
+
+              // TODO: 1. here reflect data of entry into dispContext
+              //       so that we know how to do page-up, page down (obtain entry date/time field)
+              //       2. A method in feed_disp, pass it a date to put into the context
+              //       based on the direction it will know to update start or end date
+              //       3. computePageRequest() would know to set start or end date based on
+              //       the direction
+
+              return 1;
+            }
+            else  // We are done reading, we have all entries from the DB we need
+            {
+              ++numDone;
+              total = 0;  // pull req.m_num entries for each of the feeds
+
+              // Did user already click onto another feed?
+              if (!self.p_feedIsCurrent(f))
+                return 0;  // Cancel reading
+
+              if (numDone < feeds.length)  // Finished reading all "feeds[]"?
+                return 1;  // Continue reading with another entry in the folder (advance in feeds[])
+
+              // Finished reading all feeds that were lined up in "feeds[]"?
+              self.p_displayFeedAndTitle(f, entries);
+
+              // Notify "Done"
+              cbDone(entries);
+              return 0;  // Done reading
+            }
+          });
+    })();  // closure
+  }; // for (k = 0; k < feeds.length; ++k)
+}
+FeedsDir.prototype.p_advanceToPage = p_advanceToPage;
+
+// object FeedsDir.p_putCurrentFeed
+// (current feed is m_currentFeed, it is an individual feed or a folder)
+// Read contents of the feed from the database
+// Mark it as current on left pane, dipslay feed on the right pane
+function p_putCurrentFeed()
+{
+  var self = this;
+
+  utils_ns.assert(self.m_currentFeed != null, "m_putCurrentFeed: m_currentFeed is 'null'");
+
+  var hideIconLink = false;
+  if (self.m_currentFeed.m_isFolder)  // Folders don't have destination link
+    hideIconLink = true;
 
   // Hide unhide relevent display sections
   self.p_hideUnhideSections({
@@ -1553,61 +1633,11 @@ function p_putCurrentFeed()
   // Clear title area
   self.p_displayFeedTitle(null);
 
-  // Compute request start point
-  req = self.m_feedDisp.computePageRequest(0, f.m_dispContext);
-
-  f.m_numUnread = 0;
-
-  // Read entries from the DB for all the feeds that were lined up
-  // (one individual feed or all feeds in a folder)
-  for (k = 0; k < feeds.length; ++k)
-  {
-    (function ()  // Each read request needs its own closure for the feed back-ref
-    {
-      var feedUrl = feeds[k];
-      var feed = self.m_feeds[feedUrl];  // Prepare for the back-ref
-      self.m_feedsDB.feedReadEntries(feeds[k],
-          req.m_startDate, req.m_isDescending,
-          function (entry)  // cbFilter
-          {
-            if (entry != null)  // No more entries?
-            {
-                // Put back-ref link (entry -> rss_header)
-                // Needed for display which feed the entry belongs
-                entry.x_header = feed.m_header;
-
-                self.p_addEntrySorted(entries, entry, req.m_num);
-
-              // Scan all items in order to count unread
-              if (!entry.m_is_read)
-                ++numUnread;
-              return 1;
-            }
-            else  // We are done reading, we have all entries from the DB we need
-            {
-              ++numDone;
-              total = 0;  // pull req.m_num entries for each of the feeds
-
-              // Did user already click onto another feed?
-              if (!self.p_feedIsCurrent(f))
-                return 0;  // Cancel reading
-
-              f.m_numUnread += numUnread;
-              numUnread = 0;
-
-              if (numDone < feeds.length)  // Finished reading all feeds?
-                return 1;  // Continue reading
-
-              // Finished reading all feeds that were lined up?
-              self.p_displayFeedAndTitle(f, entries);
-
-              log.info(entries.length + ' entries');
-              log.info(f.m_numUnread + ' entries un-read');
-              return 1;  // Done reading
-            }
-          });
-    })();
-  };
+  self.p_advanceToPage(0, function (entries)
+      {
+        // TODO: display "0 of total number of pages"
+        log.info(entries.length + ' entries read');
+      });
 }
 FeedsDir.prototype.p_putCurrentFeed = p_putCurrentFeed;
 
