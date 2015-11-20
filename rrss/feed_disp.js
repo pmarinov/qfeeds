@@ -199,8 +199,8 @@ function DispContext()
 {
   var self = this;
 
-  self.m_topDate = null;
-  self.m_bottomDate = null;
+  self.m_topTime = null;
+  self.m_bottomTime = null;
   self.m_curPage = 0;
   self.m_numToLoad = 50;
 
@@ -209,6 +209,18 @@ function DispContext()
   return this;
 }
 FeedDisp.prototype.DispContext = DispContext;
+
+// object DispContext.setStartAndEndTime
+// Sets the time range of what is displayed on the screen
+// This is used to form DB requests for Next (newer) and Prev (older) pages
+function setStartAndEndTime(m_topTime, m_bottomTime)
+{
+  var self = this;
+
+  self.m_topTime = m_topTime;
+  self.m_bottomTime = m_bottomTime;
+}
+DispContext.prototype.setStartAndEndTime = setStartAndEndTime;
 
 // object FeedDisp.feedDisplay
 // Display feed on the right-hand side panel

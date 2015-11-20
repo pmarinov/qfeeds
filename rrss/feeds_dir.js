@@ -1549,10 +1549,17 @@ function p_advanceToPage(nav, cbDone)
   // (one individual feed or all feeds in a folder)
   for (k = 0; k < feeds.length; ++k)
   {
-    (function ()  // Each read request needs its own closure for the feed back-ref
+    // In this loop: all requests are quickly lined up against the
+    // IndexedDB then call-backs are invoked not in any particular
+    // order for entries from any of the requests. For every feed's
+    // read request, a closure context keeps that feed's info for which
+    // the just-read entry belongs.
+    (function ()  // its own closure
     {
       var feedUrl = feeds[k];
       var feed = self.m_feeds[feedUrl];  // Prepare for the back-ref
+      var startTime = null;
+      var endTime = null;
       self.m_feedsDB.feedReadEntries(feeds[k],
           req.m_startDate, req.m_isDescending,
           function (entry)  // cbFilter
@@ -1563,18 +1570,11 @@ function p_advanceToPage(nav, cbDone)
               // Needed for display which feed the entry belongs
               entry.x_header = feed.m_header;
 
+              // We sort and never keep more than req.m_num in memory
               self.p_addEntrySorted(entries, entry, req.m_num);
-
-              // TODO: 1. here reflect data of entry into dispContext
-              //       so that we know how to do page-up, page down (obtain entry date/time field)
-              //       2. A method in feed_disp, pass it a date to put into the context
-              //       based on the direction it will know to update start or end date
-              //       3. computePageRequest() would know to set start or end date based on
-              //       the direction
-
-              return 1;
+              return 1;  // Keep on reading
             }
-            else  // We are done reading, we have all entries from the DB we need
+            else  // We are done reading one feed, chec if more feeds remain (numDone)
             {
               ++numDone;
               total = 0;  // pull req.m_num entries for each of the feeds
@@ -1588,6 +1588,13 @@ function p_advanceToPage(nav, cbDone)
 
               // Finished reading all feeds that were lined up in "feeds[]"?
               self.p_displayFeedAndTitle(f, entries);
+
+              // Mark start time and end time in the display context
+              startTime = entries[0].m_date;
+              endTime = startTime;
+              if (entries.length >= 1)
+                endTime = entries[entries.length - 1].m_date;
+              f.m_dispContext.setStartAndEndTime(startTime, endTime);
 
               // Notify "Done"
               cbDone(entries);

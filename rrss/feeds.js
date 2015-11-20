@@ -150,7 +150,10 @@ function p_dbSetTranErrorLogging(tran, tableName, operation)
   tran.onabort = function (event)
       {
         var msg = 'db: (' + tableName + ', ' + operation + ') transaction aborted';
-        utils_ns.domError(msg);
+        log.error(msg)
+        // This is usually secondary error and it overshadows the
+        // actual display of the original error
+        // utils_ns.domError(msg);
       };
   tran.onerror = function (event)
       {
