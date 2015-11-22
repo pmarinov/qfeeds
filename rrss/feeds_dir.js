@@ -85,11 +85,11 @@ function FeedsDir($dirPanel, feedDisp, panelMng)
     areaInfoFolder: utils_ns.domFind('#xfolder_info_area'),
     iconInfo: utils_ns.domFind('#xfeed_icon'),
     infoUrl: utils_ns.domFind('#xfeed_info_url'),
-    btnNewerBtn1: utils_ns.domFind('#ximg_btn_next1'),
-    btnOlderBtn1: utils_ns.domFind('#ximg_btn_prev1'),
+    btnNewerBtn1: utils_ns.domFind('#ximg_btn_prev1'),
+    btnOlderBtn1: utils_ns.domFind('#ximg_btn_next1'),
     totalPg1: utils_ns.domFind('#xtitle_total_pg1'),
-    btnNewerBtn2: utils_ns.domFind('#ximg_btn_next2'),
-    btnOlderBtn2: utils_ns.domFind('#ximg_btn_prev2'),
+    btnNewerBtn2: utils_ns.domFind('#ximg_btn_prev2'),
+    btnOlderBtn2: utils_ns.domFind('#ximg_btn_next2'),
     totalPg2: utils_ns.domFind('#xtitle_total_pg2'),
     list: utils_ns.domFindInside($dirPanel, '.xentry', -1)
   };
@@ -320,6 +320,24 @@ function p_setFeedsDomHandlers()
   self.$d.btnHideErrorDetails.on('click', function (e)
       {
         self.p_hideAreaErrorDetails(true); // Keep details area hidden in the beginning
+      });
+
+  self.$d.btnNewerBtn1.on('click', function (e)
+      {
+        self.p_gotoPgNewer();
+      });
+  self.$d.btnNewerBtn2.on('click', function (e)
+      {
+        self.p_gotoPgNewer();
+      });
+
+  self.$d.btnOlderBtn1.on('click', function (e)
+      {
+        self.p_gotoPgOlder();
+      });
+  self.$d.btnOlderBtn2.on('click', function (e)
+      {
+        self.p_gotoPgOlder();
       });
 }
 FeedsDir.prototype.p_setFeedsDomHandlers = p_setFeedsDomHandlers;
@@ -1540,20 +1558,17 @@ function p_advanceToPage(nav, cbDone)
   var req = null;
 
   // Compute request start point
-  req = self.m_feedDisp.computePageRequest(0, f.m_dispContext);
-
-  // TODO: Now we start a number of parallel requests for the IndexedDB
-  //       It is probably better to start one after the completion of the last
+  req = self.m_feedDisp.computePageRequest(nav, f.m_dispContext);
 
   // Read entries from the DB for all the feeds that were lined up
   // (one individual feed or all feeds in a folder)
   for (k = 0; k < feeds.length; ++k)
   {
-    // In this loop: all requests are quickly lined up against the
-    // IndexedDB then call-backs are invoked not in any particular
-    // order for entries from any of the requests. For every feed's
-    // read request, a closure context keeps that feed's info for which
-    // the just-read entry belongs.
+    // In this loop: all requests to read feeds[] are quickly lined up
+    // against the IndexedDB then call-backs are coming not in any
+    // particular order for entries from any of the requests. For
+    // every feed's read request, a closure context keeps that feed's
+    // info for which the just-read entry belongs.
     (function ()  // its own closure
     {
       var feedUrl = feeds[k];
@@ -1605,6 +1620,32 @@ function p_advanceToPage(nav, cbDone)
   }; // for (k = 0; k < feeds.length; ++k)
 }
 FeedsDir.prototype.p_advanceToPage = p_advanceToPage;
+
+// object FeedsDir.p_gotoPgNewer
+function p_gotoPgNewer()
+{
+  var self = this;
+
+  self.p_advanceToPage(1, function (entries)
+      {
+        // TODO: display "N of total number of pages"
+        log.info(entries.length + ' entries read');
+      });
+}
+FeedsDir.prototype.p_gotoPgNewer = p_gotoPgNewer;
+
+// object FeedsDir.p_gotoPgOlder
+function p_gotoPgOlder()
+{
+  var self = this;
+
+  self.p_advanceToPage(-1, function (entries)
+      {
+        // TODO: display "N of total number of pages"
+        log.info(entries.length + ' entries read');
+      });
+}
+FeedsDir.prototype.p_gotoPgOlder = p_gotoPgOlder;
 
 // object FeedsDir.p_putCurrentFeed
 // (current feed is m_currentFeed, it is an individual feed or a folder)

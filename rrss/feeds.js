@@ -1816,8 +1816,12 @@ function feedReadEntries(feedUrl, startTime, isDescending, cbFilter)
   self.p_dbSetTranErrorLogging(tran, 'rss_data', 'read.2');
   var store = tran.objectStore('rss_data');
   var index = store.index('rssurl_date');
-  var range = IDBKeyRange.bound(key_rssurl_oldestdate, key_rssurl_curdate);
-  var cursor = index.openCursor(range, 'prev');  // navigate in descending order of startTime
+  var range = null;
+  var cursor = null;
+  if (isDescending)
+    cursor = index.openCursor(range, 'prev');  // navigate in descending order of startTime
+  else
+    cursor = index.openCursor(range, 'next');  // navigate in ascending order of startTime
   var entries = [];
   cursor.onsuccess = function(event)
       {

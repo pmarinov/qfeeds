@@ -355,15 +355,35 @@ function feedDisplay(items, dispContext)
 FeedDisp.prototype.feedDisplay = feedDisplay;
 
 // object FeedDisp.computePageRequest
-// Advance by a page, -1, 0, -1
+// Advance by a page, -1, 0, 1
 function computePageRequest(advance, dispContext)
 {
   utils_ns.assert(dispContext instanceof DispContext, "p_displayFeedsList: x instanceof DispContext");
 
   var req = {};
-  req.m_startDate = new Date();
-  req.m_isDescending = true;
-  req.m_num = dispContext.m_numToLoad;
+  if (advance == 0)  // Redisplay same page
+  {
+    if (dispContext.m_curPage == 0)  // Handle first page as a special case
+      req.m_startDate = new Date();
+    req.m_isDescending = true;
+    req.m_num = dispContext.m_numToLoad;
+  }
+  else if (advance == -1)  // Older page
+  {
+    req.m_startDate = dispContext.m_bottomTime;
+    req.m_isDescending = true;  // DB read is descending from startDate
+    req.m_num = dispContext.m_numToLoad;
+  }
+  else if (advance == 1)  // Newer page
+  {
+    req.m_startDate = dispContext.m_topTime;
+    req.m_isDescending = false;  // DB read is ascending from startDate
+    req.m_num = dispContext.m_numToLoad;
+  }
+  else
+  {
+    utils_ns.assert(false, "computePageRequest: wronge value for 'advance' =" + advance);
+  }
 
   return req;
 }
