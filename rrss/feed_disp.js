@@ -203,10 +203,38 @@ function DispContext()
   self.m_bottomTime = null;
   self.m_curPage = 0;
   self.m_numToLoad = 50;
+  self.m_totalNumEntries = 0;  // Incremented by reading the entire feed from the IndexedDB
 
+  // TODO: when time comes to implement navigation by items on the page
   self.m_currentItem = -1;
 
   return this;
+}
+FeedDisp.prototype.DispContext = DispContext;
+
+// object DispContext.incrementNumEntries
+// Update total number of entries. This can happen only when we are reading page 0.
+function incrementNumEntries()
+{
+  var self = this;
+  if (self.m_curPage == 0)
+    ++self.m_totalNumEntries;
+}
+FeedDisp.prototype.DispContext = DispContext;
+
+// object DispContext.getCurPageNumers
+// Return current page number and total number of pages
+function getCurPageNumers()
+{
+  var self = this;
+
+  var r = {};
+  r.curPage = self.m_curPage;
+  r.totalPages = self.m_totalNumEntries / m_numToLoad;
+  // No adjust for the fact that pages overlap by one entry
+  r.totalPages = (self.m_totalNumEntries + r.totalPages) / m_numToLoad;
+
+  return r;
 }
 FeedDisp.prototype.DispContext = DispContext;
 
@@ -358,7 +386,7 @@ FeedDisp.prototype.feedDisplay = feedDisplay;
 // Advance by a page, -1, 0, 1
 function computePageRequest(advance, dispContext)
 {
-  utils_ns.assert(dispContext instanceof DispContext, "p_displayFeedsList: x instanceof DispContext");
+  utils_ns.assert(dispContext instanceof DispContext, "computePageRequest: x instanceof DispContext");
 
   var req = {};
   if (advance == 0)  // Redisplay same page
@@ -370,12 +398,20 @@ function computePageRequest(advance, dispContext)
   }
   else if (advance == -1)  // Older page
   {
+    ++dispContext.m_curPage;
     req.m_startDate = dispContext.m_bottomTime;
     req.m_isDescending = true;  // DB read is descending from startDate
     req.m_num = dispContext.m_numToLoad;
   }
   else if (advance == 1)  // Newer page
   {
+    utils_ns.assert(dispContext.m_curPage > 0, "computePageRequest: can't advance before page 0");
+    --dispContext.m_curPage;
+    if (dispContext.m_curPage == 0)  // Handle first page as a special case to display any freshly fetched
+    {
+      self.m_totalNumEntries = 0;  // In page 0 we count the total number of entries
+      req.m_startDate = new Date();
+    }
     req.m_startDate = dispContext.m_topTime;
     req.m_isDescending = false;  // DB read is ascending from startDate
     req.m_num = dispContext.m_numToLoad;

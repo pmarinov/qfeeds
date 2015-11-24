@@ -1501,16 +1501,32 @@ function compareRssEntriesByDateDescending(entry1, entry2)
   return 0;
 }
 
+// for binarySearch() or sort()
+function compareRssEntriesByDateAscending(entry1, entry2)
+{
+  var t1 = entry1.m_date.getTime();
+  var t2 = entry2.m_date.getTime();
+  if (t1 > t2)
+    return 1;
+  if (t1 < t2)
+    return -1;
+  return 0;
+}
+
 // object FeedsDir.p_addEntrySorted
 // Add newEntry into entries which is sorted by date. Oldest are
 // dropped if size exceeds max.
 // Helper function for p_putCurrentFeed().
-function p_addEntrySorted(entries, newEntry, max)
+function p_addEntrySorted(entries, newEntry, max, isDescending)
 {
   var self = this;
 
   // Find insertion point into the sorted entries[]
-  var m = entries.binarySearch(newEntry, compareRssEntriesByDateDescending);
+  var m = -1;
+  if (isDescending)
+    m = entries.binarySearch(newEntry, compareRssEntriesByDateDescending);
+  else
+    m = entries.binarySearch(newEntry, compareRssEntriesByDateAscending);
   if (m < 0)  // No entry with this date yet
     m = -(m + 1);  // Adjust for insertion point
 
@@ -1581,12 +1597,19 @@ function p_advanceToPage(nav, cbDone)
           {
             if (entry != null)  // No more entries?
             {
+              // Did user already click onto another feed?
+              if (!self.p_feedIsCurrent(f))
+                return 0;  // Cancel reading
+
               // Put back-ref link (entry -> rss_header)
               // Needed for display which feed the entry belongs
               entry.x_header = feed.m_header;
 
               // We sort and never keep more than req.m_num in memory
-              self.p_addEntrySorted(entries, entry, req.m_num);
+              self.p_addEntrySorted(entries, entry, req.m_num, req.m_isDescending);
+
+              ++f.m_dispContext.m_totalNumEntries;
+
               return 1;  // Keep on reading
             }
             else  // We are done reading one feed, chec if more feeds remain (numDone)
@@ -1600,6 +1623,10 @@ function p_advanceToPage(nav, cbDone)
 
               if (numDone < feeds.length)  // Finished reading all "feeds[]"?
                 return 1;  // Continue reading with another entry in the folder (advance in feeds[])
+
+              // When we are reading in direction of "newer" the entries are sorted in the reverse order
+              if (!req.m_isDescending)
+                entries.reverse()
 
               // Finished reading all feeds that were lined up in "feeds[]"?
               self.p_displayFeedAndTitle(f, entries);
@@ -1625,6 +1652,10 @@ FeedsDir.prototype.p_advanceToPage = p_advanceToPage;
 function p_gotoPgNewer()
 {
   var self = this;
+
+  // Can't go before page 0
+  if (self.m_currentFeed.m_dispContext.m_curPage == 0)
+    return;
 
   self.p_advanceToPage(1, function (entries)
       {
