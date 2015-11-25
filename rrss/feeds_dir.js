@@ -1551,7 +1551,6 @@ function p_advanceToPage(nav, cbDone)
   var req = null;
   var f = null;
   var entries = [];
-  var total = 0;
   var numUnread = 0;
   var k = 0;
   var feeds = [];
@@ -1591,6 +1590,8 @@ function p_advanceToPage(nav, cbDone)
       var feed = self.m_feeds[feedUrl];  // Prepare for the back-ref
       var startTime = null;
       var endTime = null;
+      var curLocation = null;
+      var curLocationStr = '';
       self.m_feedsDB.feedReadEntries(feeds[k],
           req.m_startDate, req.m_isDescending,
           function (entry)  // cbFilter
@@ -1608,14 +1609,14 @@ function p_advanceToPage(nav, cbDone)
               // We sort and never keep more than req.m_num in memory
               self.p_addEntrySorted(entries, entry, req.m_num, req.m_isDescending);
 
-              ++f.m_dispContext.m_totalNumEntries;
+              // Count the entire number of entries in this feed (or folder)
+              f.m_dispContext.incrementNumEntries();
 
               return 1;  // Keep on reading
             }
             else  // We are done reading one feed, chec if more feeds remain (numDone)
             {
               ++numDone;
-              total = 0;  // pull req.m_num entries for each of the feeds
 
               // Did user already click onto another feed?
               if (!self.p_feedIsCurrent(f))
@@ -1636,7 +1637,14 @@ function p_advanceToPage(nav, cbDone)
               endTime = startTime;
               if (entries.length >= 1)
                 endTime = entries[entries.length - 1].m_date;
+              // This will be used for the next page navigation forward or backward in time
               f.m_dispContext.setStartAndEndTime(startTime, endTime);
+
+              // Display current page and total number of pages
+              curLocation = f.m_dispContext.getCurPageNumers();
+              curLocationStr = (curLocation.curPage + 1) + ' of ' + curLocation.totalPages;
+              self.$d.totalPg1.text(curLocationStr);
+              self.$d.totalPg2.text(curLocationStr);
 
               // Notify "Done"
               cbDone(entries);
@@ -1669,6 +1677,11 @@ FeedsDir.prototype.p_gotoPgNewer = p_gotoPgNewer;
 function p_gotoPgOlder()
 {
   var self = this;
+
+  // Can't go after last page
+  var curLocation = self.m_currentFeed.m_dispContext.getCurPageNumers();
+  if (curLocation.curPage + 1 == curLocation.totalPages)
+    return;
 
   self.p_advanceToPage(-1, function (entries)
       {

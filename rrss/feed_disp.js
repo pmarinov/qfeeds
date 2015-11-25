@@ -40,6 +40,7 @@ function FeedDisp($feedDispPanel)
       self.p_handleDispClick(e)
     });
 
+  Object.preventExtensions(this);
   return this;
 }
 
@@ -220,7 +221,7 @@ function incrementNumEntries()
   if (self.m_curPage == 0)
     ++self.m_totalNumEntries;
 }
-FeedDisp.prototype.DispContext = DispContext;
+DispContext.prototype.incrementNumEntries = incrementNumEntries;
 
 // object DispContext.getCurPageNumers
 // Return current page number and total number of pages
@@ -230,13 +231,11 @@ function getCurPageNumers()
 
   var r = {};
   r.curPage = self.m_curPage;
-  r.totalPages = self.m_totalNumEntries / m_numToLoad;
-  // No adjust for the fact that pages overlap by one entry
-  r.totalPages = (self.m_totalNumEntries + r.totalPages) / m_numToLoad;
+  r.totalPages = Math.floor((self.m_totalNumEntries + self.m_numToLoad) / self.m_numToLoad);
 
   return r;
 }
-FeedDisp.prototype.DispContext = DispContext;
+DispContext.prototype.getCurPageNumers = getCurPageNumers;
 
 // object DispContext.setStartAndEndTime
 // Sets the time range of what is displayed on the screen
@@ -386,13 +385,17 @@ FeedDisp.prototype.feedDisplay = feedDisplay;
 // Advance by a page, -1, 0, 1
 function computePageRequest(advance, dispContext)
 {
+  var self = this;
   utils_ns.assert(dispContext instanceof DispContext, "computePageRequest: x instanceof DispContext");
 
   var req = {};
   if (advance == 0)  // Redisplay same page
   {
     if (dispContext.m_curPage == 0)  // Handle first page as a special case
+    {
+      dispContext.m_totalNumEntries = 0;  // In page 0 we count the total number of entries
       req.m_startDate = new Date();
+    }
     req.m_isDescending = true;
     req.m_num = dispContext.m_numToLoad;
   }
@@ -409,11 +412,15 @@ function computePageRequest(advance, dispContext)
     --dispContext.m_curPage;
     if (dispContext.m_curPage == 0)  // Handle first page as a special case to display any freshly fetched
     {
-      self.m_totalNumEntries = 0;  // In page 0 we count the total number of entries
+      dispContext.m_totalNumEntries = 0;  // In page 0 we count the total number of entries
       req.m_startDate = new Date();
+      req.m_isDescending = true;  // Page 0 is always read in ascending order (we read the full list of items)
     }
-    req.m_startDate = dispContext.m_topTime;
-    req.m_isDescending = false;  // DB read is ascending from startDate
+    else
+    {
+      req.m_startDate = dispContext.m_topTime;
+      req.m_isDescending = false;  // DB read is ascending from startDate
+    }
     req.m_num = dispContext.m_numToLoad;
   }
   else
