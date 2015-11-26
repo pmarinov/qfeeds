@@ -265,6 +265,7 @@
 
 .rss_title_area .icon_prevnext_holder
 {
+  cursor: pointer;
   width: 25px;
   float: right;
 }
