@@ -85,9 +85,11 @@ function FeedsDir($dirPanel, feedDisp, panelMng)
     areaInfoFolder: utils_ns.domFind('#xfolder_info_area'),
     iconInfo: utils_ns.domFind('#xfeed_icon'),
     infoUrl: utils_ns.domFind('#xfeed_info_url'),
+    areaPgNav1: utils_ns.domFind('#xpg_nav1'),
     btnNewerBtn1: utils_ns.domFind('#ximg_btn_prev1'),
     btnOlderBtn1: utils_ns.domFind('#ximg_btn_next1'),
     totalPg1: utils_ns.domFind('#xtitle_total_pg1'),
+    areaPgNav2: utils_ns.domFind('#xpg_nav2'),
     btnNewerBtn2: utils_ns.domFind('#ximg_btn_prev2'),
     btnOlderBtn2: utils_ns.domFind('#ximg_btn_next2'),
     totalPg2: utils_ns.domFind('#xtitle_total_pg2'),
@@ -240,7 +242,8 @@ function p_setFeedsDomHandlers()
             hideAreaInfoFolder: true,
             hideIconInfo: false,
             hideIconSettings: false,
-            hideIconLink: true  // No "link" for folder
+            hideIconLink: true,  // No "link" for folder
+            hideIconPgNav: false
           });
       });
 
@@ -297,7 +300,8 @@ function p_setFeedsDomHandlers()
               hideAreaInfoFolder: true,
               hideIconInfo: false,
               hideIconSettings: false,
-              hideIconLink: false
+              hideIconLink: false,
+              hideIconPgNav: false
             });
         }
       });
@@ -516,7 +520,7 @@ function p_restoreCurrentFeed()
 {
   var self = this;
 
-  utils_ns.assert(self.m_displayList.length == 0, "p_restoreCurrentFeed: feeds list is empty");
+  utils_ns.assert(self.m_displayList.length != 0, "p_restoreCurrentFeed: feeds list is empty");
 
   self.m_currentFeedName = self.m_saveCurrentFeedName;
   self.m_currentFeed = self.m_saveCurrentFeed;
@@ -539,7 +543,7 @@ function p_hideUnhideSections(sections)
      'hideAreaFolderSetBtn', 'hideAreaUnsubscribeBtns',
      'hideUnsubscribeBtn', 'hideUndoArea', 'hideAreaInfoFeed',
      'hideAreaInfoFolder', 'hideIconInfo', 'hideIconSettings',
-     'hideIconLink'],
+     'hideIconLink', 'hideIconPgNav'],
     "in p_hideUnhideSections");
 
   self.$d.areaAddRss.toggleClass('hide', sections.hideAddRss);
@@ -556,6 +560,8 @@ function p_hideUnhideSections(sections)
   self.$d.iconInfo.toggleClass('hide', sections.hideIconInfo);
   self.$d.iconSettings.toggleClass('hide', sections.hideIconSettings);
   self.$d.iconLink.toggleClass('hide', sections.hideIconLink);
+  self.$d.areaPgNav1.toggleClass('hide', sections.hideIconPgNav);
+  self.$d.areaPgNav2.toggleClass('hide', sections.hideIconPgNav);
 }
 FeedsDir.prototype.p_hideUnhideSections = p_hideUnhideSections;
 
@@ -821,7 +827,8 @@ function p_handleAddRssButton(ev)
       hideAreaInfoFolder: true,
       hideIconInfo: true,
       hideIconSettings: true,
-      hideIconLink: false
+      hideIconLink: false,
+      hideIconPgNav: false
     });
 
   self.p_recentlyViewedDisplay();
@@ -1042,7 +1049,8 @@ function p_feedView(newUrl)
       hideAreaInfoFolder: true,
       hideIconInfo: true,
       hideIconSettings: true,
-      hideIconLink: false
+      hideIconLink: false,
+      hideIconPgNav: true
     });
 
   self.m_newFeedUrl = newUrl;
@@ -1088,7 +1096,8 @@ function p_feedView(newUrl)
             hideAreaInfoFolder: true,
             hideIconInfo: true,
             hideIconSettings: true,
-            hideIconLink: false
+            hideIconLink: false,
+            hideIconPgNav: true
           });
 
         // fetchRss() delivers a dictionary, feedDisplay() needs an array:
@@ -1281,7 +1290,8 @@ function p_handleUndo(ev)
       hideAreaInfoFolder: true,
       hideIconInfo: false,
       hideIconSettings: false,
-      hideIconLink: false
+      hideIconLink: false,
+      hideIconPgNav: false
     });
 
   self.m_settingsArea = false;  // State is "hidden"
@@ -1441,7 +1451,8 @@ function p_displayFeedAndTitle(f, entries)
       hideAreaInfoFolder: true,
       hideIconInfo: false,
       hideIconSettings: false,
-      hideIconLink: hideIconLink
+      hideIconLink: hideIconLink,
+      hideIconPgNav: false
     });
 
   // Display feed name and header area
@@ -1720,7 +1731,8 @@ function p_putCurrentFeed()
       hideAreaInfoFolder: true,
       hideIconInfo: false,
       hideIconSettings: false,
-      hideIconLink: hideIconLink
+      hideIconLink: hideIconLink,
+      hideIconPgNav: false
     });
   // Clear title area
   self.p_displayFeedTitle(null);
@@ -1792,7 +1804,8 @@ function onFocus()
           hideAreaInfoFolder: true,
           hideIconInfo: false,
           hideIconSettings: false,
-          hideIconLink: hideIconLink
+          hideIconLink: hideIconLink,
+          hideIconPgNav: false
         });
 
       // Highlight the current to show this is on focus
