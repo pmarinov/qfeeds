@@ -519,6 +519,7 @@
   width: 21px;
   zoom: 1.8;
   margin-top: -2px;
+  margin-right: -5px;
 }
 
 .rss_entry .icon_unread
@@ -526,6 +527,7 @@
   width: 24px;
   zoom: 1.6;
   margin-top: -3px;
+  margin-right: -6px;
 }
 
 .rss_entry .unread
