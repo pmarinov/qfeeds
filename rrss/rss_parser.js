@@ -153,12 +153,12 @@ function copyRssHeader(from)
 // Hash identifies an item uniquely, all components of the hash need
 // to be constant
 //
-// Formula 1: (m_title + m_description + m_link + m_date). But it turns
-// out that m_description is not constant, many feeds put ads that
-// change every time the feed is fetched
+// Formula 1: Hash of "m_id"
 //
-// Formula 2: (m_title + m_link + m_date). But some feeds might have
-// no title, if so then use m_description instead.
+// or a synthetic
+//
+// Formula 2: ("m_title" + "m_link" + "m_date"). But some feeds might have
+// no title, if so then use "m_description" instead.
 function p_calcHash()
 {
   var self = this;
@@ -171,8 +171,13 @@ function p_calcHash()
   if (component1.length == 0)
     component1 = self.m_description;
 
+  var sha1 = null;
   var joined = [component1, self.m_link, utils_ns.dateToStrStrict(self.m_date)].join('');
-  var sha1 = CryptoJS.SHA1(joined);
+
+  if (self.m_id != null && self.m_id != '')
+    sha1 = CryptoJS.SHA1(self.m_id);
+  else
+    sha1 = CryptoJS.SHA1(joined);
 
   return sha1.toString();
 }
