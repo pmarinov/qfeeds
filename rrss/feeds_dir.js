@@ -85,6 +85,14 @@ function FeedsDir($dirPanel, feedDisp, panelMng)
     areaInfoFolder: utils_ns.domFind('#xfolder_info_area'),
     iconInfo: utils_ns.domFind('#xfeed_icon'),
     infoUrl: utils_ns.domFind('#xfeed_info_url'),
+    areaPgNav1: utils_ns.domFind('#xpg_nav1'),
+    btnNewerBtn1: utils_ns.domFind('#ximg_btn_prev1'),
+    btnOlderBtn1: utils_ns.domFind('#ximg_btn_next1'),
+    totalPg1: utils_ns.domFind('#xtitle_total_pg1'),
+    areaPgNav2: utils_ns.domFind('#xpg_nav2'),
+    btnNewerBtn2: utils_ns.domFind('#ximg_btn_prev2'),
+    btnOlderBtn2: utils_ns.domFind('#ximg_btn_next2'),
+    totalPg2: utils_ns.domFind('#xtitle_total_pg2'),
     list: utils_ns.domFindInside($dirPanel, '.xentry', -1)
   };
   self.$d.listRecent = utils_ns.domFindInside(self.$d.containerRecentlyViwed, '.xrecent_entry', -1);
@@ -234,7 +242,8 @@ function p_setFeedsDomHandlers()
             hideAreaInfoFolder: true,
             hideIconInfo: false,
             hideIconSettings: false,
-            hideIconLink: true  // No "link" for folder
+            hideIconLink: true,  // No "link" for folder
+            hideIconPgNav: false
           });
       });
 
@@ -291,7 +300,8 @@ function p_setFeedsDomHandlers()
               hideAreaInfoFolder: true,
               hideIconInfo: false,
               hideIconSettings: false,
-              hideIconLink: false
+              hideIconLink: false,
+              hideIconPgNav: false
             });
         }
       });
@@ -314,6 +324,24 @@ function p_setFeedsDomHandlers()
   self.$d.btnHideErrorDetails.on('click', function (e)
       {
         self.p_hideAreaErrorDetails(true); // Keep details area hidden in the beginning
+      });
+
+  self.$d.btnNewerBtn1.on('click', function (e)
+      {
+        self.p_gotoPgNewer();
+      });
+  self.$d.btnNewerBtn2.on('click', function (e)
+      {
+        self.p_gotoPgNewer();
+      });
+
+  self.$d.btnOlderBtn1.on('click', function (e)
+      {
+        self.p_gotoPgOlder();
+      });
+  self.$d.btnOlderBtn2.on('click', function (e)
+      {
+        self.p_gotoPgOlder();
       });
 }
 FeedsDir.prototype.p_setFeedsDomHandlers = p_setFeedsDomHandlers;
@@ -492,7 +520,7 @@ function p_restoreCurrentFeed()
 {
   var self = this;
 
-  utils_ns.assert(self.m_displayList.length == 0, "p_restoreCurrentFeed: feeds list is empty");
+  utils_ns.assert(self.m_displayList.length != 0, "p_restoreCurrentFeed: feeds list is empty");
 
   self.m_currentFeedName = self.m_saveCurrentFeedName;
   self.m_currentFeed = self.m_saveCurrentFeed;
@@ -515,7 +543,7 @@ function p_hideUnhideSections(sections)
      'hideAreaFolderSetBtn', 'hideAreaUnsubscribeBtns',
      'hideUnsubscribeBtn', 'hideUndoArea', 'hideAreaInfoFeed',
      'hideAreaInfoFolder', 'hideIconInfo', 'hideIconSettings',
-     'hideIconLink'],
+     'hideIconLink', 'hideIconPgNav'],
     "in p_hideUnhideSections");
 
   self.$d.areaAddRss.toggleClass('hide', sections.hideAddRss);
@@ -532,6 +560,8 @@ function p_hideUnhideSections(sections)
   self.$d.iconInfo.toggleClass('hide', sections.hideIconInfo);
   self.$d.iconSettings.toggleClass('hide', sections.hideIconSettings);
   self.$d.iconLink.toggleClass('hide', sections.hideIconLink);
+  self.$d.areaPgNav1.toggleClass('hide', sections.hideIconPgNav);
+  self.$d.areaPgNav2.toggleClass('hide', sections.hideIconPgNav);
 }
 FeedsDir.prototype.p_hideUnhideSections = p_hideUnhideSections;
 
@@ -797,7 +827,8 @@ function p_handleAddRssButton(ev)
       hideAreaInfoFolder: true,
       hideIconInfo: true,
       hideIconSettings: true,
-      hideIconLink: false
+      hideIconLink: false,
+      hideIconPgNav: false
     });
 
   self.p_recentlyViewedDisplay();
@@ -1018,7 +1049,8 @@ function p_feedView(newUrl)
       hideAreaInfoFolder: true,
       hideIconInfo: true,
       hideIconSettings: true,
-      hideIconLink: false
+      hideIconLink: false,
+      hideIconPgNav: true
     });
 
   self.m_newFeedUrl = newUrl;
@@ -1064,7 +1096,8 @@ function p_feedView(newUrl)
             hideAreaInfoFolder: true,
             hideIconInfo: true,
             hideIconSettings: true,
-            hideIconLink: false
+            hideIconLink: false,
+            hideIconPgNav: true
           });
 
         // fetchRss() delivers a dictionary, feedDisplay() needs an array:
@@ -1257,7 +1290,8 @@ function p_handleUndo(ev)
       hideAreaInfoFolder: true,
       hideIconInfo: false,
       hideIconSettings: false,
-      hideIconLink: false
+      hideIconLink: false,
+      hideIconPgNav: false
     });
 
   self.m_settingsArea = false;  // State is "hidden"
@@ -1417,7 +1451,8 @@ function p_displayFeedAndTitle(f, entries)
       hideAreaInfoFolder: true,
       hideIconInfo: false,
       hideIconSettings: false,
-      hideIconLink: hideIconLink
+      hideIconLink: hideIconLink,
+      hideIconPgNav: false
     });
 
   // Display feed name and header area
@@ -1477,16 +1512,32 @@ function compareRssEntriesByDateDescending(entry1, entry2)
   return 0;
 }
 
+// for binarySearch() or sort()
+function compareRssEntriesByDateAscending(entry1, entry2)
+{
+  var t1 = entry1.m_date.getTime();
+  var t2 = entry2.m_date.getTime();
+  if (t1 > t2)
+    return 1;
+  if (t1 < t2)
+    return -1;
+  return 0;
+}
+
 // object FeedsDir.p_addEntrySorted
 // Add newEntry into entries which is sorted by date. Oldest are
 // dropped if size exceeds max.
 // Helper function for p_putCurrentFeed().
-function p_addEntrySorted(entries, newEntry, max)
+function p_addEntrySorted(entries, newEntry, max, isDescending)
 {
   var self = this;
 
   // Find insertion point into the sorted entries[]
-  var m = entries.binarySearch(newEntry, compareRssEntriesByDateDescending);
+  var m = -1;
+  if (isDescending)
+    m = entries.binarySearch(newEntry, compareRssEntriesByDateDescending);
+  else
+    m = entries.binarySearch(newEntry, compareRssEntriesByDateAscending);
   if (m < 0)  // No entry with this date yet
     m = -(m + 1);  // Adjust for insertion point
 
@@ -1500,21 +1551,17 @@ function p_addEntrySorted(entries, newEntry, max)
 }
 FeedsDir.prototype.p_addEntrySorted = p_addEntrySorted;
 
-// object FeedsDir.p_putCurrentFeed
-// current feed is m_currentFeed, it is an individual feed or a folder
-// Read contents of the feed from the database
-// Mark it as current on left pane, dipslay feed on the right pane
-function p_putCurrentFeed()
+// object FeedsDir.p_advanceToPage
+// Advance to older page (nav = -1), newer page (nav = 1),
+// or display current page (nav = 0)
+function p_advanceToPage(nav, cbDone)
 {
   var self = this;
-
-  utils_ns.assert(self.m_currentFeed != null, "m_putCurrentFeed: m_currentFeed is 'null'");
 
   var j = 0;
   var req = null;
   var f = null;
   var entries = [];
-  var total = 0;
   var numUnread = 0;
   var k = 0;
   var feeds = [];
@@ -1523,6 +1570,7 @@ function p_putCurrentFeed()
   var shouldCancel = false;
   var numDone = 0;
 
+  // Set feeds[] to one or, in case of a folder, more feeds
   f = self.m_currentFeed;
   var hideIconLink = false;
   if (f.m_isFolder)
@@ -1532,6 +1580,141 @@ function p_putCurrentFeed()
   }
   else
     feeds.push(self.m_currentFeedName);
+
+  var req = null;
+
+  // Compute request start point
+  req = self.m_feedDisp.computePageRequest(nav, f.m_dispContext);
+
+  // Read entries from the DB for all the feeds that were lined up
+  // (one individual feed or all feeds in a folder)
+  for (k = 0; k < feeds.length; ++k)
+  {
+    // In this loop: all requests to read feeds[] are quickly lined up
+    // against the IndexedDB then call-backs are coming not in any
+    // particular order for entries from any of the requests. For
+    // every feed's read request, a closure context keeps that feed's
+    // info for which the just-read entry belongs.
+    (function ()  // its own closure
+    {
+      var feedUrl = feeds[k];
+      var feed = self.m_feeds[feedUrl];  // Prepare for the back-ref
+      var startTime = null;
+      var endTime = null;
+      var curLocation = null;
+      var curLocationStr = '';
+      self.m_feedsDB.feedReadEntries(feeds[k],
+          req.m_startDate, req.m_isDescending,
+          function (entry)  // cbFilter
+          {
+            if (entry != null)  // No more entries?
+            {
+              // Did user already click onto another feed?
+              if (!self.p_feedIsCurrent(f))
+                return 0;  // Cancel reading
+
+              // Put back-ref link (entry -> rss_header)
+              // Needed for display which feed the entry belongs
+              entry.x_header = feed.m_header;
+
+              // We sort and never keep more than req.m_num in memory
+              self.p_addEntrySorted(entries, entry, req.m_num, req.m_isDescending);
+
+              // Count the entire number of entries in this feed (or folder)
+              f.m_dispContext.incrementNumEntries();
+
+              return 1;  // Keep on reading
+            }
+            else  // We are done reading one feed, chec if more feeds remain (numDone)
+            {
+              ++numDone;
+
+              // Did user already click onto another feed?
+              if (!self.p_feedIsCurrent(f))
+                return 0;  // Cancel reading
+
+              if (numDone < feeds.length)  // Finished reading all "feeds[]"?
+                return 1;  // Continue reading with another entry in the folder (advance in feeds[])
+
+              // When we are reading in direction of "newer" the entries are sorted in the reverse order
+              if (!req.m_isDescending)
+                entries.reverse()
+
+              // Finished reading all feeds that were lined up in "feeds[]"?
+              self.p_displayFeedAndTitle(f, entries);
+
+              // Mark start time and end time in the display context
+              startTime = entries[0].m_date;
+              endTime = startTime;
+              if (entries.length >= 1)
+                endTime = entries[entries.length - 1].m_date;
+              // This will be used for the next page navigation forward or backward in time
+              f.m_dispContext.setStartAndEndTime(startTime, endTime);
+
+              // Display current page and total number of pages
+              curLocation = f.m_dispContext.getCurPageNumers();
+              curLocationStr = (curLocation.curPage + 1) + ' of ' + curLocation.totalPages;
+              self.$d.totalPg1.text(curLocationStr);
+              self.$d.totalPg2.text(curLocationStr);
+
+              // Notify "Done"
+              cbDone(entries);
+              return 0;  // Done reading
+            }
+          });
+    })();  // closure
+  }; // for (k = 0; k < feeds.length; ++k)
+}
+FeedsDir.prototype.p_advanceToPage = p_advanceToPage;
+
+// object FeedsDir.p_gotoPgNewer
+function p_gotoPgNewer()
+{
+  var self = this;
+
+  // Can't go before page 0
+  if (self.m_currentFeed.m_dispContext.m_curPage == 0)
+    return;
+
+  self.p_advanceToPage(1, function (entries)
+      {
+        // TODO: display "N of total number of pages"
+        log.info(entries.length + ' entries read');
+      });
+}
+FeedsDir.prototype.p_gotoPgNewer = p_gotoPgNewer;
+
+// object FeedsDir.p_gotoPgOlder
+function p_gotoPgOlder()
+{
+  var self = this;
+
+  // Can't go after last page
+  var curLocation = self.m_currentFeed.m_dispContext.getCurPageNumers();
+  if (curLocation.curPage + 1 == curLocation.totalPages)
+    return;
+
+  self.p_advanceToPage(-1, function (entries)
+      {
+        // TODO: display "N of total number of pages"
+        log.info(entries.length + ' entries read');
+      });
+}
+FeedsDir.prototype.p_gotoPgOlder = p_gotoPgOlder;
+
+// object FeedsDir.p_putCurrentFeed
+// (current feed is m_currentFeed, it is an individual feed or a folder)
+// Read contents of the feed from the database
+// Mark it as current on left pane, dipslay feed on the right pane
+function p_putCurrentFeed()
+{
+  var self = this;
+
+  utils_ns.assert(self.m_currentFeed != null, "m_putCurrentFeed: m_currentFeed is 'null'");
+
+  var hideIconLink = false;
+  if (self.m_currentFeed.m_isFolder)  // Folders don't have destination link
+    hideIconLink = true;
 
   // Hide unhide relevent display sections
   self.p_hideUnhideSections({
@@ -1548,66 +1731,17 @@ function p_putCurrentFeed()
       hideAreaInfoFolder: true,
       hideIconInfo: false,
       hideIconSettings: false,
-      hideIconLink: hideIconLink
+      hideIconLink: hideIconLink,
+      hideIconPgNav: false
     });
   // Clear title area
   self.p_displayFeedTitle(null);
 
-  // Compute request start point
-  req = self.m_feedDisp.computePageRequest(0, f.m_dispContext);
-
-  f.m_numUnread = 0;
-
-  // Read entries from the DB for all the feeds that were lined up
-  // (one individual feed or all feeds in a folder)
-  for (k = 0; k < feeds.length; ++k)
-  {
-    (function ()  // Each read request needs its own closure for the feed back-ref
-    {
-      var feedUrl = feeds[k];
-      var feed = self.m_feeds[feedUrl];  // Prepare for the back-ref
-      self.m_feedsDB.feedReadEntries(feeds[k],
-          req.m_startDate, req.m_isDescending,
-          function (entry)  // cbFilter
-          {
-            if (entry != null)  // No more entries?
-            {
-                // Put back-ref link (entry -> rss_header)
-                // Needed for display which feed the entry belongs
-                entry.x_header = feed.m_header;
-
-                self.p_addEntrySorted(entries, entry, req.m_num);
-
-              // Scan all items in order to count unread
-              if (!entry.m_is_read)
-                ++numUnread;
-              return 1;
-            }
-            else  // We are done reading, we have all entries from the DB we need
-            {
-              ++numDone;
-              total = 0;  // pull req.m_num entries for each of the feeds
-
-              // Did user already click onto another feed?
-              if (!self.p_feedIsCurrent(f))
-                return 0;  // Cancel reading
-
-              f.m_numUnread += numUnread;
-              numUnread = 0;
-
-              if (numDone < feeds.length)  // Finished reading all feeds?
-                return 1;  // Continue reading
-
-              // Finished reading all feeds that were lined up?
-              self.p_displayFeedAndTitle(f, entries);
-
-              log.info(entries.length + ' entries');
-              log.info(f.m_numUnread + ' entries un-read');
-              return 1;  // Done reading
-            }
-          });
-    })();
-  };
+  self.p_advanceToPage(0, function (entries)
+      {
+        // TODO: display "0 of total number of pages"
+        log.info(entries.length + ' entries read');
+      });
 }
 FeedsDir.prototype.p_putCurrentFeed = p_putCurrentFeed;
 
@@ -1670,7 +1804,8 @@ function onFocus()
           hideAreaInfoFolder: true,
           hideIconInfo: false,
           hideIconSettings: false,
-          hideIconLink: hideIconLink
+          hideIconLink: hideIconLink,
+          hideIconPgNav: false
         });
 
       // Highlight the current to show this is on focus

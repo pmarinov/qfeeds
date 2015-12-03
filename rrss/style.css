@@ -263,6 +263,25 @@
   opacity: 1.0;
 }
 
+.rss_title_area .icon_prevnext_holder
+{
+  cursor: pointer;
+  width: 25px;
+  float: right;
+}
+
+.rss_title_area .total_pages
+{
+  font-size: 12px;
+  overflow: hidden;
+  float: right;
+  padding-right: 6px;
+  padding-left: 5px;
+  margin-right: 5px;
+  padding-top: 4px;
+  cursor: default;
+}
+
 /* icon for link needs special offset to fit in the line */
 .rss_title_area .icon_link_pos
 {
@@ -500,6 +519,7 @@
   width: 21px;
   zoom: 1.8;
   margin-top: -2px;
+  margin-right: -5px;
 }
 
 .rss_entry .icon_unread
@@ -507,6 +527,7 @@
   width: 24px;
   zoom: 1.6;
   margin-top: -3px;
+  margin-right: -6px;
 }
 
 .rss_entry .unread

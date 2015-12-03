@@ -150,7 +150,10 @@ function p_dbSetTranErrorLogging(tran, tableName, operation)
   tran.onabort = function (event)
       {
         var msg = 'db: (' + tableName + ', ' + operation + ') transaction aborted';
-        utils_ns.domError(msg);
+        log.error(msg)
+        // This is usually secondary error and it overshadows the
+        // actual display of the original error
+        // utils_ns.domError(msg);
       };
   tran.onerror = function (event)
       {
@@ -1802,8 +1805,6 @@ function feedReadEntries(feedUrl, startTime, isDescending, cbFilter)
   log.info('db: read for ' + feedUrl + '...');
   // Compute the key for rssurl_date based on url + startTime
   var sha1 = CryptoJS.SHA1(feedUrl);
-  var key_rssurl_curdate = sha1.toString() + "_" + utils_ns.dateToStrStrict(startTime);
-  var key_rssurl_oldestdate = sha1.toString() + "_" + utils_ns.dateToStrStrict(new Date(0));
   log.trace(utils_ns.dateToStrStrict(new Date(0)));
   log.trace(utils_ns.dateToStrStrict(startTime));
   var sha1Url = sha1.toString();
@@ -1813,8 +1814,25 @@ function feedReadEntries(feedUrl, startTime, isDescending, cbFilter)
   self.p_dbSetTranErrorLogging(tran, 'rss_data', 'read.2');
   var store = tran.objectStore('rss_data');
   var index = store.index('rssurl_date');
-  var range = IDBKeyRange.bound(key_rssurl_oldestdate, key_rssurl_curdate);
-  var cursor = index.openCursor(range, 'prev');  // navigate in descending order of startTime
+  var key_rssurl_curdate = null;
+  var key_rssurl_oldestdate = null;
+  var key_rssurl_newestdate = null;
+  var range = null;
+  var cursor = null;
+  if (isDescending)
+  {
+    key_rssurl_curdate = sha1.toString() + "_" + utils_ns.dateToStrStrict(startTime);
+    key_rssurl_oldestdate = sha1.toString() + "_" + utils_ns.dateToStrStrict(new Date(0));
+    range = IDBKeyRange.bound(key_rssurl_oldestdate, key_rssurl_curdate);
+    cursor = index.openCursor(range, 'prev');  // navigate in descending order of startTime
+  }
+  else
+  {
+    key_rssurl_curdate = sha1.toString() + "_" + utils_ns.dateToStrStrict(startTime);
+    key_rssurl_newestdate = sha1.toString() + "_" + utils_ns.dateToStrStrict(new Date());
+    range = IDBKeyRange.bound(key_rssurl_curdate, key_rssurl_newestdate);
+    cursor = index.openCursor(range, 'next');  // navigate in ascending order of startTime
+  }
   var entries = [];
   cursor.onsuccess = function(event)
       {
