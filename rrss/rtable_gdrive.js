@@ -189,7 +189,7 @@ function p_loadRTFile(rtFileID, cbDone)
 RTablesGDrive.prototype.p_loadRTFile = p_loadRTFile;
 
 // object RTableGDrive.p_createAndLoadRTFile
-function p_createAndLoadRTFile(cbDone)
+function p_createAndLoadRTFile(parentFolderID, cbDone)
 {
   var self = this;
 
@@ -203,6 +203,9 @@ function p_createAndLoadRTFile(cbDone)
     }
   };
 
+  if (parentFolderID != null)
+    resource['resource'].parents = [ { id: parentFolderID } ];
+
   // 1: Create the shortcut file
   gapi.client.drive.files.insert(resource).execute(function (resp)
       {
@@ -211,6 +214,103 @@ function p_createAndLoadRTFile(cbDone)
 }
 RTablesGDrive.prototype.p_createAndLoadRTFile = p_createAndLoadRTFile;
 
+// object RTablesGDrive.p_getFolderID
+function p_getFolderID(folderName, parentFolderID, cbProcessID)
+{
+  var query_folder = "mimeType='application/vnd.google-apps.folder'"
+  if (folderName != null)
+    query_folder += " and title='" + folderName + "'"
+  if (parentFolderID != null)
+    query_folder += " and '" + parentFolderID + "' in parents"
+  query_folder += " and (not trashed)"
+  gapi.client.drive.files.list(
+        {
+          'q': query_folder
+        }).execute(function (results)
+        {
+          cbProcessID(results)
+        })
+}
+RTablesGDrive.prototype.p_getFolderID = p_getFolderID;
+
+// object RTablesGDrive.p_createFolder
+function p_createFolder(folderName, parentFolderID, cbDone)
+{
+  var self = this;
+
+  var resource =
+  {
+    'resource':
+    {
+      mimeType: 'application/vnd.google-apps.folder',
+      description: folderName,
+      title: folderName
+    }
+  };
+
+  if (parentFolderID != null)
+    resource['resource'].parents = [ { id: parentFolderID } ];
+
+  // Create a folder
+  gapi.client.drive.files.insert(resource).execute(function (resp)
+      {
+        cbDone(resp.id);
+      });
+}
+RTablesGDrive.prototype.p_createFolder = p_createFolder;
+
+// object RTablesGDrive.p_createAppFolder
+// Creates "Apps/rrss" folder
+function p_createAppFolder(cbDone)
+{
+  var self = this;
+
+  log.info("rtable: Find ID of folder 'Apps'...")
+  self.p_getFolderID('Apps', null, function(results)
+      {
+        if (results.items === undefined || results.items.length == 0)
+        {
+          // Folder Apps doesn't exist
+          // Create "Apps/rrss"
+          log.info("rtable: Creating 'Apps'...")
+          self.p_createFolder('Apps', null, function (folderAppsID)
+              {
+                log.info("rtable: ID of folder 'Apps' is " + folderAppsID + "...")
+                log.info("rtable: Creating folder 'Apps/rrss'...")
+                self.p_createFolder('rrss', folderAppsID, function (folder_rrssID)
+                    {
+                      log.info("rtable: ID of folder 'Apps/rrss' is " + folder_rrssID + "...")
+                      cbDone(folder_rrssID);
+                    });
+              })
+          return;
+        }
+
+        log.info("rtable: ID of folder 'Apps' is " + results.items[0].id + "...")
+        log.info("rtable: Find ID of folder 'rrss'...")
+        var folderAppsID = results.items[0].id;
+        self.p_getFolderID('rrss', folderAppsID, function(results)
+            {
+              // Folder 'Apps' exists but no 'rrss' in it
+              if (results.items === undefined || results.items.length == 0)
+              {
+                log.info("rtable: Creating folder 'Apps/rrss'...")
+                self.p_createFolder('rrss', folderAppsID, function (folder_rrssID)
+                    {
+                      log.info("rtable: ID of folder 'Apps/rrss' is " + folder_rrssID + "...")
+                      cbDone(folder_rrssID);
+                    });
+              }
+              else
+              {
+                log.info("rtable: ID of folder 'Apps/rrss' is " + results.items[0].id + "...")
+                cbDone(results.items[0].id);
+              }
+            })
+      })
+}
+RTablesGDrive.prototype.p_createAppFolder = p_createAppFolder;
+
 // object RTablesGDrive.RTableGDrive [constructor]
 function RTablesGDrive(rtables, cbDone)
 {
@@ -218,28 +318,34 @@ function RTablesGDrive(rtables, cbDone)
 
   self.m_tables = rtables;
 
-  // Find the short-cut file for the real-time document
-  var query = 'title=' + "'" + g_documentName + "'" + " and not trashed"
-  gapi.client.drive.files.list(
-        {
-          'q': query
-        }).execute(function (results)
-        {
-          if (results.items !== undefined && results.items.length > 0)
-          {
-            // Load the short-cut file
-            log.info('RTableGDrive: Opening ' + g_documentName + '...')
-            self.p_loadRTFile(results.items[0].id, cbDone);
-            if (results.items.length > 1)
-              log.warning('RTableGDrive: more than one short cut file for ' + g_documentName);
-          }
-          else
-          {
-            // Create the short-cut file and then load
-            log.info('RTableGDrive: ' + g_documentName + ' is new')
-            self.p_createAndLoadRTFile(cbDone);
-          }
-        });
+  // Create or open folder "App/rss"
+  self.p_createAppFolder(function (parentFolderID)
+      {
+        // Find the short-cut file for the real-time document
+        var query = 'title=' + "'" + g_documentName + "'" + " and (not trashed)"
+        gapi.client.drive.files.list(
+              {
+                'q': query
+              }).execute(function (results)
+              {
+                if (results.items !== undefined && results.items.length > 0)
+                {
+                  //
+                  // Load the short-cut file
+                  log.info('rtable: Opening Apps/rrss/' + g_documentName + '...')
+                  self.p_loadRTFile(results.items[0].id, cbDone);
+                  if (results.items.length > 1)
+                    log.warning('RTableGDrive: more than one short cut file for ' + g_documentName);
+                }
+                else
+                {
+                  //
+                  // Create the short-cut file and then load
+                  log.info('rtable: ' + g_documentName + ' is new')
+                  self.p_createAndLoadRTFile(parentFolderID, cbDone);
+                }
+              });
+      });
 
   return self;
 }
