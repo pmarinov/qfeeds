@@ -1442,7 +1442,7 @@ function p_feedRecordEntry(feedUrl, newEntry, cbWriteDone)
           newEntry2.m_description = Sanitizer.sanitize(newEntry2.m_description, function (s)
               {
                 // A naive URL rewriter
-                log.info('sanitizer URL: ' + s);
+                log.info('trace URL: ' + s);
                 return s;
               });
 

@@ -1113,7 +1113,7 @@ function p_feedView(newUrl)
           t.m_description = Sanitizer.sanitize(t.m_description, function (s)
               {
                 // A naive URL rewriter
-                log.info('sanitizer URL: ' + s);
+                log.trace('sanitizer URL: ' + s);
                 return s;
               });
 
