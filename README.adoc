@@ -22,7 +22,7 @@ Features::
 * Uses Google Drive, optionally, for synchronization between
   computers (list of subscriptions and what was marked as read)
 
-*Version:* 0.4.1 +
+*Version:* 0.5.0 +
 *Status:* Suitable only for potential developers
 
 == License
