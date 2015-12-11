@@ -1,0 +1,18 @@
+// HACKING.adoc for rrss
+
+= About
+
+This file contains notes to explain how to start debugging or
+developing of "rrss".
+
+= Install
+
+. Download the libraries: go to "lib/", if empty run "./get_libs.sh"
+. Start Google Chrome browser
+. Invoke Menu | Tools | Extensions (or enter URL: chrome://extensions)
+. From Extensions page enable "Developer mode"
+. Click "Load unpacked extension"
+. Navigate to the directory where you put "rrss",
+  select the directory by name (contents of the extension is inside it)
+. Open "New tab", go to "Apps" section (or enter URL: chrome://apps)
+. Click "rrss" to start it
