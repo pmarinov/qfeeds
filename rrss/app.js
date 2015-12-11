@@ -29,7 +29,9 @@ function App()
         var stripRe = new RegExp('(chrome-extension:..[a-z]*\/)(.*)', 'g');
         var strippedUrl = url.replace(stripRe, '$2');
         var strippedStack = errorObj.stack.toString().replace(stripRe, '$2');
-        var errorMsgHTML = '<i>Plase consider making a bug report together with this information.</i><br/>' +
+        var errorMsgHTML = '<i>Please consider ' +
+              '<a href="https://github.com/pmarinov/rrss/issues" target="_blank">making a bug report</a> ' +
+              'together with this information.</i><br/>' +
               '<hr>' +
               '<span id="xerror_msg_text"></span>' +
               '<br/><br/>' +
