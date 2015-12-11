@@ -2306,7 +2306,10 @@ function p_displayFeedsList()
       utils_ns.assert(x instanceof DirEntryFolder, "p_displayFeedsList: x instanceof DirEntryFolder");
       $a.text(x.m_name);
       $a.attr('title', "");
-      $unread.text(x.m_numUnread.toString());
+      if (x.m_numUnread != 0)
+        $unread.text(x.m_numUnread.toString());
+      else  // Don't display "0 unread"
+        $unread.text('');
       if (self.m_currentFeedName == x.m_name)
         isCurrent = true;
       if (x.m_isOpen)
@@ -2345,7 +2348,10 @@ function p_displayFeedsList()
 
       $a.text(fe.m_title);
       $a.attr('title', fe.m_link);
-      $unread.text(x.m_numUnread.toString());
+      if (x.m_numUnread != 0)
+        $unread.text(x.m_numUnread.toString());
+      else  // Don't display "0 unread"
+        $unread.text('');
       if (self.m_currentFeedName == fe.m_url)
         isCurrent = true;
       $ico = $ico_rss;
