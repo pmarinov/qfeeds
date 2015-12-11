@@ -174,7 +174,8 @@ function p_initSeqNext()
   {
       log.info('app: start of init step ' + self.m_initCnt);
       ++self.m_initCnt;
-      self.m_initSeq[self.m_initCnt - 1]();
+      var nextStep = self.m_initSeq[self.m_initCnt - 1];
+      nextStep();
   }, 0);  // Delay 0, just yield
 }
 App.prototype.p_initSeqNext = p_initSeqNext;
