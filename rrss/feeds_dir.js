@@ -1643,8 +1643,12 @@ function p_advanceToPage(nav, cbDone)
               // Finished reading all feeds that were lined up in "feeds[]"?
               self.p_displayFeedAndTitle(f, entries);
 
+              //
               // Mark start time and end time in the display context
-              startTime = entries[0].m_date;
+              if (entries.length > 0)  // No entries?
+                startTime = entries[0].m_date;
+              else
+                startTime = new Date();  // Just a filler, it will never be used
               endTime = startTime;
               if (entries.length >= 1)
                 endTime = entries[entries.length - 1].m_date;
