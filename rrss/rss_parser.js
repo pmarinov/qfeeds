@@ -369,7 +369,7 @@ function parse(feedUrl, xmlDoc)
             if ($tag.tagName == 'title')
               item_title = tagContent;
             else if ($tag.tagName == 'link')
-              item_link = jQuery($entry).attr('href');
+              item_link = jQuery($tag).attr('href');
             else if ($tag.tagName == 'content')
               item_description = tagContent;
             else if ($tag.tagName == 'summary')
