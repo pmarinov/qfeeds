@@ -103,7 +103,7 @@ function FeedsDir($dirPanel, feedDisp, panelMng)
   self.m_loadingInProgress = true;  // Loading feeds from the IndexedDB (local disk)
   self.m_isFirstTime = false;  // Is this the first time the program starts on this machine
   self.m_isFirstPrefetched = false;  // Is the offered feed prefetched
-  self.m_urlFirstTimeOffer = 'http://feeds.theguardian.com/theguardian/books/rss';
+  self.m_urlFirstTimeOffer = 'https://lareviewofbooks.org/feed/?ver=2';
 
   self.m_feedsDB = null;
   self.m_folders = []; // array of DirEntryFolder
