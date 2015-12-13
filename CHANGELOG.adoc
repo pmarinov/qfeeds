@@ -1,5 +1,11 @@
 == CHANGELOG.txt, 'rrss' - R is a reader of RSS feeds
 
+== 2015-12-13, v0.5.2, pmarinov
+
+* Start of early beta
+* First version uploaded on Google Chrome's Webstore
+* Bugfixes
+
 === 2015-10-12, v0.4.1, pmarinov
 
 * Switch to Google Drive

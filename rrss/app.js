@@ -84,7 +84,7 @@ function App()
   self.m_feedsDB = null;
   self.m_gdriveConnect = null;
 
-  self.m_initSeq = [];
+  self.m_initSeq = [];  // A vector of init steps executed in order
   self.m_initCnt = 0;
   self.m_initSeq.push(function()
       {

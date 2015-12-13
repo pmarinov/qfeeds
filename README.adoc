@@ -7,10 +7,6 @@
 
 _R is a reader of RSS feeds_
 
-Screenshots::
-
-* Individual feed: {screenshot1}[screenshot 1]
-
 Features::
 
 * "rrss" (pronounced "r-rss") is an RSS reader
@@ -24,8 +20,11 @@ Features::
 * Uses Google Drive, optionally, for synchronization between
   computers (list of subscriptions and what was marked as read)
 
-*Version:* 0.5.1 +
+*Version:* 0.5.2 +
 *Status:* Beta
+
+Try it::
+https://chrome.google.com/webstore/detail/rrss/kdjijdhlleambcpendblfhdmpmfdbcbd
 
 = License
 
