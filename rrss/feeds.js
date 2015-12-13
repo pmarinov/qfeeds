@@ -51,7 +51,7 @@ function Feeds()
   // (object RTablesGDrive)
   self.m_rtGDrive = null;
 
-  // Start the poll loop
+  // Setup the poll loop
   self.m_timeoutID = setTimeout(p_poll, 1, self);
 
   // Help strict mode detect miss-typed fields
@@ -800,6 +800,7 @@ function dbOpen(cbDone)
         // you've never logged into Dropbox all entries are
         // LOCAL_ONLY)
         self.p_feedPendingDeleteDB(false);
+        log.info("db: ('rrss', 'open') Done1");
         cbDone();
       };
   req.onupgradeneeded = function(event)
@@ -809,29 +810,30 @@ function dbOpen(cbDone)
 
         // Records of type RssHeader 
         var s = db.createObjectStore('rss_subscriptions', { keyPath: 'm_url' });
-        log.info("db: ('rrss', 'open') table 'rss_subscriptions' created");
+        log.info("db: ('rrss', 'open') table 'rss_subscriptions' start create operation");
 
         // Records of type RssEntry
-        var d = db.createObjectStore('rss_data', { keyPath: 'm_hash' });
-        log.info("db: ('rrss', 'open') table 'rss_data' created");
+        var d1 = db.createObjectStore('rss_data', { keyPath: 'm_hash' });
+        log.info("db: ('rrss', 'open') table 'rss_data' start create operation");
 
-        d.createIndex('rssurl_date', 'm_rssurl_date', { unique: false });
+        d1.createIndex('rssurl_date', 'm_rssurl_date', { unique: false });
         log.info("db: ('rrss', 'open') index 'rssurl_date' created");
 
         // Records of pref=value: store user preferences as k/v pairs
-        var d = db.createObjectStore('preferences', { keyPath: 'm_pref' });
-        log.info("db: ('rrss', 'open') table 'preferences' created");
+        var d2 = db.createObjectStore('preferences', { keyPath: 'm_pref' });
+        log.info("db: ('rrss', 'open') table 'preferences' start create operation");
 
         self.m_db = db;
-        log.info("db: ('rrss', 'open') all tables and indexes of Feeds DB created");
 
-        self.m_feedsCB.onDbCreated();
+        // All create transactions endup with a single "oncomplete" call
+        d2.transaction.oncomplete = function(event)
+            {
+              log.info("db: ('rrss', 'open') all tables and indexes of Feeds DB created");
+              self.m_feedsCB.onDbCreated();
 
-        // TODO: we get an error here: Failed to execute 'transaction'
-        // on 'IDBDatabase': A version change transaction is running.
-        // Q: But how we'll re-read any old data when we upgrade tables?!
-        // self.p_feedReadAll();  // From any previous version of the db
-        cbDone();
+              log.info("db: ('rrss', 'open') Done2");
+              // Now IndexedDB calls req.onsuccess()
+            };
       };
 }
 Feeds.prototype.dbOpen = dbOpen;
