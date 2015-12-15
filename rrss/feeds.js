@@ -34,6 +34,7 @@ function Feeds()
   self.m_pollIndex = 0;
   self.m_timeoutID = null;
   self.m_loopIsSuspended = true;
+  self.m_pollIntervalSec = 60 * 60;  // Interval between feeds poll in seconds
 
   self.m_db = null;
   self.m_rss_entry_cnt = 0;
@@ -2118,13 +2119,13 @@ function p_poll(self)
   {
     log.info(utils_ns.dateToStr(new Date()) +
                 ' the feeds list is empty -- poll loop completed, wait...');
-    self.p_reschedulePoll(60);
+    self.p_reschedulePoll(self.m_pollIntervalSec);
     return;
   }
 
   if (self.m_loopIsSuspended)
   {
-    self.p_reschedulePoll(60);
+    self.p_reschedulePoll(self.m_pollIntervalSec);
     return;
   }
 
@@ -2136,7 +2137,7 @@ function p_poll(self)
   {
     self.m_feedsCB.onRssFetchProgress(100);  // progress 100%
     self.m_pollIndex = 0;
-    self.p_reschedulePoll(60);
+    self.p_reschedulePoll(self.m_pollIntervalSec);
     return;
   }
 
@@ -2155,8 +2156,8 @@ function p_poll(self)
         {
           // Reached the end of the poll loop
           self.m_pollIndex = 0;
-          delay = 60;
-          log.info(utils_ns.dateToStr(new Date()) +' -- poll loop completed, wait...');
+          delay = self.m_pollIntervalSec;
+          log.info(utils_ns.dateToStr(new Date()) + ' -- poll loop completed, wait...');
           self.m_feedsCB.onRssFetchProgress(100);  // progress 100%
         }
         self.p_reschedulePoll(delay);
