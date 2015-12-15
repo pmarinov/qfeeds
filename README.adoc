@@ -20,8 +20,8 @@ Features::
 * Uses Google Drive, optionally, for synchronization between
   computers (list of subscriptions and what was marked as read)
 
-*Version:* 0.5.2 +
-*Status:* Beta
+Version: 0.5.3 +
+Status: Beta
 
 Try it::
 https://chrome.google.com/webstore/detail/rrss/kdjijdhlleambcpendblfhdmpmfdbcbd

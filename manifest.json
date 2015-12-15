@@ -3,7 +3,7 @@
 
 "name": "rrss",
 "description": "R is a reader of RSS feeds",
-"version": "0.5.2",
+"version": "0.5.3",
 
 "oauth2":
 {
