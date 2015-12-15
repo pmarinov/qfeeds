@@ -354,6 +354,7 @@ function feedDisplay(items, dispContext)
 
     // Fill in the body
     $d.body = utils_ns.domFindInside($rssEntry, '.xbody');
+    $d.body.toggleClass('hide', true);  // Start in state "folded"
 
     $d.btitle = utils_ns.domFindInside($d.body, '.xbody_title');
     $d.btitle.text(e.m_title);
