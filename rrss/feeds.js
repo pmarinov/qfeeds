@@ -184,7 +184,7 @@ function p_dbReadAll(tableName, cb_processEntry)
         var cursor = event.target.result;
         if (!cursor)
         {
-          console.log("db: ('" + tableName + "') " + cnt + ' entries retrieved');
+          log.info("db: ('" + tableName + "') " + cnt + ' entries retrieved');
           cb_processEntry(cursor);
           return;  // no more entries
         }
@@ -979,13 +979,13 @@ function p_feedNeedsUpdate(newFeed, origFeed, shouldCompareRemoteStateOnly)
   {
     if (newFeed.m_tags != origFeed.m_tags)
     {
-      console.log('db: new remote tags: ' + newFeed.m_tags + ' ' +
+      log.info('db: new remote tags: ' + newFeed.m_tags + ' ' +
                   '(old: ' + origFeed.m_tags + ')');
       r.needsUpdate = true;
     }
     if (newFeed.m_remote_state != origFeed.m_remote_state)
     {
-      console.log('db: new remote state: ' + newFeed.m_remote_state + ' ' +
+      log.info('db: new remote state: ' + newFeed.m_remote_state + ' ' +
                   '(old: ' + origFeed.m_remote_state + ')');
       r.needsUpdate = true;
     }
@@ -995,12 +995,12 @@ function p_feedNeedsUpdate(newFeed, origFeed, shouldCompareRemoteStateOnly)
     log.info('db: entry already in [' + newFeed.m_url + ']');
     if (newFeed.m_title != origFeed.m_title)
     {
-      console.log('db: new title: ' + newFeed.m_title + ' (old: ' + origFeed.m_title + ')');
+      log.info('db: new title: ' + newFeed.m_title + ' (old: ' + origFeed.m_title + ')');
       r.needsUpdate = true;
     };
     if (newFeed.m_link != origFeed.m_link)
     {
-      console.log('db: new link: ' + newFeed.m_link + ' (old: ' + origFeed.m_link + ')');
+      log.info('db: new link: ' + newFeed.m_link + ' (old: ' + origFeed.m_link + ')');
       r.needsUpdate = true;
     };
     if (newFeed.m_description != origFeed.m_description)
@@ -1016,33 +1016,33 @@ function p_feedNeedsUpdate(newFeed, origFeed, shouldCompareRemoteStateOnly)
         shortOldDesc = '[none]'
       else if (shortOldDesc.length > 80)
         shortOldDesc = shortOldDesc.substring(0, 80) + '...';
-      console.log('db: new description: ' + shortDesc + ' ' +
+      log.info('db: new description: ' + shortDesc + ' ' +
                   '(old: ' + shortOldDesc + ')');
 
       r.needsUpdate = true;
     };
     if (newFeed.m_rss_type != origFeed.m_rss_type)
     {
-      console.log('db: new rss_type: ' + newFeed.m_rss_type + ' ' +
+      log.info('db: new rss_type: ' + newFeed.m_rss_type + ' ' +
                   '(old: ' + origFeed.m_rss_type + ')');
       r.needsUpdate = true;
     };
     if (newFeed.m_rss_version != origFeed.m_rss_version)
     {
-      console.log('db: new rss_version: ' + newFeed.m_rss_version + ' ' +
+      log.info('db: new rss_version: ' + newFeed.m_rss_version + ' ' +
                   '(old: ' + origFeed.m_rss_version + ')');
       r.needsUpdate = true;
     };
     if (newFeed.m_tags != origFeed.m_tags)
     {
-      console.log('db: new tags: ' + newFeed.m_tags + ' ' +
+      log.info('db: new tags: ' + newFeed.m_tags + ' ' +
                   '(old: ' + origFeed.m_tags + ')');
       r.needsUpdate = true;
       r.needsRTableSync = true;  // Also update RTable 'rss_subscriptions'
     }
     if (newFeed.m_is_unsubscribed != origFeed.m_is_unsubscribed)
     {
-      console.log('db: new is_unsubscribed: ' + newFeed.m_is_unsubscribed + ' ' +
+      log.info('db: new is_unsubscribed: ' + newFeed.m_is_unsubscribed + ' ' +
                   '(old: ' + origFeed.m_is_unsubscribed + ')');
       r.needsUpdate = true;
     }
@@ -1324,7 +1324,7 @@ function feedMarkUnsubscribed(feedUrl, isUnsubscribed)
   var index = self.m_rssFeeds.binarySearch(f, compareRssHeadersByUrl);
   if (index < 0)
   {
-    console.log('Feeds.update: error, ' + f.m_url + ' is unknown');
+    log.warn('Feeds.update: error, ' + f.m_url + ' is unknown');
     return;
   };
   var target = feeds_ns.copyRssHeader(self.m_rssFeeds[index]);
@@ -1395,7 +1395,7 @@ function feedDumpEntries(feed)
       log.info(d);
     }
   }
-  console.log('total of ' + keys.length + ' items');
+  log.info('total of ' + keys.length + ' items');
 }
 Feeds.prototype.feedDumpEntries = feedDumpEntries;
 
@@ -1631,7 +1631,7 @@ function p_feedUpdate(feedHeaderNew, cbWriteDone)
   var index = self.m_rssFeeds.binarySearch(feedHeaderNew, compareRssHeadersByUrl);
   if (index < 0)
   {
-    console.log('Feeds.update: error, ' + feedHeaderNew.m_url + ' is unknown');
+    log.warn('Feeds.update: error, ' + feedHeaderNew.m_url + ' is unknown');
     if (cbWriteDone != null)
       cbWriteDone();  // Nothing to write, consider operation completed
     return null;
@@ -1951,13 +1951,13 @@ function p_feedUpdateHeader(toUpdate, updated)
 
   if (updated.m_title != target.m_title)
   {
-    console.log('new title: ' + updated.m_title + ' (old: ' + target.m_title + ')');
+    log.info('new title: ' + updated.m_title + ' (old: ' + target.m_title + ')');
     target.m_title = updated.m_title;
     wasUpdated = true;
   };
   if (updated.m_link != target.m_link)
   {
-    console.log('new link: ' + updated.m_link + ' (old: ' + target.m_link + ')');
+    log.info('new link: ' + updated.m_link + ' (old: ' + target.m_link + ')');
     target.m_link = updated.m_link;
     wasUpdated = true;
   };
@@ -1974,7 +1974,7 @@ function p_feedUpdateHeader(toUpdate, updated)
       shortOldDesc = '[none]'
     else if (shortOldDesc.length > 80)
       shortOldDesc = shortOldDesc.substring(0, 80) + '...';
-    console.log('new description: ' + shortDesc + ' ' +
+    log.info('new description: ' + shortDesc + ' ' +
                 '(old: ' + shortOldDesc + ')');
 
     target.m_description = updated.m_description;
@@ -1982,14 +1982,14 @@ function p_feedUpdateHeader(toUpdate, updated)
   };
   if (updated.m_rss_type != target.m_rss_type)
   {
-    console.log('new rss_type: ' + updated.m_rss_type + ' ' +
+    log.info('new rss_type: ' + updated.m_rss_type + ' ' +
                 '(old: ' + target.m_rss_type + ')');
     target.m_rss_type = updated.m_rss_type;
     wasUpdated = true;
   };
   if (updated.m_rss_version != target.m_rss_version)
   {
-    console.log('new rss_version: ' + updated.m_rss_version + ' ' +
+    log.info('new rss_version: ' + updated.m_rss_version + ' ' +
                 '(old: ' + target.m_rss_version + ')');
     target.m_rss_version = updated.m_rss_version;
     wasUpdated = true;
@@ -2002,7 +2002,7 @@ function p_feedUpdateHeader(toUpdate, updated)
     {
       if (updated.m_date.getTime() != target.m_date.getTime())
       {
-        console.log('new updated: ' + updated.m_date + ' ' +
+        log.info('new updated: ' + updated.m_date + ' ' +
                     '(old: ' + target.m_date + ')');
         target.m_date = updated.m_date;
         wasUpdated = true;
@@ -2012,14 +2012,14 @@ function p_feedUpdateHeader(toUpdate, updated)
   else
   {
     // First time Date is set in feeld m_date
-    console.log('new updated: ' + updated.m_date + ' ' +
+    log.info('new updated: ' + updated.m_date + ' ' +
                 '(old: ' + target.m_date + ')');
     target.m_date = updated.m_date;
     wasUpdated = true;
   }
   if (updated.m_is_unsubscribed != target.m_is_unsubscribed)
   {
-    console.log('new is_unsubscribed: ' + updated.m_is_unsubscribed + ' ' +
+    log.info('new is_unsubscribed: ' + updated.m_is_unsubscribed + ' ' +
                 '(old: ' + target.m_is_unsubscribed + ')');
     target.m_is_unsubscribed = updated.m_is_unsubscribed;
     wasUpdated = true;
@@ -2116,7 +2116,7 @@ function p_poll(self)
 {
   if (self.m_rssFeeds.length == 0)
   {
-    console.log(utils_ns.dateToStr(new Date()) +
+    log.info(utils_ns.dateToStr(new Date()) +
                 ' the feeds list is empty -- poll loop completed, wait...');
     self.p_reschedulePoll(60);
     return;
@@ -2156,7 +2156,7 @@ function p_poll(self)
           // Reached the end of the poll loop
           self.m_pollIndex = 0;
           delay = 60;
-          console.log(utils_ns.dateToStr(new Date()) +' -- poll loop completed, wait...');
+          log.info(utils_ns.dateToStr(new Date()) +' -- poll loop completed, wait...');
           self.m_feedsCB.onRssFetchProgress(100);  // progress 100%
         }
         self.p_reschedulePoll(delay);

@@ -110,7 +110,7 @@ function p_gdriveLogout()
 
   chrome.identity.removeCachedAuthToken(token, function ()
       {
-          console.log('sign_out1: OK');
+          log.info('sign_out1: OK');
       });
 }
 ConnectGDrive.prototype.p_gdriveLogout = p_gdriveLogout;

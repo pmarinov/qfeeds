@@ -890,10 +890,10 @@ function p_handleFolderSet()
   // Toggle Settings section (will get hidden)
   self.p_handleHideUnhideSettings(null);
 
-  console.log('selected folder name: ' + selectedFolder);
+  log.info('selected folder name: ' + selectedFolder);
   utils_ns.assert(self.m_currentFeed != null, "p_handleFolderSet: m_currentFeed != null");
   utils_ns.assert(self.m_currentFeed.m_isFolder == false, "p_handleFolderSet: m_isFolder == false");
-  console.log('for feed: ' + self.m_currentFeed.m_header.m_url);
+  log.info('for feed: ' + self.m_currentFeed.m_header.m_url);
   self.m_feedsDB.feedSetTags(self.m_currentFeed.m_header.m_url, selectedFolder);
 }
 FeedsDir.prototype.p_handleFolderSet = p_handleFolderSet;
@@ -1076,7 +1076,7 @@ function p_feedView(newUrl)
           console.warn('rss fetch, failed: ' + shortMsg + ', for: ' + newUrl);
         }
         else
-          console.log('success: ' + newUrl);
+          log.info('success: ' + newUrl);
 
         // Populate the list of folders in the folder selection drop-down
         self.p_generateFoldersDropDown();
@@ -1998,7 +1998,7 @@ function p_handleDirClick(ev)
 
     if (i > self.m_displayList.length)
     {
-      console.log('no item behind what was displayed');
+      console.warn('no item behind what was displayed');
       return;
     }
 

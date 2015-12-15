@@ -52,7 +52,7 @@ function App()
       }
 
   // Establish compatible indexDB based on the browser
-  log.setLevel('info');
+  log.setLevel('warn');
   log.info("app: Obtaining indexDB handler...");
 
   // TODO: move this into object Feeds!
