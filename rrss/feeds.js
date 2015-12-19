@@ -697,6 +697,12 @@ function rtableConnect()
   self.m_remote_read_id = 1;
   self.m_rtGDrive = new feeds_ns.RTablesGDrive(tables, function (code)
       {
+        if (code == 0)
+        {
+          log.warn('feeds: failed to connect to GDrive')
+          return;
+        }
+
         self.p_rtableInitRemoteEntryRead();
         self.p_rtableInitRemoteFeedUrl();
       });

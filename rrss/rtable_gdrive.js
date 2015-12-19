@@ -57,7 +57,7 @@ function p_recordsChanged(tableId, isDeleted, isLocal, key, newValue)
   }
   catch (e)  // Error in my code, display it, then re-throw
   {
-    log.error('Ooops!');
+    log.error('rtable: ' + e.message);
     var errorObj =
     {
       stack: e.stack
@@ -128,7 +128,7 @@ function p_loadRTFile(rtFileID, cbDone)
         }
         catch (e)  // Error in my code, display it, then re-throw
         {
-          log.error('Ooops!');
+          log.error('rtable: ' + e.message);
           var errorObj =
           {
             stack: e.stack
@@ -158,7 +158,7 @@ function p_loadRTFile(rtFileID, cbDone)
         }
         catch (e)  // Error in my code, display it, then re-throw
         {
-          log.error('Ooops!');
+          log.error('rtable: ' + e.message);
           var errorObj =
           {
             stack: e.stack
@@ -169,21 +169,8 @@ function p_loadRTFile(rtFileID, cbDone)
       },
       function (rtError) // errorFn
       {
-        try  // GDrive swallows all errors, install my own catchers for display of my own errors
-        {
-          log.info('errorFn ' + rtError +  'for ' +  + g_documentName);
-          cbDone(0);
-        }
-        catch (e)  // Error in my code, display it, then re-throw
-        {
-          log.error('Ooops!');
-          var errorObj =
-          {
-            stack: e.stack
-          };
-          window.onerror(e.message, 'chrome-extension:mumbojumbo/app.html', 0, 0, errorObj);
-          throw e;
-        }
+        cbDone(0);
+        utils_ns.domError('rtable: (' + g_documentName + ' ) error ' + rtError.type + ' ' + rtError.message);
       });
 }
 RTablesGDrive.prototype.p_loadRTFile = p_loadRTFile;
