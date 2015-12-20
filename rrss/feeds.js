@@ -385,7 +385,7 @@ function p_rtableRemoteFeedsListener(records)
         return;  // leave the anonymous scope
 
       // Reflect the new state on the screen (remove feeds from display)
-      var x = self.p_feedFindByHash(r.id);  // id = m_rss_feed_hash
+      var x = self.p_feedFindByHash(r.data.m_rss_feed_hash);
 
       // Skip operation if it is remote delete
       // Local delete will take place when scheduled
@@ -620,8 +620,8 @@ function p_rtableInitRemoteEntryRead()
 {
   var self = this;
 
-  feeds_ns.RTablesAddListener(
-      function (table, records)
+  // One listener for all tables
+  feeds_ns.RTablesAddListener(function (table, records)
       {
         self.p_rtableListener(table, records);
       });
@@ -875,21 +875,33 @@ function compareRssHeadersByUrl(feed1, feed2)
 }
 
 // object Feeds.p_feedInsert
-// Insert a feed (RSSHeader) to list of feeds m_rssFeeds
+// Insert a feed (RSSHeader) to the cached list of feeds (self.m_rssFeeds)
 function p_feedInsert(newFeed)
 {
   var self = this;
 
   // Find insertion point into the sorted m_rssFeeds[]
+  var r = null;
+  var origFeed = null;
   var m = self.m_rssFeeds.binarySearch(newFeed, compareRssHeadersByUrl);
   if (m >= 0)  // Entry with this url is already in
-    return;
+  {
+    origFeed = self.m_rssFeeds[m];
+    r = self.p_feedNeedsUpdate(newFeed, origFeed, false);
+    if (!r.needsUpdate)
+      return;
 
-  m = -(m + 1);
-  if (m >= self.m_rssFeeds.length)  // add?
-    self.m_rssFeeds.push(newFeed);
-  else  // insert
-    self.m_rssFeeds.splice(m, 0, newFeed);
+    // replace
+    self.m_rssFeeds[m] = newFeed;
+  }
+  else
+  {
+    m = -(m + 1);
+    if (m >= self.m_rssFeeds.length)  // add?
+      self.m_rssFeeds.push(newFeed);
+    else  // insert
+      self.m_rssFeeds.splice(m, 0, newFeed);
+  }
 
   // Notify event subscribers
   var listNewFeeds = new Array();

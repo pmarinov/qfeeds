@@ -2108,10 +2108,8 @@ function p_updateFeeds(updates)
       // New content for this feed
       // TODO: check what changed, flag that the feed changed
       // self.m_feeds[key] = v;
-      log.trace("possible new content");
-
-      // Transfer error info from updates[] to m_feeds
-      self.m_feeds[key].m_header.x_errors = v.x_errors;
+      log.trace('feeds_dir: possible new content for ' + v.m_url);
+      self.m_feeds[key].m_header = v;
     }
   }
 }

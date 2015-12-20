@@ -170,7 +170,7 @@ function p_loadRTFile(rtFileID, cbDone)
       function (rtError) // errorFn
       {
         cbDone(0);
-        utils_ns.domError('rtable: (' + g_documentName + ' ) error ' + rtError.type + ' ' + rtError.message);
+        utils_ns.domError('rtable: (' + g_documentName + ' ) error "' + rtError.type + '", ' + rtError.message);
       });
 }
 RTablesGDrive.prototype.p_loadRTFile = p_loadRTFile;
