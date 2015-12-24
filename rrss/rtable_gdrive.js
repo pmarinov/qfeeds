@@ -23,6 +23,7 @@ if (typeof feeds_ns === 'undefined')
 var g_documentName = 'rtables.rrss';
 var g_authenticated = false;
 var g_cbRecordsChanged = null;
+var g_cbNewTokenNeeded = null;  // GDrive periodically generates the event "new access token needed"
 
 // object RTableGDrive.p_recordsChanged
 // Invoked to handle all operations that signal changes on records
@@ -102,25 +103,25 @@ function p_loadRTFile(rtFileID, cbDone)
                   function (event)
                   {
                       self.p_recordsChanged(tableId, false, event.isLocal, event.property, event.newValue);
-                      console.trace('rtable: ' + rtable.name + ', event: added ' + event.values);
+                      log.trace('rtable: ' + rtable.name + ', event: added');
                   });
               rtable.map.addEventListener(gapi.drive.realtime.EventType.VALUE_CHANGED,
                   function (event)
                   {
                       self.p_recordsChanged(tableId, false, event.isLocal, event.property, event.newValue);
-                      console.trace('rtable: ' + rtable.name + ', event: changed ' + event.values);
+                      log.trace('rtable: ' + rtable.name + ', event: changed');
                   });
               rtable.map.addEventListener(gapi.drive.realtime.EventType.VALUES_SET,
                   function (event)
                   {
                       self.p_recordsChanged(tableId, false, event.isLocal, event.property, event.newValue);
-                      console.trace('rtable: ' + rtable.name + ', event: set ' + event.values);
+                      log.trace('rtable: ' + rtable.name + ', event: set');
                   });
               rtable.map.addEventListener(gapi.drive.realtime.EventType.VALUES_REMOVED,
                   function (event)
                   {
                       self.p_recordsChanged(tableId, true, event.isLocal, event.property, event.newValue);
-                      console.trace('rtable: ' + rtable.name + ', event: removed ' + event.values);
+                      log.trace('rtable: ' + rtable.name + ', event: removed');
                   });
             })();
           }
@@ -170,7 +171,17 @@ function p_loadRTFile(rtFileID, cbDone)
       function (rtError) // errorFn
       {
         cbDone(0);
-        utils_ns.domError('rtable: (' + g_documentName + ' ) error "' + rtError.type + '", ' + rtError.message);
+
+        var msg = 'rtable: "' + rtError.type + '", isFatal=' + rtError.isFatal + ', "' + rtError.message + '"';
+
+        if (rtError.type == gapi.drive.realtime.ErrorType.TOKEN_REFRESH_REQUIRED)
+        {
+          log.warn(msg);
+          g_authenticated = false;
+          g_cbNewTokenNeeded();
+        }
+        else
+          utils_ns.domError(msg);
       });
 }
 RTablesGDrive.prototype.p_loadRTFile = p_loadRTFile;
@@ -474,6 +485,24 @@ function RTablesAddListener(cbRecordsChanged)
   g_cbRecordsChanged = cbRecordsChanged;
 }
 
+// In response to event "new token needed" this method will be invoked to set it
+function RTablesSetAccessToken(accessToken)
+{
+  var token =
+  {
+    access_token: accessToken
+  }
+  gapi.auth.setToken(token);
+  g_authenticated = true;
+  log.warn('rtable: access token refreshed');
+}
+
+// Attach one global listener to handle event "refresh access token"
+function RTablesAddListenerReconnect(cbNewTokenNeeded)
+{
+  g_cbNewTokenNeeded = cbNewTokenNeeded;
+}
+
 // Checks if Dropbox is still connected
 function RTablesIsOnline()
 {
@@ -497,6 +526,8 @@ function RTablesInit(accessToken, cbReady)
 
 feeds_ns.RTablesGDrive = RTablesGDrive;
 feeds_ns.RTablesAddListener = RTablesAddListener;
+feeds_ns.RTablesAddListenerReconnect = RTablesAddListenerReconnect;
+feeds_ns.RTablesSetAccessToken = RTablesSetAccessToken;
 feeds_ns.RTablesIsOnline = RTablesIsOnline;
 feeds_ns.RTablesInit = RTablesInit;
 })();

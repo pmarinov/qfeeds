@@ -210,6 +210,15 @@ function p_getConnectGDriveHandlers()
           {
             feeds_ns.RTablesInit(accessToken, function()
                 {
+                  feeds_ns.RTablesAddListenerReconnect(function ()
+                      {
+                        // event: rtable_gdrive needs new access token
+                        self.m_gdriveConnect.gdriveRefreshToken(function (newToken)
+                            {
+                              feeds_ns.RTablesSetAccessToken(newToken);
+                            });
+                      });
+
                   self.m_feedsDir.remoteStoreConnected();
                 });
           }

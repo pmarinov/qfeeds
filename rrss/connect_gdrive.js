@@ -116,6 +116,17 @@ function p_gdriveLogout()
 ConnectGDrive.prototype.p_gdriveLogout = p_gdriveLogout;
 
 // object ConnectGDrive.p_gdriveLoginLogout()
+// Periodically rtable_gdrive would need new token, it can be obtained via this method
+function gdriveRefreshToken(cbSetNewToken)
+{
+    chrome.identity.getAuthToken({ 'interactive': false }, function(accessToken)
+        {
+          cbSetNewToken(accessToken);
+        });
+}
+ConnectGDrive.prototype.gdriveRefreshToken = gdriveRefreshToken;
+
+// object ConnectGDrive.p_gdriveLoginLogout()
 // Handle pressing of Login/Logout button
 function p_gdriveLoginLogout(isInteractive)
 {
