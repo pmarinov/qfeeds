@@ -390,12 +390,15 @@ function computePageRequest(advance, dispContext)
   utils_ns.assert(dispContext instanceof DispContext, "computePageRequest: x instanceof DispContext");
 
   var req = {};
+  var tomorrow = null;
   if (advance == 0)  // Redisplay same page
   {
     if (dispContext.m_curPage == 0)  // Handle first page as a special case
     {
       dispContext.m_totalNumEntries = 0;  // In page 0 we count the total number of entries
-      req.m_startDate = new Date();
+      req.m_startDate = new Date();  // 1 day in the future to accomodate timezones
+      tomorrow = req.m_startDate.getDate() + 1;
+      req.m_startDate.setDate(tomorrow);
     }
     req.m_isDescending = true;
     req.m_num = dispContext.m_numToLoad;
@@ -414,7 +417,9 @@ function computePageRequest(advance, dispContext)
     if (dispContext.m_curPage == 0)  // Handle first page as a special case to display any freshly fetched
     {
       dispContext.m_totalNumEntries = 0;  // In page 0 we count the total number of entries
-      req.m_startDate = new Date();
+      req.m_startDate = new Date();  // 1 day in the future to accomodate timezones
+      tomorrow = req.m_startDate.getDate() + 1;
+      req.m_startDate.setDate(tomorrow);
       req.m_isDescending = true;  // Page 0 is always read in ascending order (we read the full list of items)
     }
     else
