@@ -479,7 +479,6 @@ function fetchRss(urlRss, cb)
     {
       var feed = emptyRssHeader();
       feed.m_url = urlRss;
-      feed.m_title = urlRss;
       feed.x_errors.push(new RssError('Error in the Internet:', errorMsg));
       cb(1, feed, errorMsg);
     });

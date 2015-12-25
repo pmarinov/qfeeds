@@ -416,7 +416,6 @@ function p_rtableRemoteFeedsListener(records)
       // Now apply the data that come from the remote operation
       newFeed.m_hash = r.data.m_rss_feed_hash;
       newFeed.m_url = r.data.m_rss_feed_url;
-      newFeed.m_title = r.data.m_rss_feed_url;  // Display URL for title before first fetch
       newFeed.m_tags = r.data.m_tags;
       newFeed.m_remote_state = feeds_ns.RssSyncState.IS_SYNCED;
 

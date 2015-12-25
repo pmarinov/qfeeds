@@ -2091,6 +2091,8 @@ function p_updateFeeds(updates)
   var key = null;
   var v = null;
   var newFeed = null;
+  var title = '';
+  var destHeader = null;
   for (i = 0; i < updates.length; ++i)
   {
     var key = updates[i].m_url;
@@ -2106,10 +2108,18 @@ function p_updateFeeds(updates)
     else
     {
       // New content for this feed
-      // TODO: check what changed, flag that the feed changed
-      // self.m_feeds[key] = v;
       log.trace('feeds_dir: possible new content for ' + v.m_url);
-      self.m_feeds[key].m_header = v;
+      destHeader = self.m_feeds[key];
+
+      title = v.m_title;
+      if (title == null || title == '')  // If title still empty, use URL
+        title = destHeader.m_header.m_url;
+
+      // Set from new feed header data
+      destHeader.m_header = v;
+
+      // Set readable title
+      destHeader.m_header.m_title = title;
     }
   }
 }
