@@ -1,5 +1,10 @@
 == CHANGELOG.txt, 'rrss' - R is a reader of RSS feeds
 
+== 2015-12-25, v0.5.4, pmarinov
+
+* bugfix: "rtable" failed to handle TOKEN_REFRESH_REQUIRED
+* bugfix: failure in handling remote updates to a feed's header
+
 == 2015-12-13, v0.5.2, pmarinov
 
 * Start of early beta

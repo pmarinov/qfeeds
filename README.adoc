@@ -20,7 +20,7 @@ Features::
 * Uses Google Drive, optionally, for synchronization between
   computers (list of subscriptions and what was marked as read)
 
-Version: 0.5.3 +
+Version: 0.5.4 +
 Status: Beta
 
 Try it::
