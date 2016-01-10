@@ -384,13 +384,13 @@ function p_rtableRemoteFeedsListener(records)
       if (r.isLocal)  // our own loop-back?
         return;  // leave the anonymous scope
 
-      // Reflect the new state on the screen (remove feeds from display)
-      var x = self.p_feedFindByHash(r.data.m_rss_feed_hash);
+      var x = null;
 
       // Skip operation if it is remote delete
       // Local delete will take place when scheduled
       if (r.isDeleted)  // remotely deleted?
       {
+        x = self.p_feedFindByHash(r.id);
         if (x == -1)
         {
           log.warn('p_rtableRemoteFeedsListener: unknown feed ' + r.id);
@@ -401,6 +401,8 @@ function p_rtableRemoteFeedsListener(records)
         self.m_feedsCB.onRemoteFeedDeleted(r.id);
         return;  // leave the anonymous scope
       }
+
+      x = self.p_feedFindByHash(r.data.m_rss_feed_hash);
 
       // A record was added or updated
       var newFeed = null;
