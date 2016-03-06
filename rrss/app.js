@@ -22,6 +22,31 @@ function App()
   var $popupErrorDlg = utils_ns.domFind('#xerror_popup');
   var $popupErrorMsg = utils_ns.domFind('#xerror_pop_msg');
 
+  // When an extension is started we need to check if the background
+  // page has any feeds pending for display and subscription
+  chrome.runtime.sendMessage({msg: 'getFeedsList'}, function(response)
+      {
+        console.log('app: message response from "background.js"')
+        console.log(response.feedData);
+      });
+  // After that, permanently wait for more feeds send by background
+  // page. The cases are that user goes to a page and click the
+  // extension icon, we have to behave as if the user's intention was
+  // to add feeds
+  chrome.runtime.onMessage.addListener(function(request, sender, sendResponse)
+      {
+        if (request.msg == 'feedsActivated')
+        {
+          console.log('app: message from "background.js"')
+          console.log(request.feedData);
+          if (request.feedData === undefined)
+            return;
+          if (request.feedData.length < 1)
+            return;
+          self.m_feedsDir.p_feedView(request.feedData[0].href);
+        }
+      });
+
   var m_oldOnError = window.onerror;
   // Override previous handler.
   window.onerror = function(errorMsg, url, lineNumber, column, errorObj)

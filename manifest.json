@@ -26,6 +26,7 @@
   "identity",
   "identity.email",
   "storage",
+  "tabs",
   "https://ssl.gstatic.com/",
   "https://www.googleapis.com/",
   "https://www.google.com/",
@@ -36,7 +37,16 @@
 
 "content_security_policy": "script-src 'self' https://apis.google.com https://drive.google.com; object-src 'self'",
 
-"browser_action" :
+"content_scripts": [ {
+      "js": [ "chrome/sniff_common.js", "chrome/doc_start.js" ],
+      "matches": [ "http://*/*", "https://*/*" ],
+      "run_at": "document_start"
+   }, {
+      "js": [ "chrome/sniff_common.js", "chrome/feed_finder.js" ],
+      "matches": [ "http://*/*", "https://*/*" ]
+   } ],
+
+"browser_action":
 {
   "default_title": "rrss (devel)",
   "default_icon" : "chrome/icon_rss.png"
