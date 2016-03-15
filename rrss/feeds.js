@@ -857,7 +857,6 @@ function dbLoad(cbDone)
       function()
       {
         log.info('db: all feeds loaded from IndexedDB, start the RSS fetch loop');
-        self.suspendFetchLoop(false, 1);  // Resume fetch loop, start fetching now
         self.m_feedsCB.onDbInitDone();
         cbDone();
       });
