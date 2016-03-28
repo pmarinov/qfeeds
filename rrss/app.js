@@ -21,6 +21,37 @@ function App()
   var self = this;
   var $popupErrorDlg = utils_ns.domFind('#xerror_popup');
   var $popupErrorMsg = utils_ns.domFind('#xerror_pop_msg');
+  var subscriptionReqList = [];  // App started via a subscription request?
+
+  // When an extension is started we need to check if the background
+  // page has any feeds pending for display and subscription
+  chrome.runtime.sendMessage({msg: 'getFeedsList'}, function(response)
+      {
+        console.log('app: message response from "background.js"')
+        console.log(response.feedData);
+          if (response.feedData === undefined)
+            return;
+          if (response.feedData.length < 1)
+            return;
+          subscriptionReqList = response.feedData;
+      });
+  // After that, permanently wait for more feeds send by background
+  // page. The cases are that user goes to a page and click the
+  // extension icon, we have to behave as if the user's intention was
+  // to add feeds
+  chrome.runtime.onMessage.addListener(function(request, sender, sendResponse)
+      {
+        if (request.msg == 'feedsActivated')
+        {
+          console.log('app: message from "background.js"')
+          console.log(request.feedData);
+          if (request.feedData === undefined)
+            return;
+          if (request.feedData.length < 1)
+            return;
+          self.m_feedsDir.p_feedView(request.feedData[0].href);
+        }
+      });
 
   var m_oldOnError = window.onerror;
   // Override previous handler.
@@ -88,55 +119,61 @@ function App()
   self.m_initCnt = 0;
   self.m_initSeq.push(function()
       {
-          self.m_panelMng = new feeds_ns.PanelMng();
+        self.m_panelMng = new feeds_ns.PanelMng();
 
-          self.m_feedDisp = new feeds_ns.FeedDisp(self.$d.feedDisp);
-          self.m_feedsDir = new feeds_ns.FeedsDir(self.$d.feedsPanel, self.m_feedDisp, self.m_panelMng);
-          self.p_initSeqNext();
+        self.m_feedDisp = new feeds_ns.FeedDisp(self.$d.feedDisp);
+        self.m_feedsDir = new feeds_ns.FeedsDir(self.$d.feedsPanel, self.m_feedDisp, self.m_panelMng);
+        self.p_initSeqNext();
       });
   self.m_initSeq.push(function()
       {
-          // Setup object for work on IndexedDB
-          self.m_feedsDB = new feeds_ns.Feeds();
-          // Connect feedsDir callbacks into feedsDB so that data can be displayed via these callback
-          self.m_feedsDir.connectToFeedsDb(self.m_feedsDB);
-          // Open IndexedDB and load all feeds (object type RSSHeader) in memory
-          // Via call-backs this will also list the feeds and folders in
-          // the panel for feeds navigation (left-hand-side)
-          self.m_feedsDB.dbOpen(function ()
-              {
-                  self.p_initSeqNext();
-              });
+        // Setup object for work on IndexedDB
+        self.m_feedsDB = new feeds_ns.Feeds();
+        // Connect feedsDir callbacks into feedsDB so that data can be displayed via these callback
+        self.m_feedsDir.connectToFeedsDb(self.m_feedsDB);
+        // Open IndexedDB and load all feeds (object type RSSHeader) in memory
+        // Via call-backs this will also list the feeds and folders in
+        // the panel for feeds navigation (left-hand-side)
+        self.m_feedsDB.dbOpen(function ()
+            {
+              self.p_initSeqNext();
+            });
       });
   self.m_initSeq.push(function()
       {
-          // Load all preferences from the IndexedDB into cache
-          self.m_feedsDB.prefReadAll(function ()
-              {
-                  self.p_setDefaultPref();  // Set default values for preferences (if this is first load)
-                  self.p_initSeqNext();
-              });
+        // Load all preferences from the IndexedDB into cache
+        self.m_feedsDB.prefReadAll(function ()
+            {
+              self.p_setDefaultPref();  // Set default values for preferences (if this is first load)
+              self.p_initSeqNext();
+            });
       });
   self.m_initSeq.push(function()
       {
-          // Load all feeds data from the IndexedDB
-          self.m_feedsDB.dbLoad(function ()
-              {
-                  self.p_initSeqNext();
-              });
+        // Load all feeds data from the IndexedDB
+        self.m_feedsDB.dbLoad(function ()
+            {
+              var delay = 1;
+              // Don't start fetch loop immediately if subscription screen was requested
+              if (subscriptionReqList.length > 0)
+                delay = 120;  // 2 min delay in case of subscription req
+              self.m_feedsDB.suspendFetchLoop(false, delay);  // Resume fetch loop, start fetching now
+
+              self.p_initSeqNext();
+            });
       });
   self.m_initSeq.push(function()
       {
-          self.m_panelAbout = new feeds_ns.PanelAbout();
-          self.m_panelImportOpml = new feeds_ns.FeedsImport(self.m_feedsDB, self.m_feedsDir, self.m_panelMng);
+        self.m_panelAbout = new feeds_ns.PanelAbout();
+        self.m_panelImportOpml = new feeds_ns.FeedsImport(self.m_feedsDB, self.m_feedsDir, self.m_panelMng);
 
-          self.m_panelMng.setMenuEntryHandler('xcmd_pane_feeds_dir', self.m_feedsDir);
-          self.m_panelMng.setMenuEntryHandler('ximport_opml', self.m_panelImportOpml);
-          self.m_panelMng.setMenuEntryHandler('xcmd_pane_about', self.m_panelAbout);
+        self.m_panelMng.setMenuEntryHandler('xcmd_pane_feeds_dir', self.m_feedsDir);
+        self.m_panelMng.setMenuEntryHandler('ximport_opml', self.m_panelImportOpml);
+        self.m_panelMng.setMenuEntryHandler('xcmd_pane_about', self.m_panelAbout);
 
-          self.m_panelMng.p_activatePane(0);  // Activate feeds display
+        self.m_panelMng.p_activatePane(0);  // Activate feeds display
 
-          self.p_initSeqNext();
+        self.p_initSeqNext();
       });
   self.m_initSeq.push(function()
       {
@@ -151,8 +188,10 @@ function App()
       });
   self.m_initSeq.push(function()
       {
-          Object.preventExtensions(this);
-          self.p_initSeqNext();
+        if (subscriptionReqList.length > 0)
+          self.m_feedsDir.p_feedView(subscriptionReqList[0].href);
+        Object.preventExtensions(this);
+        self.p_initSeqNext();
       });
 
   // Kick off the init steps

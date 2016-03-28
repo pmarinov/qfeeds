@@ -28,6 +28,13 @@ function FeedsDir($dirPanel, feedDisp, panelMng)
   self.m_feedsDB = null;
   self.m_feedDisp = feedDisp;
   self.m_panelMng = panelMng;
+
+  // The right-hand side of the screen has a few major modes
+  self.MODE_SUBCRIPTION = 10;
+  self.MODE_FEEDS = 20;
+
+  self.m_feedDirMode = self.MODE_FEEDS;
+
   var dispCB = self.p_getDispCBHandlers();
   self.m_feedDisp.setCBHandlers(dispCB);
 
@@ -276,34 +283,7 @@ function p_setFeedsDomHandlers()
   self.$d.btnCancel.on('click', function(e)
       {
         self.m_newFeedUrl = null;
-
-        if (self.m_displayList.length == 0)
-        {
-          // Feeds list is empty, piggy back on onFocus()
-          self.onFocus();
-        }
-        else
-        {
-          self.p_restoreCurrentFeed();
-
-          self.p_hideUnhideSections({
-              hideAddRss: true,
-              hideFeedContainer: false,
-              hideAreaRenameFolder: true,
-              hideAreaSelectFolder: true,
-              hideAreaSubscribeBtns: true,
-              hideAreaFolderSetBtn: true,
-              hideAreaUnsubscribeBtns: true,
-              hideUnsubscribeBtn: true,
-              hideUndoArea: true,
-              hideAreaInfoFeed: true,
-              hideAreaInfoFolder: true,
-              hideIconInfo: false,
-              hideIconSettings: false,
-              hideIconLink: false,
-              hideIconPgNav: false
-            });
-        }
+        self.onFocus();
       });
 
   self.$d.btnUnsubscribe.on('click', function (e)
@@ -1053,6 +1033,9 @@ function p_feedView(newUrl)
       hideIconPgNav: true
     });
 
+  // Major mode for right-hand side feed display
+  self.m_feedDirMode = self.MODE_SUBCRIPTION;
+
   self.m_newFeedUrl = newUrl;
 
   // Show "Loading..."
@@ -1062,6 +1045,10 @@ function p_feedView(newUrl)
   feeds_ns.fetchRss(newUrl,
       function(c, feed, errorMsg)
       {
+        // Are we still on mode to display subscription or the user clicked on something else
+        if (self.m_feedDirMode != self.MODE_SUBCRIPTION)
+          return;
+
         // Hide "Loading..."
         self.$d.areaLoadingMsg.toggleClass('hide', true);
 
@@ -1610,6 +1597,8 @@ function p_advanceToPage(nav, cbDone)
             if (entry != null)  // No more entries?
             {
               // Did user already click onto another feed?
+              if (self.m_feedDirMode != self.MODE_FEEDS)
+                return 0;
               if (!self.p_feedIsCurrent(f))
                 return 0;  // Cancel reading
 
@@ -1625,11 +1614,13 @@ function p_advanceToPage(nav, cbDone)
 
               return 1;  // Keep on reading
             }
-            else  // We are done reading one feed, chec if more feeds remain (numDone)
+            else  // We are done reading one feed, check if more feeds remain (numDone)
             {
               ++numDone;
 
               // Did user already click onto another feed?
+              if (self.m_feedDirMode != self.MODE_FEEDS)
+                return 0;
               if (!self.p_feedIsCurrent(f))
                 return 0;  // Cancel reading
 
@@ -1721,6 +1712,7 @@ function p_putCurrentFeed()
     hideIconLink = true;
 
   // Hide unhide relevent display sections
+  self.m_feedDirMode = self.MODE_FEEDS;  // Major mode for right-hand side feed display
   self.p_hideUnhideSections({
       hideAddRss: true,
       hideFeedContainer: false,
@@ -1792,28 +1784,8 @@ function onFocus()
       if (self.m_currentFeed != null && self.m_currentFeed.m_isFolder)  // Folders don't have destination link
         hideIconLink = true;
 
-      // Hide unhide relevent display sections
-      // This will close any state like "Info", "Settings", etc.
-      self.p_hideUnhideSections({
-          hideAddRss: true,
-          hideFeedContainer: false,
-          hideAreaRenameFolder: true,
-          hideAreaSelectFolder: true,
-          hideAreaSubscribeBtns: true,
-          hideAreaFolderSetBtn: true,
-          hideAreaUnsubscribeBtns: true,
-          hideUnsubscribeBtn: true,
-          hideUndoArea: true,
-          hideAreaInfoFeed: true,
-          hideAreaInfoFolder: true,
-          hideIconInfo: false,
-          hideIconSettings: false,
-          hideIconLink: hideIconLink,
-          hideIconPgNav: false
-        });
-
-      // Highlight the current to show this is on focus
-      self.p_displayFeedsList();
+      // Put (re-laod from DB) current feed based on m_currentFeed
+      self.p_putCurrentFeed();
     }
   }
 }
