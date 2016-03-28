@@ -1,5 +1,12 @@
 == CHANGELOG.txt, 'rrss' - R is a reader of RSS feeds
 
+== 2016-03-27, v0.6.0, pmarinov
+
+* NEW: Add RSS sniffer, render feed, offer subscription
+* bugfix: handling of remote (GDrive) unsubscribe operation
+* bugfix: title wrongly set to URL in some cases
+* bugfix: Entries might remain undisplayed for up to 24h
+
 == 2015-12-25, v0.5.4, pmarinov
 
 * bugfix: "rtable" failed to handle TOKEN_REFRESH_REQUIRED
