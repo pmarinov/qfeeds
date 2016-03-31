@@ -1705,8 +1705,6 @@ function p_putCurrentFeed()
 {
   var self = this;
 
-  utils_ns.assert(self.m_currentFeed != null, "m_putCurrentFeed: m_currentFeed is 'null'");
-
   var hideIconLink = false;
   if (self.m_currentFeed.m_isFolder)  // Folders don't have destination link
     hideIconLink = true;
@@ -1730,6 +1728,14 @@ function p_putCurrentFeed()
       hideIconLink: hideIconLink,
       hideIconPgNav: false
     });
+
+  // Highlight the current to show this is on focus
+  self.p_displayFeedsList();
+
+  // Nothing to display yet? -- this is comming from onFocus() when there is nothing yet
+  if (self.m_currentFeed == null)
+    return;
+
   // Clear title area
   self.p_displayFeedTitle(null);
 
@@ -1779,14 +1785,7 @@ function onFocus()
     if (self.m_currentFeedName == null && self.m_displayList.length > 0)
       self.p_activateDirEntry(0);  // Automatically select one if nothing is current
     else
-    {
-      var hideIconLink = false;
-      if (self.m_currentFeed != null && self.m_currentFeed.m_isFolder)  // Folders don't have destination link
-        hideIconLink = true;
-
-      // Put (re-laod from DB) current feed based on m_currentFeed
-      self.p_putCurrentFeed();
-    }
+      self.p_putCurrentFeed();  // Put (re-laod from DB) current feed based on m_currentFeed
   }
 }
 FeedsDir.prototype.onFocus = onFocus;
