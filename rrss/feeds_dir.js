@@ -1705,6 +1705,33 @@ function p_putCurrentFeed()
 {
   var self = this;
 
+  // Hide unhide relevent display sections
+  self.m_feedDirMode = self.MODE_FEEDS;  // Major mode for right-hand side feed display
+  self.p_hideUnhideSections({
+      hideAddRss: true,
+      hideFeedContainer: false,
+      hideAreaRenameFolder: true,
+      hideAreaSelectFolder: true,
+      hideAreaSubscribeBtns: true,
+      hideAreaFolderSetBtn: true,
+      hideAreaUnsubscribeBtns: true,
+      hideUnsubscribeBtn: true,
+      hideUndoArea: true,
+      hideAreaInfoFeed: true,
+      hideAreaInfoFolder: true,
+      hideIconInfo: false,
+      hideIconSettings: false,
+      hideIconLink: true,
+      hideIconPgNav: false
+    });
+
+  // Highlight the current to show this is on focus
+  self.p_displayFeedsList();
+
+  // Nothing to display yet? -- this is comming from onFocus() when there is nothing yet
+  if (self.m_currentFeed == null)
+    return;
+
   var hideIconLink = false;
   if (self.m_currentFeed.m_isFolder)  // Folders don't have destination link
     hideIconLink = true;
@@ -1728,13 +1755,6 @@ function p_putCurrentFeed()
       hideIconLink: hideIconLink,
       hideIconPgNav: false
     });
-
-  // Highlight the current to show this is on focus
-  self.p_displayFeedsList();
-
-  // Nothing to display yet? -- this is comming from onFocus() when there is nothing yet
-  if (self.m_currentFeed == null)
-    return;
 
   // Clear title area
   self.p_displayFeedTitle(null);
