@@ -1,5 +1,9 @@
 == CHANGELOG.txt, 'rrss' - R is a reader of RSS feeds
 
+== 2016-03-30, v0.6.1, pmarinov
+
+* bufix: crash at install time due to empty subs list
+
 == 2016-03-27, v0.6.0, pmarinov
 
 * NEW: Add RSS sniffer, render feed, offer subscription

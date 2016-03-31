@@ -20,10 +20,11 @@ Features::
 * Uses Google Drive, optionally, for synchronization between
   computers (list of subscriptions and what was marked as read)
 
-Version: 0.6.0 +
-Status: Beta
+= Try it
 
-Try it::
+Version: 0.6.1 +
+Status: Beta +
+Chrome webstore: +
 https://chrome.google.com/webstore/detail/rrss/kdjijdhlleambcpendblfhdmpmfdbcbd
 
 = License
