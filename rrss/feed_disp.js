@@ -64,7 +64,7 @@ function p_markAsRead(screenIndex, isRead, isRemoteAction)
   var $markedRead = utils_ns.domFindInside($bar, '.xmarked_read');
   var $markedUnread = utils_ns.domFindInside($bar, '.xmarked_unread');
   var $feedUrl = utils_ns.domFindInside($rssEntry, '.xbody_feed_source_url');
-  var is_too_old = $rssEntry.attr('rss_is_too_old');
+  var is_too_old = $rssEntry.attr('rss_is_too_old') != 'false';
 
   if (is_too_old)
     isRead = true;
