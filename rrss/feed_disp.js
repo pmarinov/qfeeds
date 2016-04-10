@@ -64,12 +64,19 @@ function p_markAsRead(screenIndex, isRead, isRemoteAction)
   var $markedRead = utils_ns.domFindInside($bar, '.xmarked_read');
   var $markedUnread = utils_ns.domFindInside($bar, '.xmarked_unread');
   var $feedUrl = utils_ns.domFindInside($rssEntry, '.xbody_feed_source_url');
+  var is_too_old = $rssEntry.attr('rss_is_too_old');
+
+  if (is_too_old)
+    isRead = true;
 
   // Mark the selected as read/unread
   $bar.toggleClass('unread', !isRead);
   // Show appropriate icon for marked as read/unrad
-  $markedRead.toggleClass("hide", !isRead);
-  $markedUnread.toggleClass("hide", isRead);
+  if (!is_too_old)  // Only if not both hidden
+  {
+    $markedRead.toggleClass("hide", !isRead);
+    $markedUnread.toggleClass("hide", isRead);
+  }
 
   var feedUrl = $feedUrl.attr('href');
   var entryHash = $rssEntry.attr('rss_hash');
@@ -140,8 +147,6 @@ function p_handleDispClick(ev)
     if (!utils_ns.clickIsInside($bar, ev.pageX, ev.pageY))
       continue;
 
-    log.info('click on fold/unfold area ' + i);
-
     $barUrl = utils_ns.domFindInside($rssEntry, '.xurl');
     if (utils_ns.clickIsInside($barUrl, ev.pageX, ev.pageY))
     {
@@ -165,6 +170,8 @@ function p_handleDispClick(ev)
       self.p_markAsRead(i, true, false);
       continue;
     }
+
+    log.info('click on fold/unfold area ' + i);
 
     d = self.m_currentDispContext;
     utils_ns.assert(d instanceof DispContext, "p_handleDispClick: x instanceof DispContext");
@@ -296,6 +303,7 @@ function feedDisplay(items, dispContext)
   var t2 = 0;
   var d = 0;
   var since = '';
+  var is_read = false;
   for (i = 0; i < self.$d.rssEntries.length; ++i)
   {
     $rssEntry = $(self.$d.rssEntries[i]);
@@ -327,9 +335,23 @@ function feedDisplay(items, dispContext)
 
     $d.marked_read = utils_ns.domFindInside($d.bar, '.xmarked_read');
     $d.marked_unread = utils_ns.domFindInside($d.bar, '.xmarked_unread');
-    // Show appropriate icon for marked as read/unrad
-    $d.marked_read.toggleClass("hide", !e.m_is_read);
-    $d.marked_unread.toggleClass("hide", e.m_is_read);
+    is_read = e.m_is_read;
+    if (feeds_ns.isTooOldRssEntry(e))
+    {
+      // Disable the read/unread control
+      is_read = true;
+      $d.marked_read.toggleClass("hide", true);
+      $d.marked_unread.toggleClass("hide", true);
+      // Store the hash of the RSS entry into the DOM
+      $rssEntry.attr('rss_is_too_old', true);
+    }
+    else
+    {
+      // Show appropriate icon for marked as read/unrad
+      $d.marked_read.toggleClass("hide", !e.m_is_read);
+      $d.marked_unread.toggleClass("hide", e.m_is_read);
+      $rssEntry.attr('rss_is_too_old', false);
+    }
 
     $d.url = utils_ns.domFindInside($d.bar, '.xurl');
     $d.url.attr('href', e.m_link);
@@ -350,7 +372,7 @@ function feedDisplay(items, dispContext)
     $d.date.text(since);
 
     // Show bar in bold if entry is unread
-    $d.bar.toggleClass("unread", !e.m_is_read);
+    $d.bar.toggleClass("unread", !is_read);
 
     // Fill in the body
     $d.body = utils_ns.domFindInside($rssEntry, '.xbody');

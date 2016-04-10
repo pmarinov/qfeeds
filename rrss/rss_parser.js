@@ -58,7 +58,7 @@ function RssEntry(title, link, description, updated, id)
   this.m_is_read = false;
   this.m_remote_state = RssSyncState.IS_LOCAL_ONLY;
 
-  // meta (stored in db)
+  // meta (not stored in db)
   this.x_header = null; // back-ref to header
   return this;
 }
@@ -78,6 +78,16 @@ function copyRssEntry(from)
   x.m_is_read = from.m_is_read;
   x.m_remote_state = from.m_remote_state;
   return x;
+}
+
+// object RssEntry.isTooOld
+// When an entry is older than a month it is considered too old
+function isTooOldRssEntry(entry)
+{
+  var oldDate = new Date();  // 1 month in the past
+  var month_ago = oldDate.getMonth() - 1;
+  oldDate.setMonth(month_ago);
+  return entry.m_date < oldDate;
 }
 
 // object RssHeader [constructor]
@@ -490,6 +500,7 @@ feeds_ns.RssSyncState = RssSyncState;
 feeds_ns.RssEntry = RssEntry;
 feeds_ns.emptyRssEntry = emptyRssEntry;
 feeds_ns.copyRssEntry = copyRssEntry;
+feeds_ns.isTooOldRssEntry = isTooOldRssEntry;
 feeds_ns.RssHeader = RssHeader;
 feeds_ns.emptyRssHeader = emptyRssHeader;
 feeds_ns.copyRssHeader = copyRssHeader;
