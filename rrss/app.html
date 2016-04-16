@@ -29,6 +29,10 @@
   <script src="../lib/html4.js" type="text/javascript"></script>
   <script src="../lib/sanitizer.js" type="text/javascript"></script>
 
+  <!-- Prism syntax highlighter (display nice XML source) -->
+  <link href="../lib/prism.css" rel="stylesheet"/>
+  <script src="../lib/prism.js"></script>
+
   <!-- APP -->
   <link href="style.css" rel="stylesheet" type="text/css">
   <script src="utils.js" type="text/javascript"></script>
@@ -324,6 +328,20 @@
     <div id='xfeed_info_area' class='feed_info_area'>
       <div>
         <span>URL: </span><span id='xfeed_info_url'></span>
+      </div>
+      <div class='clearfix'>
+      </div>
+      <span id='xshow_src_btns_area' class='show_src_area pull-left hide' style='padding-top: 10px;'>
+          <span class='label_folder'>
+              XML source:
+          </span>
+          <button type='button' id='xfeed_src_show' class='btn btn-sm'>Show</button>
+          <button type='button' id='xfeed_src_hide' class='btn btn-sm'>Hide</button>
+      </span>
+      <div class='clearfix'>
+      </div>
+      <div id='xxml_display'>
+          <pre class='language-markup'><code class='language-markup' id='xxml_display_code'>markup here</code></pre>
       </div>
       <div class='clearfix'>
       </div>

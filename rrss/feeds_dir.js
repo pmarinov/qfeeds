@@ -77,6 +77,8 @@ function FeedsDir($dirPanel, feedDisp, panelMng)
     btnSetFolder: utils_ns.domFind('#xfeed_setfolder'),
     btnSubscribe: utils_ns.domFind('#xfeed_subscribe'),
     btnCancel: utils_ns.domFind('#xfeed_cancel'),
+    areaXMLDisplay: utils_ns.domFind('#xxml_display'),
+    xmlCode: utils_ns.domFind('#xxml_display_code'),
     btnUnsubscribe: utils_ns.domFind('#xfeed_unsubscribe'),
     btnUndo: utils_ns.domFind('#xfeed_unsub_undo'),
     titleFeedErrors: utils_ns.domFind('#xfeed_error_text'),
@@ -247,6 +249,7 @@ function p_setFeedsDomHandlers()
             hideUndoArea: true,
             hideAreaInfoFeed: true,
             hideAreaInfoFolder: true,
+            hideXMLDisplay: true,
             hideIconInfo: false,
             hideIconSettings: false,
             hideIconLink: true,  // No "link" for folder
@@ -523,7 +526,7 @@ function p_hideUnhideSections(sections)
      'hideAreaFolderSetBtn', 'hideAreaUnsubscribeBtns',
      'hideUnsubscribeBtn', 'hideUndoArea', 'hideAreaInfoFeed',
      'hideAreaInfoFolder', 'hideIconInfo', 'hideIconSettings',
-     'hideIconLink', 'hideIconPgNav'],
+     'hideIconLink', 'hideIconPgNav', 'hideXMLDisplay'],
     "in p_hideUnhideSections");
 
   self.$d.areaAddRss.toggleClass('hide', sections.hideAddRss);
@@ -538,6 +541,7 @@ function p_hideUnhideSections(sections)
   self.$d.areaInfoFeed.toggleClass('hide', sections.hideAreaInfoFeed);
   self.$d.areaInfoFolder.toggleClass('hide', sections.hideAreaInfoFolder);
   self.$d.iconInfo.toggleClass('hide', sections.hideIconInfo);
+  self.$d.areaXMLDisplay.toggleClass('hide', sections.hideXMLDisplay);
   self.$d.iconSettings.toggleClass('hide', sections.hideIconSettings);
   self.$d.iconLink.toggleClass('hide', sections.hideIconLink);
   self.$d.areaPgNav1.toggleClass('hide', sections.hideIconPgNav);
@@ -777,7 +781,7 @@ function p_handleHideUnhideInfo(ev)
   self.$d.areaInfoFolder.toggleClass('hide', true);
 
   // Display error info if this is an individual feed
-  if (!self.m_currentFeed.m_isFolder)
+  if ((self.m_currentFeed != null) && (!self.m_currentFeed.m_isFolder))
     self.p_displayFeedErrors(self.m_currentFeed.m_header, toShow);  // Show error area if any errors
 }
 FeedsDir.prototype.p_handleHideUnhideInfo = p_handleHideUnhideInfo;
@@ -805,6 +809,7 @@ function p_handleAddRssButton(ev)
       hideUndoArea: true,
       hideAreaInfoFeed: true,
       hideAreaInfoFolder: true,
+      hideXMLDisplay: true,
       hideIconInfo: true,
       hideIconSettings: true,
       hideIconLink: false,
@@ -1027,7 +1032,8 @@ function p_feedView(newUrl)
       hideUndoArea: true,
       hideAreaInfoFeed: true,
       hideAreaInfoFolder: true,
-      hideIconInfo: true,
+      hideXMLDisplay: false,
+      hideIconInfo: false,
       hideIconSettings: true,
       hideIconLink: false,
       hideIconPgNav: true
@@ -1043,7 +1049,7 @@ function p_feedView(newUrl)
 
   // Read the feed and display it
   feeds_ns.fetchRss(newUrl,
-      function(c, feed, errorMsg)
+      function(c, feed, errorMsg, xmlDoc)
       {
         // Are we still on mode to display subscription or the user clicked on something else
         if (self.m_feedDirMode != self.MODE_SUBCRIPTION)
@@ -1051,6 +1057,20 @@ function p_feedView(newUrl)
 
         // Hide "Loading..."
         self.$d.areaLoadingMsg.toggleClass('hide', true);
+
+        // Display source of the XML
+        if ((xmlDoc instanceof Object) && 
+            (xmlDoc.children !== undefined) &&
+            xmlDoc.children.length > 0)
+        {
+          var feedObj = xmlDoc.children[0];
+          var xmlStr = jQuery(feedObj).prop('outerHTML');
+          self.$d.xmlCode.html(Prism.highlight(xmlStr, Prism.languages.markup));
+        }
+        else
+        {
+          self.$d.xmlCode.text('No XML source to display');
+        }
 
         var j = 0;
         var t = '';
@@ -1081,7 +1101,8 @@ function p_feedView(newUrl)
             hideUndoArea: true,
             hideAreaInfoFeed: true,
             hideAreaInfoFolder: true,
-            hideIconInfo: true,
+            hideXMLDisplay: false,
+            hideIconInfo: false,
             hideIconSettings: true,
             hideIconLink: false,
             hideIconPgNav: true
@@ -1275,6 +1296,7 @@ function p_handleUndo(ev)
       hideUndoArea: true,
       hideAreaInfoFeed: true,
       hideAreaInfoFolder: true,
+      hideXMLDisplay: true,
       hideIconInfo: false,
       hideIconSettings: false,
       hideIconLink: false,
@@ -1436,6 +1458,7 @@ function p_displayFeedAndTitle(f, entries)
       hideUndoArea: true,
       hideAreaInfoFeed: true,
       hideAreaInfoFolder: true,
+      hideXMLDisplay: true,
       hideIconInfo: false,
       hideIconSettings: false,
       hideIconLink: hideIconLink,
@@ -1719,6 +1742,7 @@ function p_putCurrentFeed()
       hideUndoArea: true,
       hideAreaInfoFeed: true,
       hideAreaInfoFolder: true,
+      hideXMLDisplay: true,
       hideIconInfo: false,
       hideIconSettings: false,
       hideIconLink: true,
@@ -1750,6 +1774,7 @@ function p_putCurrentFeed()
       hideUndoArea: true,
       hideAreaInfoFeed: true,
       hideAreaInfoFolder: true,
+      hideXMLDisplay: true,
       hideIconInfo: false,
       hideIconSettings: false,
       hideIconLink: hideIconLink,

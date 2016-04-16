@@ -415,6 +415,13 @@
   border-left: 1px dotted lightgray;
 }
 
+.select_folder_area .show_src_area
+{
+  float: left;
+  margin-left: 10px;
+  padding-left: 15px;
+}
+
 .unsubscribe_btn_area
 {
   border-top: 1px lightgray dotted;

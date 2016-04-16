@@ -475,15 +475,15 @@ function fetchRss(urlRss, cb)
       if (xmlStr == null)  // A strange case of empty response, then xmlStr is "null"
       {
         var nullFeed = new RssHeader(urlRss, null, null, null, null, null);
-        cb(1, nullFeed, 'Empty response');
+        cb(1, nullFeed, 'Empty response', '');
         return;
       }
 
       var r = parse(urlRss, xmlStr);
       if (r.errorMsg != null)
-        cb(1, r.feed, r.errorMsg);
+        cb(1, r.feed, r.errorMsg, '');
       else
-        cb(0, r.feed, null);
+        cb(0, r.feed, null, xmlStr);
     })
     .fail(function ()
     {
