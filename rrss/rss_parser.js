@@ -466,7 +466,7 @@ function fetchRss(urlRss, cb)
           if (errorThrown != '')
             errorMsg = jqXHR.status + ', ' + errorThrown;
           else
-            errorMsg = jqXHR.status;
+            errorMsg = 'HTTP ' + jqXHR.status;
         }
       }
     })
