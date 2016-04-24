@@ -70,7 +70,7 @@ function p_recordsChanged(tableId, isDeleted, isLocal, key, newValue)
 RTablesGDrive.prototype.p_recordsChanged = p_recordsChanged;
 
 // object RTableGDrive.p_loadRTFile
-function p_loadRTFile(rtFileID, cbDone)
+function p_loadRTFile(rtFileID, cbDone, cbDisplayProgress)
 {
   var self = this;
 
@@ -125,6 +125,7 @@ function p_loadRTFile(rtFileID, cbDone)
                   });
             })();
           }
+          cbDisplayProgress(11);
           cbDone(1);
         }
         catch (e)  // Error in my code, display it, then re-throw
@@ -310,15 +311,17 @@ function p_createAppFolder(cbDone)
 RTablesGDrive.prototype.p_createAppFolder = p_createAppFolder;
 
 // object RTablesGDrive.RTableGDrive [constructor]
-function RTablesGDrive(rtables, cbDone)
+function RTablesGDrive(rtables, cbDone, cbDisplayProgress)
 {
   var self = this;
 
   self.m_tables = rtables;
 
   // Create or open folder "App/rss"
+  cbDisplayProgress(8);
   self.p_createAppFolder(function (parentFolderID)
       {
+        cbDisplayProgress(9);
         // Find the short-cut file for the real-time document
         var query = 'title=' + "'" + g_documentName + "'" + " and (not trashed)"
         gapi.client.drive.files.list(
@@ -330,8 +333,9 @@ function RTablesGDrive(rtables, cbDone)
                 {
                   //
                   // Load the short-cut file
+                  cbDisplayProgress(10);
                   log.info('rtable: Opening Apps/rrss/' + g_documentName + '...')
-                  self.p_loadRTFile(results.items[0].id, cbDone);
+                  self.p_loadRTFile(results.items[0].id, cbDone, cbDisplayProgress);
                   if (results.items.length > 1)
                     log.warning('RTableGDrive: more than one short cut file for ' + g_documentName);
                 }
@@ -340,7 +344,7 @@ function RTablesGDrive(rtables, cbDone)
                   //
                   // Create the short-cut file and then load
                   log.info('rtable: ' + g_documentName + ' is new')
-                  self.p_createAndLoadRTFile(parentFolderID, cbDone);
+                  self.p_createAndLoadRTFile(parentFolderID, cbDone, cbDisplayProgress);
                 }
               });
       });
@@ -406,7 +410,7 @@ RTablesGDrive.prototype.deleteRec = deleteRec;
 // local -- dictionary of keys of local entries this way initialSync()
 //          can generate events for all that were deleted remotely too
 // local = null, won't generate delete events
-function initialSync(tableID, local)
+function initialSync(tableID, local, cbDisplayProgress)
 {
   var self = this;
 
@@ -437,7 +441,7 @@ function initialSync(tableID, local)
         isDeleted: false,  // The record was deletd, data is null
         data: utils_ns.copyFields(rec, [])  // record data
       };
-    keyName = self.m_tables[tableID].key; 
+    keyName = self.m_tables[tableID].key;
     updateObj.data[keyName] = key;  // Add the key_name:key_valye as a field
     objlist.push(updateObj);
 
@@ -450,6 +454,8 @@ function initialSync(tableID, local)
     local[key] = 1;
   }
   g_cbRecordsChanged(tableID, objlist);
+
+  cbDisplayProgress(100);
 
   if (local == null)
     return;
@@ -510,16 +516,17 @@ function RTablesIsOnline()
 }
 
 // Call this once at init time to complete the initialization
-function RTablesInit(accessToken, cbReady)
+function RTablesInit(accessToken, cbReady, displayProgress)
 {
   gapi.load('auth:client', function()
       {
         var token =
         {
           access_token: accessToken
-        }
+        };
         gapi.auth.setToken(token);
         g_authenticated = true;
+        displayProgress(6);
         gapi.client.load('drive', 'v2', cbReady);
       });
 }

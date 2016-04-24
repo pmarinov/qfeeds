@@ -617,7 +617,7 @@ Feeds.prototype.p_rtableSyncRemoteSubscriptions = p_rtableSyncRemoteSubscription
 
 // object Feeds.p_rtableInitRemoteEntryRead
 // Initialize remote table (rtable) that stores status_read for RSS entries
-function p_rtableInitRemoteEntryRead()
+function p_rtableInitRemoteEntryRead(cbDisplayProgress)
 {
   var self = this;
 
@@ -637,7 +637,13 @@ function p_rtableInitRemoteEntryRead()
   // updated remotely but doesn't generate corresponding
   // events. Unfortunately, we have to do a full datastore query that
   // walks all entries only to discover what changed remotely.
-  self.m_rtGDrive.initialSync(self.m_remote_read_id, null);
+  self.m_rtGDrive.initialSync(self.m_remote_read_id, null, function(progress)
+    {
+      // We get progress from 0 to 100%, fit it as progress from 10% to 55%
+      var range = 55 - 10;
+      var global = (range / 100.0) * progress + 10;
+      cbDisplayProgress(global);
+    });
 
   // Walk over all RSS entry records in the local DB and send to
   // remote table all that were marked as read
@@ -647,7 +653,7 @@ Feeds.prototype.p_rtableInitRemoteEntryRead = p_rtableInitRemoteEntryRead;
 
 // object Feeds.p_rtableInitRemoteFeedUrl
 // Initialize remote table (rtable) that stores url of RSS feeds
-function p_rtableInitRemoteFeedUrl()
+function p_rtableInitRemoteFeedUrl(cbDisplayProgress)
 {
   var self = this;
 
@@ -669,14 +675,22 @@ function p_rtableInitRemoteFeedUrl()
       log.info('feeds: done, unsynched -> remote table rss_subscriptions');
       // Now bring any unknown remote locally, delete any that remain local only
       log.info('feeds: bring any new entries from remote table rss_subscriptions to local DB');
-      self.m_rtGDrive.initialSync(self.m_remote_subscriptions_id, localEntries);
+      self.m_rtGDrive.initialSync(self.m_remote_subscriptions_id, localEntries, function(progress)
+      {
+        // We get progress from 0 to 100%, fit it as progress from 55% to 100%
+        var range = 100 - 55;
+        var global = (range / 100.0) * progress + 55;
+        if (progress == 100)
+          global = 100;  // Avoid float roundup errors
+        cbDisplayProgress(global);
+      });
     });
 }
 Feeds.prototype.p_rtableInitRemoteFeedUrl = p_rtableInitRemoteFeedUrl;
 
 // object Feeds.rtableConnect
 // This method is invoked once when the application is logged into Dropbox
-function rtableConnect()
+function rtableConnect(cbDisplayProgress)
 {
   var self = this;
 
@@ -704,9 +718,10 @@ function rtableConnect()
           return;
         }
 
-        self.p_rtableInitRemoteEntryRead();
-        self.p_rtableInitRemoteFeedUrl();
-      });
+        self.p_rtableInitRemoteEntryRead(cbDisplayProgress);
+        self.p_rtableInitRemoteFeedUrl(cbDisplayProgress);
+      },
+      cbDisplayProgress);
 }
 Feeds.prototype.rtableConnect = rtableConnect;
 

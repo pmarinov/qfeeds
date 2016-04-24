@@ -36,6 +36,9 @@ function ConnectGDrive(cb, startWithLoggedIn)
   // Callback handlers
   self.m_cb = cb;
 
+  // progress 0%
+  self.m_cb.onProgress(0);
+
   self.m_user_email = '';
   self.m_user_name = '';
   self.m_accessToken = null;
@@ -47,6 +50,8 @@ function ConnectGDrive(cb, startWithLoggedIn)
   gapi.load("drive-realtime,drive-share", function()
       {
         // callback: API Done Loading
+
+        self.m_cb.onProgress(5);
 
         self.$d.btnGDrive.on('click', function (e)
             {
@@ -70,7 +75,10 @@ function ConnectGDrive(cb, startWithLoggedIn)
             });
 
         if (!startWithLoggedIn)
+        {
+          self.m_cb.onProgress(100);
           return;
+        }
 
         try  // GDrive swallows all errors, install my own catchers for displahy of my own errors
         {
@@ -148,9 +156,10 @@ function p_gdriveLoginLogout(isInteractive)
               //callback(chrome.runtime.lastError);
               log.error(chrome.runtime.lastError);
               self.m_accessToken = null;
-              self.m_cb.onClientReady(1, accessToken);
+              self.m_cb.onClientqReady(1, accessToken);
+              self.m_cb.onProgress(100);
               return;
-            }
+            };
             self.m_accessToken = accessToken;
 
             chrome.identity.getProfileUserInfo(function(profileInfo)
@@ -159,7 +168,10 @@ function p_gdriveLoginLogout(isInteractive)
                   self.p_gdriveSetLoginButton();
                 });
             log.info('Google API Access token: ' + accessToken);
-            self.m_cb.onClientReady(0, accessToken);
+            self.m_cb.onClientReady(0, accessToken, function(progress)
+                {
+                  self.m_cb.onProgress(progress);
+                });
             self.m_authenticated = true;
           }
           catch (e)  // Error in my code, display it, then re-throw

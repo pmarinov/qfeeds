@@ -153,8 +153,8 @@ function App()
         // Load all feeds data from the IndexedDB
         self.m_feedsDB.dbLoad(function ()
             {
-              var delay = 1;
-              // Don't start fetch loop immediately if subscription screen was requested
+              var delay = 5;  // Delay start of fetch loop to give priority initial GDrive sync
+              // Don't start fetch loop immediately if subscription screen was requested upon startup
               if (subscriptionReqList.length > 0)
                 delay = 120;  // 2 min delay in case of subscription req
               self.m_feedsDB.suspendFetchLoop(false, delay);  // Resume fetch loop, start fetching now
@@ -188,7 +188,7 @@ function App()
       });
   self.m_initSeq.push(function()
       {
-        if (subscriptionReqList.length > 0)
+        if (subscriptionReqList.length > 0)  // Subscription requested upon startup?
           self.m_feedsDir.p_feedView(subscriptionReqList[0].href);
         Object.preventExtensions(this);
         self.p_initSeqNext();
@@ -243,7 +243,7 @@ function p_getConnectGDriveHandlers()
   {
     // If user logins into Dropbox this function is called
     // when access object is ready
-    onClientReady: function(code, accessToken)
+    onClientReady: function(code, accessToken, displayProgress)
         {
           if (code == 0)
           {
@@ -258,8 +258,9 @@ function p_getConnectGDriveHandlers()
                             });
                       });
 
-                  self.m_feedsDir.remoteStoreConnected();
-                });
+                  self.m_feedsDir.remoteStoreConnected(displayProgress);
+                },
+                displayProgress);
           }
         },
 

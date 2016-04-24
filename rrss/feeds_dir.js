@@ -149,10 +149,10 @@ function connectToFeedsDb(feedsDB)
 FeedsDir.prototype.connectToFeedsDb = connectToFeedsDb;
 
 // object FeedsDir.remoteStoreConnected
-function remoteStoreConnected()
+function remoteStoreConnected(cbDisplayProgress)
 {
   var self = this;
-  self.m_feedsDB.rtableConnect();
+  self.m_feedsDB.rtableConnect(cbDisplayProgress);
 }
 FeedsDir.prototype.remoteStoreConnected = remoteStoreConnected;
 
