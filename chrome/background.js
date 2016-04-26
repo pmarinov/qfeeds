@@ -33,7 +33,7 @@ chrome.browserAction.onClicked.addListener(function(tab)
         chrome.tabs.create({ url: '../rrss/app.html'}, function (newTab)
             {
               rrssTab = newTab.id;
-              console.log('"rrss" started at tab ' + rrssTab);
+              console.log('"rrss" started at tab ' + rrssTab + ', active tab reset to ' + restoreLastActiveTab);
               lastActiveTab = restoreLastActiveTab;  // We need lastActiveTab before extension was started
             });
       }
@@ -69,10 +69,16 @@ function isSelfURL(url)
 // Record any new tab as lastActiveTab
 chrome.tabs.onSelectionChanged.addListener(function(tabId, selectInfo)
     {
-      console.log('selected: ' + tabId);
       restoreLastActiveTab = lastActiveTab;
       if (rrssTab != tabId)
+      {
+        console.log('selected (active): ' + lastActiveTab);
         lastActiveTab = tabId;  // Record only if this is not our own extension's main page
+      }
+      else
+      {
+        console.log('selected: ' + tabId);
+      }
     });
 
 // 1. Monitor the URLs of all tabs in case the extension is activated

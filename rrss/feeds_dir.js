@@ -525,7 +525,7 @@ function p_hideUnhideSections(sections)
      'hideAreaSubscribeBtns', 'hideAreaFolderSetBtn', 'hideAreaFolderSetBtn',
      'hideAreaFolderSetBtn', 'hideAreaUnsubscribeBtns',
      'hideUnsubscribeBtn', 'hideUndoArea', 'hideAreaInfoFeed',
-     'hideAreaInfoFolder', 'hideIconInfo', 'hideIconSettings',
+     'hideAreaInfoFolder', 'hideAreaFeedErrors', 'hideIconInfo', 'hideIconSettings',
      'hideIconLink', 'hideIconPgNav', 'hideXMLDisplay'],
     "in p_hideUnhideSections");
 
@@ -540,6 +540,7 @@ function p_hideUnhideSections(sections)
   self.$d.areaUndo.toggleClass('hide', sections.hideUndoArea);
   self.$d.areaInfoFeed.toggleClass('hide', sections.hideAreaInfoFeed);
   self.$d.areaInfoFolder.toggleClass('hide', sections.hideAreaInfoFolder);
+  self.$d.areaFeedErrors.toggleClass('hide', sections.hideAreaFeedErrors)
   self.$d.iconInfo.toggleClass('hide', sections.hideIconInfo);
   self.$d.areaXMLDisplay.toggleClass('hide', sections.hideXMLDisplay);
   self.$d.iconSettings.toggleClass('hide', sections.hideIconSettings);
@@ -772,17 +773,29 @@ function p_handleHideUnhideInfo(ev)
   if (self.$d.areaInfoFeed.hasClass('hide'))
     toShow = true;  // Now it is hidden, so transition to stage "shown"
 
-  // TODO: check if current element is a folder (then show "Folder info" section)
-  self.$d.areaInfoFeed.toggleClass('hide');
+  // Some parmanently hidden areas
+  // TODO: we probably shouldn't touch these here, is quite confusing
+  self.$d.areaInfoFolder.toggleClass('hide', true);
   self.$d.areaRenameFolder.toggleClass('hide', true);
-  self.$d.areaSelectFolder.toggleClass('hide', true);
   self.$d.areaUnsubscribeBtns.toggleClass('hide', true);
   self.$d.areaUndo.toggleClass('hide', true);
-  self.$d.areaInfoFolder.toggleClass('hide', true);
 
-  // Display error info if this is an individual feed
-  if ((self.m_currentFeed != null) && (!self.m_currentFeed.m_isFolder))
-    self.p_displayFeedErrors(self.m_currentFeed.m_header, toShow);  // Show error area if any errors
+  // TODO: check if current element is a folder (then show "Folder info" section)
+  if (self.m_feedDirMode != self.MODE_SUBCRIPTION)
+  {
+    self.$d.areaInfoFeed.toggleClass('hide');
+    self.$d.areaSelectFolder.toggleClass('hide', true);
+
+    // Display error info if this is an individual feed
+    if ((self.m_currentFeed != null) && (!self.m_currentFeed.m_isFolder))
+      self.p_displayFeedErrors(self.m_currentFeed.m_header, toShow);  // Show error area if any errors
+  }
+  else
+  {
+    // Feed is displayed with purpose of possible subscription
+    // Keep area "Selet folder" permanently shown
+    self.$d.areaInfoFeed.toggleClass('hide');
+  }
 }
 FeedsDir.prototype.p_handleHideUnhideInfo = p_handleHideUnhideInfo;
 
@@ -809,6 +822,7 @@ function p_handleAddRssButton(ev)
       hideUndoArea: true,
       hideAreaInfoFeed: true,
       hideAreaInfoFolder: true,
+      hideAreaFeedErrors: true,
       hideXMLDisplay: true,
       hideIconInfo: true,
       hideIconSettings: true,
@@ -1032,6 +1046,7 @@ function p_feedView(newUrl)
       hideUndoArea: true,
       hideAreaInfoFeed: true,
       hideAreaInfoFolder: true,
+      hideAreaFeedErrors: true,
       hideXMLDisplay: false,
       hideIconInfo: false,
       hideIconSettings: true,
@@ -1101,6 +1116,7 @@ function p_feedView(newUrl)
             hideUndoArea: true,
             hideAreaInfoFeed: true,
             hideAreaInfoFolder: true,
+            hideAreaFeedErrors: true,
             hideXMLDisplay: false,
             hideIconInfo: false,
             hideIconSettings: true,
@@ -1296,6 +1312,7 @@ function p_handleUndo(ev)
       hideUndoArea: true,
       hideAreaInfoFeed: true,
       hideAreaInfoFolder: true,
+      hideAreaFeedErrors: true,
       hideXMLDisplay: true,
       hideIconInfo: false,
       hideIconSettings: false,
@@ -1458,6 +1475,7 @@ function p_displayFeedAndTitle(f, entries)
       hideUndoArea: true,
       hideAreaInfoFeed: true,
       hideAreaInfoFolder: true,
+      hideAreaFeedErrors: true,
       hideXMLDisplay: true,
       hideIconInfo: false,
       hideIconSettings: false,
@@ -1742,6 +1760,7 @@ function p_putCurrentFeed()
       hideUndoArea: true,
       hideAreaInfoFeed: true,
       hideAreaInfoFolder: true,
+      hideAreaFeedErrors: true,
       hideXMLDisplay: true,
       hideIconInfo: false,
       hideIconSettings: false,
@@ -1774,6 +1793,7 @@ function p_putCurrentFeed()
       hideUndoArea: true,
       hideAreaInfoFeed: true,
       hideAreaInfoFolder: true,
+      hideAreaFeedErrors: true,
       hideXMLDisplay: true,
       hideIconInfo: false,
       hideIconSettings: false,
