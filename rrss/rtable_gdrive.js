@@ -69,6 +69,30 @@ function p_recordsChanged(tableId, isDeleted, isLocal, key, newValue)
 }
 RTablesGDrive.prototype.p_recordsChanged = p_recordsChanged;
 
+function getStats()
+{
+  var self = this;
+
+  var stats =
+  {
+    bytes: self.m_bytesUsed,
+    records: 0,
+    table: '\'Apps/rrss/rtables.rrss\'',
+    maxBytes: '10 MB'
+  }
+
+  var i = 0;
+  var rtable = null;
+  for (i = 0; i < self.m_tables.length; ++i)
+  {
+    rtable = self.m_tables[i];
+    stats.records += rtable.map.size;
+  }
+
+  return stats;
+}
+RTablesGDrive.prototype.getStats = getStats;
+
 // object RTableGDrive.p_loadRTFile
 function p_loadRTFile(rtFileID, cbDone, cbDisplayProgress)
 {
@@ -86,6 +110,7 @@ function p_loadRTFile(rtFileID, cbDone, cbDisplayProgress)
           var i = 0;
           var rtModel = rtDocument.getModel();
           log.info('rtable: bytes used ' + rtModel.bytesUsed);
+          self.m_bytesUsed = rtModel.bytesUsed;
 
           for (i = 0; i < self.m_tables.length; ++i)
           {
@@ -197,7 +222,7 @@ function p_createAndLoadRTFile(parentFolderID, cbDone)
     'resource':
     {
       mimeType: 'application/vnd.google-apps.drive-sdk',
-      description: 'rtabler.rrss',
+      description: 'rtables.rrss',
       title: g_documentName
     }
   };
@@ -316,6 +341,7 @@ function RTablesGDrive(rtables, cbDone, cbDisplayProgress)
   var self = this;
 
   self.m_tables = rtables;
+  self.m_bytesUsed = 0;
 
   // Create or open folder "App/rss"
   cbDisplayProgress(8);

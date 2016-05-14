@@ -143,16 +143,20 @@
     </div>
 
     <!-- Section: Settings -->
-    <div class="submenu_title_holder submenu_title_top_sep">
-      <span class="indent1"></span>
+    <div class="submenu_title_holder submenu_title_top_sep" style='height: 100%'>
       <span class="submenu_title">Settings</span>
     </div>
-    <div id="xcmd_pane_settings" class="submenu_entry_holder">
-      <span class="indent1"></span>
-      <span class="submenu_entry disabled" title="[not yet implemented]">Settings</span>
-    </div>  <!-- #xcmd_pane_settings -->
+    <div class='submenu_entry_holder'>
+      <span class='submenu_entry_inline disabled' id='xcmd_pane_settings'
+            title='[not yet implemented]'>
+        Settings
+      </span>
+      <span>&nbsp;&nbsp;&#8226&nbsp;&nbsp;</span>
+      <span class='submenu_entry_inline' id='xcmd_pane_stats'>
+        Stats
+      </span>
+    </div>
     <div id="xcmd_pane_about" class="submenu_entry_holder">
-      <span class="indent1"></span>
       <span class="submenu_entry">About</span>
     </div>  <!-- #xcmd_pane_about -->
   </div> <!-- left_pane -->
@@ -331,17 +335,9 @@
       </div>
       <div class='clearfix'>
       </div>
-      <span id='xshow_src_btns_area' class='show_src_area pull-left hide' style='padding-top: 10px;'>
-          <span class='label_folder'>
-              XML source:
-          </span>
-          <button type='button' id='xfeed_src_show' class='btn btn-sm'>Show</button>
-          <button type='button' id='xfeed_src_hide' class='btn btn-sm'>Hide</button>
-      </span>
-      <div class='clearfix'>
-      </div>
       <div id='xxml_display'>
-          <pre class='language-markup'><code class='language-markup' id='xxml_display_code'>markup here</code></pre>
+        <span>Size: <span id='xfeed_size'>0 bytes</span></span>
+        <pre class='language-markup'><code class='language-markup' id='xxml_display_code'>markup here</code></pre>
       </div>
       <div class='clearfix'>
       </div>
@@ -607,6 +603,26 @@
       </div> <!-- #ximport_opml_step3_importing -->
 
     </div>  <!-- #xdisp_pane_import_opml -->
+
+    <!-- Screen for display of stats -->
+    <div id='xdisp_pane_stats' class='stats_pane_area hide'>
+      <div style='font-weight: bold; font-size: 120%; margin-bottom: 4px;'>Stats</div>
+
+      <div id='xstats_container' class='stats_container'>
+        <div class='hide'>  <!-- keep here the original DOM entries from which to clone() -->
+        <div class='xstats_group_title title' style='font-weight: bold; margin-top: 8px;'>
+          Group
+        </div>
+        <div class='xstats_entry entry'>
+          <span>Key</span>
+          <span>value</span>
+        </div>
+        </div>
+        <div id='xstats_group_container'>
+        <!-- Replicate here the necessary number of groups and entries -->
+        </div>
+      </div>
+    </div>
 
     <!-- About screen display -->
     <div id='xdisp_pane_about' class='hide' style='width: 85%'>

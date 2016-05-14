@@ -78,6 +78,7 @@ function FeedsDir($dirPanel, feedDisp, panelMng)
     btnSubscribe: utils_ns.domFind('#xfeed_subscribe'),
     btnCancel: utils_ns.domFind('#xfeed_cancel'),
     areaXMLDisplay: utils_ns.domFind('#xxml_display'),
+    feedSize: utils_ns.domFind('#xfeed_size'),
     xmlCode: utils_ns.domFind('#xxml_display_code'),
     btnUnsubscribe: utils_ns.domFind('#xfeed_unsubscribe'),
     btnUndo: utils_ns.domFind('#xfeed_unsub_undo'),
@@ -1074,18 +1075,25 @@ function p_feedView(newUrl)
         self.$d.areaLoadingMsg.toggleClass('hide', true);
 
         // Display source of the XML
+        var feedLen = 0
         if ((xmlDoc instanceof Object) && 
             (xmlDoc.children !== undefined) &&
             xmlDoc.children.length > 0)
         {
           var feedObj = xmlDoc.children[0];
           var xmlStr = jQuery(feedObj).prop('outerHTML');
-          self.$d.xmlCode.html(Prism.highlight(xmlStr, Prism.languages.markup));
+          feedLen = xmlStr.length;
+          // Syntax highlihging can be CPU intensive, limit to feeds of up to certain size
+          if (feedLen > 128 * 1024)
+            self.$d.xmlCode.text(xmlStr);  // No highlighting, black and white should be good enough
+          else
+            self.$d.xmlCode.html(Prism.highlight(xmlStr, Prism.languages.markup)); // Nice
         }
         else
         {
           self.$d.xmlCode.text('No XML source to display');
         }
+        self.$d.feedSize.text(feedLen + ' bytes');
 
         var j = 0;
         var t = '';

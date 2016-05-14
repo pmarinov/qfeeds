@@ -165,10 +165,12 @@ function App()
   self.m_initSeq.push(function()
       {
         self.m_panelAbout = new feeds_ns.PanelAbout();
+        self.m_panelStats = new feeds_ns.PanelStats(self.m_feedsDB);
         self.m_panelImportOpml = new feeds_ns.FeedsImport(self.m_feedsDB, self.m_feedsDir, self.m_panelMng);
 
         self.m_panelMng.setMenuEntryHandler('xcmd_pane_feeds_dir', self.m_feedsDir);
         self.m_panelMng.setMenuEntryHandler('ximport_opml', self.m_panelImportOpml);
+        self.m_panelMng.setMenuEntryHandler('xcmd_pane_stats', self.m_panelStats);
         self.m_panelMng.setMenuEntryHandler('xcmd_pane_about', self.m_panelAbout);
 
         self.m_panelMng.p_activatePane(0);  // Activate feeds display
@@ -438,6 +440,13 @@ function PanelMng()
       handler: null,
       isActive: false,
       isEnabled: true
+    },
+    {
+      $leftPaneTriggerArea: utils_ns.domFind('#xcmd_pane_stats'),
+      $rightPaneDispArea: utils_ns.domFind('#xdisp_pane_stats'),
+      handler: null,
+      isActive: false,
+      isEnabled: true
     }
   ];
   for(i = 0; i < self.m_commandPaneMap.length; ++i)
@@ -508,6 +517,70 @@ function onFocusAbout()
 }
 PanelAbout.prototype.onFocus = onFocusAbout;
 
+// object PanelStats [constructor]
+function PanelStats(feedsDB)
+{
+  var self = this;
+
+  self.$d =
+  {
+    entryStats: utils_ns.domFind('#xcmd_pane_stats'),
+    origGroupTitle: utils_ns.domFind('.xstats_group_title'),
+    origStatsEntry: utils_ns.domFind('.xstats_entry'),
+    dispContainer: utils_ns.domFind('#xstats_group_container'),
+    dispList: [] 
+  };
+  self.m_feedsDB = feedsDB;
+
+  Object.preventExtensions(this);
+
+  return this;
+}
+
+// object PanelStats.onFocusLost
+function onFocusLostStats()
+{
+  var self = this;
+
+  self.$d.entryStats.toggleClass('selected', false);
+}
+PanelStats.prototype.onFocusLost = onFocusLostStats;
+
+// object PanelStats.onFocus
+function onFocusStats()
+{
+  var self = this;
+
+  self.$d.entryStats.toggleClass('selected', true);
+
+  // Empty the container
+  self.$d.dispContainer.html('');
+
+  var $g = null;
+  var $e = null;
+  var k = '';
+  var v = '';
+  var groups = 0;
+  var i = 0;
+  var stats = self.m_feedsDB.getStats();
+  for (groups = 0; groups < stats.length; ++groups)
+  {
+    $g = $(self.$d.origGroupTitle).clone();
+    $g.text(stats[groups].groupName);
+    self.$d.dispContainer.append($g);
+    for (i = 0; i < stats[groups].values.length; ++i)
+    {
+      $e = $(self.$d.origStatsEntry).clone();
+      k = stats[groups].values[i].name;
+      v = stats[groups].values[i].value;
+      $e.text(k + ': ' + v);
+      self.$d.dispContainer.append($e);
+    }
+  }
+
+}
+PanelStats.prototype.onFocus = onFocusStats;
+
 var app = null;
 feeds_ns.app = null;
 
@@ -518,5 +591,6 @@ $(document).ready(function()
     });
 
 feeds_ns.PanelMng = PanelMng;
+feeds_ns.PanelStats = PanelStats;
 feeds_ns.PanelAbout = PanelAbout;
 })();

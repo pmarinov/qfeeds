@@ -132,7 +132,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
     // We have received a list of feed urls found on the page.
     // Enable the page action icon.
     feedData[sender.tab.id] = input;
-    console.log('background_js: set feedIcon fo tab ' + sender.tab.id)
+    console.log('background_js: set feedIcon for tab ' + sender.tab.id)
     console.log(input)
     chrome.browserAction.setIcon({
           tabId: sender.tab.id,

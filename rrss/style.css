@@ -725,6 +725,14 @@
   font-weight: bold;
 }
 
+.stats_pane_area
+{
+  width: 100%;
+  float: left;
+  overflow: hidden;
+  padding-top: 12px;
+}
+
 /* Pop-up, dark-background */
 .black_overlay
 {

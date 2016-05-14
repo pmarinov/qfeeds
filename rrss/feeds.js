@@ -367,6 +367,53 @@ function p_feedFindByUrl(feedUrl)
 }
 Feeds.prototype.p_feedFindByUrl = p_feedFindByUrl;
 
+function getStats()
+{
+  var self = this;
+
+  var gdriveStats = self.m_rtGDrive.getStats();
+
+  var entryGDrive =
+  {
+    groupName: 'GDrive usage by "r-rss"',
+    values:
+    [
+      {
+        name: 'Tables file',
+        value: gdriveStats.table
+      },
+      {
+        name: 'Bytes used',
+        value: gdriveStats.bytes
+      },
+      {
+        name: 'Max size',
+        value: gdriveStats.maxBytes
+      },
+      {
+        name: 'Number of records',
+        value: gdriveStats.records
+      }
+    ]
+  }
+
+  var entryFeeds =
+  {
+    groupName: 'Feeds',
+    values:
+    [
+      {
+        name: 'Total number',
+        value: self.m_rssFeeds.length
+      }
+    ]
+  }
+
+  var stats = [entryGDrive, entryFeeds];
+  return stats;
+}
+Feeds.prototype.getStats = getStats;
+
 // object Feeds.p_rtableRemoteFeedsListener
 // Handle updates from the remote tables for 'rss_subscriptions'
 function p_rtableRemoteFeedsListener(records)
