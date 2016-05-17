@@ -263,6 +263,25 @@ function RemoteFeedUrl(feed)
   return this;
 }
 
+// object Feeds.p_incExpireCount
+// Increment the value of preference key 'm_local.app.expired_remote_records'
+function p_incExpireCount()
+{
+  var self = this;
+
+  var strCnt = self.prefGet("m_local.feeds.expired_remote_records");
+  var cnt = 0;
+  if (strCnt !== undefined)
+  {
+    cnt = parseInt(strCnt);
+    if (isNaN(cnt))
+      cnt = 0;
+  }
+  ++cnt;
+  self.prefSet("m_local.feeds.expired_remote_records", cnt.toString());
+}
+Feeds.prototype.p_incExpireCount = p_incExpireCount;
+
 // object Feeds.p_rtableRemoteEntryReadListener
 // Handle updates from the remote tables for 'rss_entries_read'
 function p_rtableRemoteEntryReadListener(records)

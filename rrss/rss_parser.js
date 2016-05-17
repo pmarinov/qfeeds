@@ -80,14 +80,19 @@ function copyRssEntry(from)
   return x;
 }
 
-// object RssEntry.isTooOld
-// When an entry is older than a month it is considered too old
-function isTooOldRssEntry(entry)
+function isTooOldDate(a_date)
 {
   var oldDate = new Date();  // 1 month in the past
   var month_ago = oldDate.getMonth() - 1;
   oldDate.setMonth(month_ago);
-  return entry.m_date < oldDate;
+  return a_date < oldDate;
+}
+
+// object RssEntry.isTooOld
+// When an entry is older than a month it is considered too old
+function isTooOldRssEntry(entry)
+{
+  return isTooOldDate(entry.m_date);
 }
 
 // object RssHeader [constructor]
@@ -500,6 +505,7 @@ feeds_ns.RssSyncState = RssSyncState;
 feeds_ns.RssEntry = RssEntry;
 feeds_ns.emptyRssEntry = emptyRssEntry;
 feeds_ns.copyRssEntry = copyRssEntry;
+feeds_ns.isTooOldDate = isTooOldDate;
 feeds_ns.isTooOldRssEntry = isTooOldRssEntry;
 feeds_ns.RssHeader = RssHeader;
 feeds_ns.emptyRssHeader = emptyRssHeader;
