@@ -78,6 +78,20 @@ function dateToStrStrict(x)
   return d;
 }
 
+// Parses string from dateToStrStrict()
+// Ignores time portion
+function parseStrictDateStr(strDate)
+{
+  var sdate = strDate;
+  var y = parseInt(sdate.slice(0, 4));
+  assert(!isNaN(y), 'Invalid date str: ' + strDate)
+  var m = parseInt(sdate.slice(4, 6));
+  assert(!isNaN(m), 'Invalid date str: ' + strDate)
+  m -= 1;
+  var d = parseInt(sdate.slice(6, 8));
+  return new Date(y, m, d);
+}
+
 function domError(msg)
 {
   log.error(msg);
@@ -315,6 +329,7 @@ utils_ns.hasFields = hasFields;
 utils_ns.parseDate = parseDate;
 utils_ns.dateToStr = dateToStr;
 utils_ns.dateToStrStrict = dateToStrStrict;
+utils_ns.parseStrictDateStr = parseStrictDateStr;
 utils_ns.domError = domError;
 utils_ns.domFindInside = domFindInside;
 utils_ns.domFind = domFind;
@@ -322,6 +337,5 @@ utils_ns.clickIsInside = clickIsInside;
 utils_ns.listOfFields = listOfFields;
 utils_ns.copyFields = copyFields;
 utils_ns.marshal = marshal;
-
 
 })();

@@ -82,8 +82,8 @@ function copyRssEntry(from)
 
 function isTooOldDate(a_date)
 {
-  var oldDate = new Date();  // 1 month in the past
-  var month_ago = oldDate.getMonth() - 1;
+  var oldDate = new Date();  // 3 months in the past
+  var month_ago = oldDate.getMonth() - 3;
   oldDate.setMonth(month_ago);
   return a_date < oldDate;
 }

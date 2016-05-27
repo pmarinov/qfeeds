@@ -239,11 +239,16 @@ function RemoteEntryRead(rssEntry)
 
   var h = rssEntry.m_rssurl_date.indexOf('_');
   utils_ns.assert(h >= 0, "RemoteEntryRead: invalid rssurl_date hash");
-   var rssurl_hash = rssEntry.m_rssurl_date.slice(0, h);
+  var rssurl_hash = rssEntry.m_rssurl_date.slice(0, h);
   this.m_rss_feed_hash = rssurl_hash;
 
   this.m_is_read = rssEntry.m_is_read;
   this.m_date = utils_ns.dateToStrStrict(rssEntry.m_date);
+  // Strip the time (after '_')
+  // Date is sufficient for keeping the age of an entry
+  // Date is used only for the purpose of making an entry expire and be deleted
+  var limit = this.m_date.indexof('_')
+  this.m_date = this.m_date.slice(0, limit)
   return this;
 }
 
@@ -311,6 +316,9 @@ function p_rtableRemoteEntryReadListener(records)
       // Apply new state in the IndexedDB
       var rss_entry_hash = r.data.m_rss_entry_hash;
       var is_read = r.data.m_is_read;
+      var dateEntry = utils_ns.parseStrictDateStr(r.data.m_date)
+      if (feeds_ns.isTooOldDate(dateEntry))
+          console.log('Expire entry ' + r.data.m_date)
       var entry_date = r.data.m_date;  // date in strict string format
       self.feedUpdateEntry(rss_entry_hash,
           function(state, dbEntry)
