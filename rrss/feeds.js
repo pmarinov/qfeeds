@@ -247,7 +247,7 @@ function RemoteEntryRead(rssEntry)
   // Strip the time (after '_')
   // Date is sufficient for keeping the age of an entry
   // Date is used only for the purpose of making an entry expire and be deleted
-  var limit = this.m_date.indexof('_')
+  var limit = this.m_date.indexOf('_')
   this.m_date = this.m_date.slice(0, limit)
   return this;
 }
@@ -313,12 +313,18 @@ function p_rtableRemoteEntryReadListener(records)
       // Reflect the new state on the screen (if the feed is currently displayed)
       self.m_feedsCB.onRemoteMarkAsRead(r.data.m_rss_entry_hash, r.data.m_rss_feed_hash, r.data.m_is_read);
 
-      // Apply new state in the IndexedDB
+      // Check if the entry is too old and needs to be remove from the remote table (expired)
       var rss_entry_hash = r.data.m_rss_entry_hash;
       var is_read = r.data.m_is_read;
-      var dateEntry = utils_ns.parseStrictDateStr(r.data.m_date)
+      var dateEntry = utils_ns.parseStrictDateStr(r.data.m_date);
       if (feeds_ns.isTooOldDate(dateEntry))
-          console.log('Expire entry ' + r.data.m_date)
+      {
+        log.trace('Expire entry ' + r.data.m_date);
+        self.m_rtGDrive.deleteRec(self.m_remote_read_id, rss_entry_hash);
+        self.p_incExpireCount();
+      }
+
+      // Apply new state in the IndexedDB
       var entry_date = r.data.m_date;  // date in strict string format
       self.feedUpdateEntry(rss_entry_hash,
           function(state, dbEntry)
@@ -400,6 +406,15 @@ function getStats()
 
   var gdriveStats = self.m_rtGDrive.getStats();
 
+  var strCnt = self.prefGet("m_local.feeds.expired_remote_records");
+  var cntExpired = 0;
+  if (strCnt !== undefined)
+  {
+    cntExpired = parseInt(strCnt);
+    if (isNaN(cntExpired))
+      cntExpired = 0;
+  }
+
   var entryGDrive =
   {
     groupName: 'GDrive usage by "r-rss"',
@@ -420,6 +435,10 @@ function getStats()
       {
         name: 'Number of records',
         value: gdriveStats.records
+      },
+      {
+        name: 'Number of expired',
+        value: cntExpired + ' (from this instance only)'
       }
     ]
   }
