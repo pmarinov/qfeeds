@@ -1,5 +1,15 @@
 == CHANGELOG.txt, 'rrss' - R is a reader of RSS feeds
 
+== 2016-06-12, v0.6.3, pmarinov
+
+* NEW: Permantly display as read all entries older than 3 months
+* NEW: Delete all records older than 3 montsh from GDrive remote tbl.
+* NEW: In subscription screen, offer to display XML source of feeds
+* NEW: Display progress for login and initial sync into GDrive
+* NEW: Add panel to display various, possibly interesting, statistics
+* bugfix: Remove leftover artifacts from displayin subscr. errors
+* bugfix: Handle HTTP errors that have no message
+
 == 2016-03-30, v0.6.2, pmarinov
 
 * bufix: crash at install time due to empty subs list
