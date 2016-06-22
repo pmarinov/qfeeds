@@ -243,23 +243,104 @@ function parse(feedUrl, xmlDoc)
   var items = {};
   var typeStr = '';
   var rssType = '';
-  if ($feed.nodeName == 'rss' || $feed.nodeName == 'rdf:RDF')
+  if ( $feed.nodeName == 'rdf:RDF')
+  {
+    // ====== RDF ======
+    // $feed is <rdf>...</rdf>
+    rssType = 'RDF';
+    version = '1.0';
+
+    for (j = 0; j < $feed.children.length; ++j)
+    {
+      $entry = $feed.children[j];
+
+      if ($entry.tagName == 'item')
+      {
+        //
+        // RDF Entry (inside tag <item>)
+        // Each entry has <title>, <description>, etc.
+        $itemTags = $entry.children;
+        item_title = null;
+        item_link = null;
+        item_description = null;
+        item_strTime = null;
+        item_id = null;
+        item_link = null;
+        for (k = 0; k < $itemTags.length; ++k)
+        {
+          $tag = $itemTags[k];
+          tagContent = jQuery($tag).text();
+
+          if ($tag.tagName == 'title')
+            item_title = tagContent;
+          else if ($tag.tagName == 'link')
+            item_link = tagContent;
+          else if ($tag.tagName == 'description')
+            item_description = tagContent;
+          else if ($tag.tagName == 'dc:date')
+            item_strTime = tagContent;
+          else if ($tag.tagName == 'dc:identifier')
+            item_id = tagContent;
+        }
+
+        item_updated = utils_ns.parseDate(item_strTime);
+
+        if (item_title.length == 0 && item_description.length == 0)
+        {
+          errorXML = jQuery($entry).prop('outerHTML').substr(0, 256);
+          errors.push(new RssError('Item needs "title" or "description"', errorXML));
+        }
+
+        if (item_updated == null)
+        {
+          errorXML = jQuery($entry).prop('outerHTML').substr(0, 256);
+          errors.push(new RssError('"dc:date" bad', errorXML));
+        }
+
+        item = new RssEntry(item_title, item_link, item_description, item_updated, item_id);
+        items[item.m_hash] = item;
+      }
+      else if ($entry.tagName == 'channel')
+      {
+        //
+        // RDF Entry (inside tag <channel>)
+        // Each entry has <title>, <description>, etc.
+        $itemTags = $entry.children;
+        header_title = null;
+        header_link = null;
+        header_description = null;
+        for (k = 0; k < $itemTags.length; ++k)
+        {
+          $tag = $itemTags[k];
+          tagContent = jQuery($tag).text();
+
+          //
+          // Header elements of the RDF feed
+          if ($tag.tagName == 'title')
+            header_title = tagContent;
+          else if ($tag.tagName == 'link')
+            header_link = tagContent;
+          else if ($tag.tagName == 'description')
+            header_description = tagContent;
+        }
+      }
+    }
+
+    header_updated = utils_ns.parseDate(header_strTime);
+
+    ret.feed =
+      new RssHeader(feedUrl, header_title, header_link, header_description, 'no language', new Date());
+    ret.feed.m_rss_version = version;
+    ret.feed.m_rss_type = rssType;
+    ret.feed.x_items = items;
+    ret.feed.x_errors = errors;
+  }
+  else if ($feed.nodeName == 'rss')
   {
     // ====== RSS ======
-    // $feed is <rss>...</rss> or <rdf>...</rdf>
-    if($feed.nodeName == 'rss')
-    {
-      rssType = 'RSS';
-      version = jQuery($feed).attr('version');
-    }
-    else
-    {
-      rssType = 'rdf';
-      version = '1.0';
-      log.info('TODO: add RDF parser, ' + feedUrl);
-      errorXML = jQuery($feed).prop('outerHTML').substr(0, 256);
-      errors.push(new RssError('TODO: add parser for RDF (RSS v1.0)', errorXML));
-    }
+    // $feed is <rss>...</rss>
+    rssType = 'RSS';
+    version = jQuery($feed).attr('version');
 
     // In practice there should be only one entry <channel>...</channel>
     for (i = 0; i < $feed.children.length; ++i)
