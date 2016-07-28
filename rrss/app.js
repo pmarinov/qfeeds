@@ -123,9 +123,7 @@ function App()
         self.m_feedsDB = new feeds_ns.Feeds();
         // Connect feedsDir callbacks into feedsDB so that data can be displayed via these callback
         self.m_feedsDir.connectToFeedsDb(self.m_feedsDB);
-        // Open IndexedDB and load all feeds (object type RSSHeader) in memory
-        // Via call-backs this will also list the feeds and folders in
-        // the panel for feeds navigation (left-hand-side)
+        // Open IndexedDB
         self.m_feedsDB.dbOpen(function ()
             {
               self.p_initSeqNext();
@@ -142,11 +140,13 @@ function App()
       });
   self.m_initSeq.push(function()
       {
-        // Load all feeds data from the IndexedDB
+        // Load all feeds data from the IndexedDB (object type RSSHeader)
+        // Via call-backs this will also list the feeds and folders in
+        // the panel for feeds navigation (left-hand-side)
         self.m_feedsDB.dbLoad(function ()
             {
-              var delay = 5;  // Delay start of fetch loop to give priority initial GDrive sync
-              // Don't start fetch loop immediately if subscription screen was requested upon startup
+              var delay = 5;  // Delay start of fetch loop to give priority to initial GDrive sync
+              // Don't start fetch loop immediately if screen for New Feed Subscription was requested upon startup
               if (subscriptionReqList.length > 0)
                 delay = 120;  // 2 min delay in case of subscription req
               self.m_feedsDB.suspendFetchLoop(false, delay);  // Resume fetch loop, start fetching now
@@ -156,6 +156,7 @@ function App()
       });
   self.m_initSeq.push(function()
       {
+        // Setup objects for the screen
         self.m_panelAbout = new feeds_ns.PanelAbout();
         self.m_panelStats = new feeds_ns.PanelStats(self.m_feedsDB);
         self.m_panelImportOpml = new feeds_ns.FeedsImport(self.m_feedsDB, self.m_feedsDir, self.m_panelMng);

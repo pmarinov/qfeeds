@@ -27,6 +27,7 @@ function Feeds()
 
   self.m_rssFeeds = [];  // array of RssHeader, sorted by url
   self.m_listNotify = [];
+  self.m_hook_feed_poll_completed = [];
 
   self.m_prefs = {};  // App's preferences
 
@@ -1746,8 +1747,61 @@ function updateEntriesAll(cbUpdate)
 }
 Feeds.prototype.updateEntriesAll = updateEntriesAll;
 
+// object Feeds.expireEntries
+// Walk over all records for RSS entries (table: rss_data), delete old records
+function expireEntries()
+{
+  var self = this;
+
+  log.info('db: expire all...');
+  // Insert entry in m_dbSubscriptions
+  var tran = self.m_db.transaction(['rss_data'], 'readwrite');
+  self.p_dbSetTranErrorLogging(tran, 'rss_data', 'update.3');
+  var store = tran.objectStore('rss_data');
+  var cursor = store.openCursor();  // navigate all entries
+  cursor.onsuccess = function(event)
+      {
+        var req = null;
+
+        var cursor = event.target.result;
+        if (!cursor)
+        {
+          cbUpdate(null);  // Tell the callback we are done
+          return;
+        }
+
+        var entry = cursor.value;
+
+        // Call the update callback for this value
+        var r = cbUpdate(cursor.value);
+        if (r == 0)
+        {
+          return;  // done with all entries
+        }
+        else if (r == 1)  // Write new value and move to the next
+        {
+          req = cursor.update(cursor.value);
+          req.onsuccess = function(event)
+              {
+                var data = req.result;
+                log.info('db: update success: ' + req.result);
+              }
+          req.onerror = function(event)
+              {
+                log.error('db: update error msg: ' + req.error.message);
+              }
+          cursor.continue();
+        }
+        else if (r == 2)  // Don't write anything, move to the next
+        {
+          cursor.continue();
+        }
+      }
+}
+Feeds.prototype.expireEntries = expireEntries;
+
 // object Feeds.p_feedUpdate
-// update fields and entries in m_rssFeeds[] that are new
+// update fields and entries (type RSSHeader) in m_rssFeeds[] that are new
 // cbWriteDone -- called to signal when the write to disk operation is completed
 //                (it will be called even if 0 records are updated)
 function p_feedUpdate(feedHeaderNew, cbWriteDone)
@@ -2274,6 +2328,7 @@ function p_poll(self)
   log.info('fetch: ' + self.m_pollIndex + ' url: ' + urlRss);
   ++self.m_pollIndex;
 
+  var i = 0;
   self.p_fetchRss(urlRss, function()
       {
         self.m_feedsCB.onRssFetchProgress((self.m_pollIndex / self.m_rssFeeds.length) * 100);
@@ -2285,6 +2340,9 @@ function p_poll(self)
           delay = self.m_pollIntervalSec;
           log.info(utils_ns.dateToStr(new Date()) + ' -- poll loop completed, wait...');
           self.m_feedsCB.onRssFetchProgress(100);  // progress 100%
+          // Execute hook for completion of polling loop
+          for (i = 0; i < self.m_hook_feed_poll_completed.lenght; ++i)
+            self.m_hook_feed_poll_completed[i]()
         }
         self.p_reschedulePoll(delay);
       },
