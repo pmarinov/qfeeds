@@ -28,6 +28,16 @@ function Feeds()
   self.m_rssFeeds = [];  // array of RssHeader, sorted by url
   self.m_listNotify = [];
   self.m_hook_feed_poll_completed = [];
+  self.m_hook_feed_poll_completed.push(function ()
+      {
+        // Check if it is time to expire some old entries from DB on disk
+        self.p_expireEntries();
+      });
+  self.m_hook_feed_poll_completed.push(function ()
+      {
+        // Compute size of entries on disk
+        self.p_entriesCalcSize();
+      });
 
   self.m_prefs = {};  // App's preferences
 
@@ -55,6 +65,10 @@ function Feeds()
 
   // Setup the poll loop
   self.m_timeoutID = setTimeout(p_poll, 1, self);
+
+  // DBSize (rough db size)
+  self.m_dbsize = 0;
+  self.m_dbentered = false; // TODO: remove
 
   // Help strict mode detect miss-typed fields
   Object.preventExtensions(this);
@@ -405,44 +419,57 @@ function getStats()
 {
   var self = this;
 
-  var gdriveStats = self.m_rtGDrive.getStats();
-
-  var strCnt = self.prefGet("m_local.feeds.expired_remote_records");
-  var cntExpired = 0;
-  if (strCnt !== undefined)
-  {
-    cntExpired = parseInt(strCnt);
-    if (isNaN(cntExpired))
-      cntExpired = 0;
-  }
-
   var entryGDrive =
   {
-    groupName: 'GDrive usage by "r-rss"',
-    values:
-    [
-      {
-        name: 'Tables file',
-        value: gdriveStats.table
-      },
-      {
-        name: 'Bytes used',
-        value: gdriveStats.bytes
-      },
-      {
-        name: 'Max size',
-        value: gdriveStats.maxBytes
-      },
-      {
-        name: 'Number of records',
-        value: gdriveStats.records
-      },
-      {
-        name: 'Number of expired',
-        value: cntExpired + ' (from this instance only)'
-      }
-    ]
+    groupName: 'GDrive (not activated)',
+    values: []
+  };
+
+  if (self.m_rtGDrive != null)
+  {
+    var gdriveStats = self.m_rtGDrive.getStats();
+
+    var strCnt = self.prefGet("m_local.feeds.expired_remote_records");
+    var cntExpired = 0;
+    if (strCnt !== undefined)
+    {
+      cntExpired = parseInt(strCnt);
+      if (isNaN(cntExpired))
+        cntExpired = 0;
+    }
+
+    entryGDrive =
+    {
+      groupName: 'GDrive usage by "r-rss"',
+      values:
+      [
+        {
+          name: 'Tables file',
+          value: gdriveStats.table
+        },
+        {
+          name: 'Bytes used',
+          value: gdriveStats.bytes
+        },
+        {
+          name: 'Max size limit by GDrive',
+          value: gdriveStats.maxBytes
+        },
+        {
+          name: 'Number of records',
+          value: gdriveStats.records
+        },
+        {
+          name: 'Number of expired',
+          value: cntExpired + ' (from this instance only)'
+        }
+      ]
+    }
   }
+
+  var sizeStr = '(computation pending)'
+  if (self.m_dbsize > 0)
+    sizeStr = utils_ns.numberWithCommas(self.m_dbsize) + ' (rough size in bytes)'
 
   var entryFeeds =
   {
@@ -452,6 +479,10 @@ function getStats()
       {
         name: 'Total number',
         value: self.m_rssFeeds.length
+      },
+      {
+        name: 'Size on disk',
+        value: sizeStr
       }
     ]
   }
@@ -1747,18 +1778,83 @@ function updateEntriesAll(cbUpdate)
 }
 Feeds.prototype.updateEntriesAll = updateEntriesAll;
 
-// object Feeds.expireEntries
-// Walk over all records for RSS entries (table: rss_data), delete old records
-function expireEntries()
+// object Feeds.p_timeSinceLastDBExpireCycle
+// Computes time in milliseconds since the last time the expiration cycle for recoreds was run
+function p_timeSinceLastDBExpireCycle()
 {
   var self = this;
 
-  log.info('db: expire all...');
-  // Insert entry in m_dbSubscriptions
+  var strDateExpirationCycle = self.prefGet('m_local.feeds.expired_db_last_cycle');
+  if (strDateExpirationCycle === undefined)
+    return -1;  // This preference record is empty, this is the first time
+
+  var timeStampLastCycle = parseInt(strDateExpirationCycle);
+  utils_ns.assert(!isNaN(timeStampLastCycle), 'Invalid timestamp: ' + strDateExpirationCycle);
+
+  var now = new Date();
+  var elapsedTime = now.getTime() - timeStampLastCycle;
+
+  return elapsedTime;
+}
+Feeds.prototype.p_timeSinceLastDBExpireCycle = p_timeSinceLastDBExpireCycle;
+
+// object Feeds.p_isTimeToExpireDB
+// Increment the value of preference key 'm_local.app.expired_remote_records'
+function p_isTimeToExpireDB()
+{
+  var self = this;
+
+  var elapsedTime = self.p_timeSinceLastDBExpireCycle();
+  if (elapsedTime == -1)  // No date was yet recorded, first time call
+    return true;
+
+  var msDay = 24 * 60 * 60 * 1000;  // Miliseconds in 24 hours
+  if (elapsedTime > msDay)
+    return true;
+  else
+    return false;
+}
+Feeds.prototype.p_isTimeToExpireDB = p_isTimeToExpireDB;
+
+// object Feeds.p_recordTimeExpireCycle
+// Records the current time in the key 'm_local.feeds.expired_db_last_cycle'
+function p_recordTimeExpireCycle()
+{
+  var self = this;
+
+  var strDate = ((new Date()).getTime()).toString();
+  self.prefSet('m_local.feeds.expired_db_last_cycle', strDate);
+}
+Feeds.prototype.p_recordTimeExpireCycle = p_recordTimeExpireCycle;
+
+// object Feeds.p_expireEntries
+// Walk over all records for RSS entries (table: rss_data), delete old records
+// Keep track of time of last action, don't repeat in intervals less than 24h
+function p_expireEntries()
+{
+  var self = this;
+
+  if (!self.p_isTimeToExpireDB())
+  {
+    log.info('p_expireEntries: skip');
+    return;
+  }
+
+  self.p_recordTimeExpireCycle();
+
+  // Call it only once
+  // TODO: remove
+  if (self.m_dbentered)
+    return;
+  self.m_dbentered = true;
+
+  log.info('db: expire older entries...');
+
   var tran = self.m_db.transaction(['rss_data'], 'readwrite');
-  self.p_dbSetTranErrorLogging(tran, 'rss_data', 'update.3');
+  self.p_dbSetTranErrorLogging(tran, 'rss_data', 'expire');
   var store = tran.objectStore('rss_data');
   var cursor = store.openCursor();  // navigate all entries
+  var totalSize = 0;
   cursor.onsuccess = function(event)
       {
         var req = null;
@@ -1766,14 +1862,18 @@ function expireEntries()
         var cursor = event.target.result;
         if (!cursor)
         {
-          cbUpdate(null);  // Tell the callback we are done
+          // cbUpdate(null);  // Tell the callback we are done
+          self.m_dbsize = totalSize;
+          log.info('db: expire records, last record');
           return;
         }
 
         var entry = cursor.value;
 
         // Call the update callback for this value
-        var r = cbUpdate(cursor.value);
+        totalSize += utils_ns.roughSizeOfObject(cursor.value);
+        // var r = cbUpdate(cursor.value);
+        var r = 2;
         if (r == 0)
         {
           return;  // done with all entries
@@ -1784,11 +1884,11 @@ function expireEntries()
           req.onsuccess = function(event)
               {
                 var data = req.result;
-                log.info('db: update success: ' + req.result);
+                log.info('db: expire records success: ' + req.result);
               }
           req.onerror = function(event)
               {
-                log.error('db: update error msg: ' + req.error.message);
+                log.error('db: expire records error msg: ' + req.error.message);
               }
           cursor.continue();
         }
@@ -1798,7 +1898,37 @@ function expireEntries()
         }
       }
 }
-Feeds.prototype.expireEntries = expireEntries;
+Feeds.prototype.p_expireEntries = p_expireEntries;
+
+// object Feeds.p_entriesCalcSize
+// Walk over all records for RSS entries (table: rss_data), compute total size
+function p_entriesCalcSize()
+{
+  var self = this;
+
+  log.info('db: calculate size of all entries...');
+
+  var totalSize = 0;
+  var cnt = 0;
+
+  self.feedReadEntriesAll(function(rssEntry)
+      {
+        if (rssEntry == null)
+        {
+          log.info('db calc size, total entries: ' + cnt);
+          log.info('db calc size, total size: ' + utils_ns.numberWithCommas(totalSize));
+          self.m_dbsize = totalSize;
+          return 0;
+        }
+        else
+        {
+          ++cnt;
+          totalSize += utils_ns.roughSizeOfObject(rssEntry);
+          return 1;
+        }
+      });
+}
+Feeds.prototype.p_entriesCalcSize = p_entriesCalcSize;
 
 // object Feeds.p_feedUpdate
 // update fields and entries (type RSSHeader) in m_rssFeeds[] that are new
@@ -2328,6 +2458,10 @@ function p_poll(self)
   log.info('fetch: ' + self.m_pollIndex + ' url: ' + urlRss);
   ++self.m_pollIndex;
 
+
+  // TODO: remove, only for initial dev
+  // self.p_expireEntries();
+
   var i = 0;
   self.p_fetchRss(urlRss, function()
       {
@@ -2341,7 +2475,7 @@ function p_poll(self)
           log.info(utils_ns.dateToStr(new Date()) + ' -- poll loop completed, wait...');
           self.m_feedsCB.onRssFetchProgress(100);  // progress 100%
           // Execute hook for completion of polling loop
-          for (i = 0; i < self.m_hook_feed_poll_completed.lenght; ++i)
+          for (i = 0; i < self.m_hook_feed_poll_completed.length; ++i)
             self.m_hook_feed_poll_completed[i]()
         }
         self.p_reschedulePoll(delay);
