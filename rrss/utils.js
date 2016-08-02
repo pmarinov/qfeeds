@@ -360,6 +360,11 @@ function numberWithCommas(x)
   return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
+function numberWith2Decimals(v)
+{
+  return parseFloat(Math.round(v * 100) / 100).toFixed(2)
+}
+
 utils_ns.assert = assert;
 utils_ns.roughSizeOfObject = roughSizeOfObject;
 utils_ns.hasFields = hasFields;
@@ -375,5 +380,6 @@ utils_ns.listOfFields = listOfFields;
 utils_ns.copyFields = copyFields;
 utils_ns.marshal = marshal;
 utils_ns.numberWithCommas = numberWithCommas;
+utils_ns.numberWith2Decimals = numberWith2Decimals;
 
 })();

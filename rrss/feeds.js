@@ -69,6 +69,9 @@ function Feeds()
   // DBSize (rough db size)
   self.m_dbsize = 0;
   self.m_dbentered = false; // TODO: remove
+  self.m_numTotal = 0;
+  self.m_numExpire = 0;
+  self.m_totalSizeToExpire = 0;
 
   // Help strict mode detect miss-typed fields
   Object.preventExtensions(this);
@@ -449,7 +452,7 @@ function getStats()
         },
         {
           name: 'Bytes used',
-          value: gdriveStats.bytes
+          value: utils_ns.numberWithCommas(gdriveStats.bytes)
         },
         {
           name: 'Max size limit by GDrive',
@@ -470,6 +473,22 @@ function getStats()
   var sizeStr = '(computation pending)'
   if (self.m_dbsize > 0)
     sizeStr = utils_ns.numberWithCommas(self.m_dbsize) + ' (rough size in bytes)'
+  var cntStr = '(count pending)'
+  if (self.m_numTotal > 0)
+    cntStr = utils_ns.numberWithCommas(self.m_numTotal)
+  var expiredSizeStr = '(nothing expired yet)'
+  if (self.m_totalSizeToExpire > 0)
+    expiredSizeStr = utils_ns.numberWithCommas(self.m_totalSizeToExpire)
+  var expiredCntStr = '(nothing expired yet)'
+  if (self.m_numExpire > 0)
+    expiredCntStr = utils_ns.numberWithCommas(self.m_numExpire)
+  var strSinceLastExpireCycle = '(never expired)'
+  var elapsedTimeMs = self.p_timeSinceLastDBExpireCycle();  // In milliseconds
+  if (elapsedTimeMs != -1)  // No date was yet recorded, first time call
+  {
+    var elapsedHours = elapsedTimeMs / (60.0 * 60.0 * 1000);
+    strSinceLastExpireCycle = utils_ns.numberWith2Decimals(elapsedHours) + ' hours';
+  }
 
   var entryFeeds =
   {
@@ -481,8 +500,24 @@ function getStats()
         value: self.m_rssFeeds.length
       },
       {
+        name: 'Number of individual entries',
+        value: cntStr,
+      },
+      {
         name: 'Size on disk',
         value: sizeStr
+      },
+      {
+        name: 'Number of individual expired entries',
+        value: expiredCntStr,
+      },
+      {
+        name: 'Size on disk of individual expired entries',
+        value: expiredSizeStr
+      },
+      {
+        name: 'Time since last purge of expired entries',
+        value: strSinceLastExpireCycle
       }
     ]
   }
@@ -1834,13 +1869,13 @@ function p_expireEntries()
 {
   var self = this;
 
-  if (!self.p_isTimeToExpireDB())
-  {
-    log.info('p_expireEntries: skip');
-    return;
-  }
+  // if (!self.p_isTimeToExpireDB())
+  // {
+  //   log.info('p_expireEntries: skip');
+  //   return;
+  // }
 
-  self.p_recordTimeExpireCycle();
+  // self.p_recordTimeExpireCycle();
 
   // Call it only once
   // TODO: remove
@@ -1853,8 +1888,10 @@ function p_expireEntries()
   var tran = self.m_db.transaction(['rss_data'], 'readwrite');
   self.p_dbSetTranErrorLogging(tran, 'rss_data', 'expire');
   var store = tran.objectStore('rss_data');
-  var cursor = store.openCursor();  // navigate all entries
-  var totalSize = 0;
+  var cursor = store.openCursor();  // navigate through all the entries
+  var totalSizeToExpire = 0;
+  var numExpire = 0;
+  var numTotal = 0;
   cursor.onsuccess = function(event)
       {
         var req = null;
@@ -1863,39 +1900,34 @@ function p_expireEntries()
         if (!cursor)
         {
           // cbUpdate(null);  // Tell the callback we are done
-          self.m_dbsize = totalSize;
+          self.m_numExpire = numExpire;
+          self.m_totalSizeToExpire = totalSizeToExpire;
           log.info('db: expire records, last record');
+          log.info('db: expire record, num = ' + numExpire + ' from total = ' + numTotal +
+                   ', size = ' + totalSizeToExpire);
           return;
         }
 
         var entry = cursor.value;
 
         // Call the update callback for this value
-        totalSize += utils_ns.roughSizeOfObject(cursor.value);
-        // var r = cbUpdate(cursor.value);
-        var r = 2;
-        if (r == 0)
+        ++numTotal;
+        if (feeds_ns.isTooOldRssEntry(cursor.value))
         {
-          return;  // done with all entries
+          ++numExpire;
+          totalSizeToExpire += utils_ns.roughSizeOfObject(cursor.value);
         }
-        else if (r == 1)  // Write new value and move to the next
-        {
-          req = cursor.update(cursor.value);
-          req.onsuccess = function(event)
-              {
-                var data = req.result;
-                log.info('db: expire records success: ' + req.result);
-              }
-          req.onerror = function(event)
-              {
-                log.error('db: expire records error msg: ' + req.error.message);
-              }
-          cursor.continue();
-        }
-        else if (r == 2)  // Don't write anything, move to the next
-        {
-          cursor.continue();
-        }
+        // req = cursor.update(cursor.value);
+        // req.onsuccess = function(event)
+        //     {
+        //       var data = req.result;
+        //       log.info('db: expire records success: ' + req.result);
+        //     }
+        // req.onerror = function(event)
+        //     {
+        //       log.error('db: expire records error msg: ' + req.error.message);
+        //     }
+        cursor.continue();
       }
 }
 Feeds.prototype.p_expireEntries = p_expireEntries;
@@ -1918,6 +1950,7 @@ function p_entriesCalcSize()
           log.info('db calc size, total entries: ' + cnt);
           log.info('db calc size, total size: ' + utils_ns.numberWithCommas(totalSize));
           self.m_dbsize = totalSize;
+          self.m_numTotal = cnt;
           return 0;
         }
         else
@@ -2460,7 +2493,7 @@ function p_poll(self)
 
 
   // TODO: remove, only for initial dev
-  // self.p_expireEntries();
+  self.p_expireEntries();
 
   var i = 0;
   self.p_fetchRss(urlRss, function()
