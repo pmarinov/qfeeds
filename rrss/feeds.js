@@ -478,7 +478,7 @@ function getStats()
     cntStr = utils_ns.numberWithCommas(self.m_numTotal)
   var expiredSizeStr = '(nothing expired yet)'
   if (self.m_totalSizeToExpire > 0)
-    expiredSizeStr = utils_ns.numberWithCommas(self.m_totalSizeToExpire)
+    expiredSizeStr = utils_ns.numberWithCommas(self.m_totalSizeToExpire) + ' (rough size in bytes)'
   var expiredCntStr = '(nothing expired yet)'
   if (self.m_numExpire > 0)
     expiredCntStr = utils_ns.numberWithCommas(self.m_numExpire)
@@ -506,23 +506,31 @@ function getStats()
       {
         name: 'Size on disk',
         value: sizeStr
+      }
+    ]
+  }
+
+  var entryExpired =
+  {
+    groupName: 'Purge of expired entries from disk (last operation only)',
+    values:
+    [
+      {
+        name: 'Number of entries',
+        value: expiredCntStr
       },
       {
-        name: 'Number of individual expired entries',
-        value: expiredCntStr,
-      },
-      {
-        name: 'Size on disk of individual expired entries',
+        name: 'Size saved on disk',
         value: expiredSizeStr
       },
       {
-        name: 'Time since last purge of expired entries',
+        name: 'Time since last purge',
         value: strSinceLastExpireCycle
       }
     ]
   }
 
-  var stats = [entryGDrive, entryFeeds];
+  var stats = [entryGDrive, entryFeeds, entryExpired];
   return stats;
 }
 Feeds.prototype.getStats = getStats;
