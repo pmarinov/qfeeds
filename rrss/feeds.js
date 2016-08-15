@@ -70,8 +70,9 @@ function Feeds()
   self.m_dbsize = 0;
   self.m_dbentered = false; // TODO: remove
   self.m_numTotal = 0;
-  self.m_numExpire = 0;
-  self.m_totalSizeToExpire = 0;
+  self.m_numExpire = -1;
+  self.m_totalSizeToExpire = -1;
+  self.m_numDeleteErrors = 0;
 
   // Help strict mode detect miss-typed fields
   Object.preventExtensions(this);
@@ -129,7 +130,7 @@ function prefSet(key, value)
               }
           reqAdd.onerror = function(event)
               {
-                log.errror("db: ('preferences', 'write') error for: " + newEntry2.m_pref);
+                log.error("db: ('preferences', 'write') error for: " + newEntry2.m_pref);
                 var error_msg = "db: ('preference', 'open') error: " + reqAdd.error.message;
                 utils_ns.domError(error_msg);
               }
@@ -343,7 +344,6 @@ function p_rtableRemoteEntryReadListener(records)
       }
 
       // Apply new state in the IndexedDB
-      var entry_date = r.data.m_date;  // date in strict string format
       self.feedUpdateEntry(rss_entry_hash,
           function(state, dbEntry)
           {
@@ -368,7 +368,7 @@ function p_rtableRemoteEntryReadListener(records)
               log.trace("db: ('rss_data') update entry (" + rss_entry_hash + '): not found: put local placeholder');
               // Create a pseudo entry -- only hash, date, m_remote_state and is_read are valid
               dbEntry.m_hash = rss_entry_hash;
-              dbEntry.m_date = entry_date;
+              dbEntry.m_date = dateEntry;  // in Date object format
               dbEntry.m_remote_state = feeds_ns.RssSyncState.IS_REMOTE_ONLY;
               dbEntry.m_is_read = is_read;
               dbEntry.m_title = '';
@@ -477,10 +477,10 @@ function getStats()
   if (self.m_numTotal > 0)
     cntStr = utils_ns.numberWithCommas(self.m_numTotal)
   var expiredSizeStr = '(nothing expired yet)'
-  if (self.m_totalSizeToExpire > 0)
+  if (self.m_totalSizeToExpire != -1)
     expiredSizeStr = utils_ns.numberWithCommas(self.m_totalSizeToExpire) + ' (rough size in bytes)'
   var expiredCntStr = '(nothing expired yet)'
-  if (self.m_numExpire > 0)
+  if (self.m_numExpire != -1)
     expiredCntStr = utils_ns.numberWithCommas(self.m_numExpire)
   var strSinceLastExpireCycle = '(never expired)'
   var elapsedTimeMs = self.p_timeSinceLastDBExpireCycle();  // In milliseconds
@@ -516,7 +516,7 @@ function getStats()
     values:
     [
       {
-        name: 'Number of entries',
+        name: 'Deleted entries',
         value: expiredCntStr
       },
       {
@@ -526,6 +526,10 @@ function getStats()
       {
         name: 'Time since last purge',
         value: strSinceLastExpireCycle
+      },
+      {
+        name: 'Delete errors',
+        value: self.m_numDeleteErrors
       }
     ]
   }
@@ -1877,19 +1881,13 @@ function p_expireEntries()
 {
   var self = this;
 
-  // if (!self.p_isTimeToExpireDB())
-  // {
-  //   log.info('p_expireEntries: skip');
-  //   return;
-  // }
-
-  // self.p_recordTimeExpireCycle();
-
-  // Call it only once
-  // TODO: remove
-  if (self.m_dbentered)
+  if (!self.p_isTimeToExpireDB())
+  {
+    log.info('p_expireEntries: skip');
     return;
-  self.m_dbentered = true;
+  }
+
+  self.p_recordTimeExpireCycle();
 
   log.info('db: expire older entries...');
 
@@ -1922,19 +1920,26 @@ function p_expireEntries()
         ++numTotal;
         if (feeds_ns.isTooOldRssEntry(cursor.value))
         {
+          // Update counters to display in pane Stats
           ++numExpire;
           totalSizeToExpire += utils_ns.roughSizeOfObject(cursor.value);
+
+          // Delete this record in IndexedDb
+          var delReq = cursor.delete();
+          delReq.onsuccess = function(event)
+              {
+                log.info('db: expire records success');
+              }
+          delReq.onerror = function(event)
+              {
+                ++self.m_numDeleteErrors;
+                log.error('db: expire records error msg: ' + req.error.message);
+                log.error("db: ('rss_data', 'delete') error for: " + cursor.m_hash);
+                var error_msg = "db: ('rss_data', 'delete') error: " + reqAdd.error.message;
+                utils_ns.domError(error_msg);
+              }
         }
-        // req = cursor.update(cursor.value);
-        // req.onsuccess = function(event)
-        //     {
-        //       var data = req.result;
-        //       log.info('db: expire records success: ' + req.result);
-        //     }
-        // req.onerror = function(event)
-        //     {
-        //       log.error('db: expire records error msg: ' + req.error.message);
-        //     }
+
         cursor.continue();
       }
 }
@@ -2021,6 +2026,11 @@ function p_feedUpdate(feedHeaderNew, cbWriteDone)
   {
     keyNew = keysNew[i];
     newEntry = feedHeaderNew.x_items[keyNew];
+
+    // Skip it, if entry is too old
+    if (feeds_ns.isTooOldRssEntry(newEntry))
+      continue;
+
     // Record a new entry if not already in the database
     ++cntDone;
     self.p_feedRecordEntry(target.m_url, newEntry,
@@ -2498,10 +2508,6 @@ function p_poll(self)
   var urlRss = self.m_rssFeeds[self.m_pollIndex].m_url;
   log.info('fetch: ' + self.m_pollIndex + ' url: ' + urlRss);
   ++self.m_pollIndex;
-
-
-  // TODO: remove, only for initial dev
-  self.p_expireEntries();
 
   var i = 0;
   self.p_fetchRss(urlRss, function()
