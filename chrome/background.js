@@ -12,48 +12,90 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+//
+// Background (event) page of the extension
+//
+// * Keep track of which is the active tab
+// * Via messages from the content script record if pages have feeds
+// * Manage the icon of the extension
+// * Display an orange dot if current tab contains a feed
+// * If icon clicked, create the extension tab
+// * If icon clicked and current tab has a feed, send it via a message to extension
+// * Use localStorage to survive unloading of the event (background) page
+
 (function ()
 {
 
-var rrssTab = null;  // Integer ID of tab into which "rrss" is running
+// Extension installed (browser is started)
+chrome.runtime.onInstalled.addListener(function()
+    {
+      console.log('installed');
 
-// A dictionary keyed off of tabId that keeps track of data per tab (for
-// example what feedUrl was detected in the tab).
-var feedData = {};
-var lastActiveTab = 0;  // TODO: track last active tab properly
-var restoreLastActiveTab = 0;  // Because event "selected" is before event "new" we don't yet know what kind of tab
+      var tabs =
+      {
+        rrssTab: null,  // Integer ID of tab into which "rrss" is running
+        lastActiveTab: 0
+      };
+      localStorage.setItem('tabs', JSON.stringify(tabs));
+
+      // A dictionary keyed off of tabId that keeps track of data per tab (for
+      // example what feedUrl was detected in the tab).
+      var feedData = {}
+      localStorage.setItem('feedData', JSON.stringify(feedData));
+    });
+
+// A tab was closed
+chrome.tabs.onRemoved.addListener(function(tabId)
+    {
+      // console.log('remove ' + tabId)
+      var feedData = JSON.parse(localStorage.getItem('feedData'));
+      delete feedData[tabId];
+      localStorage.setItem('feedData', JSON.stringify(feedData));
+    });
+
+// Not clear, closing the background page or closing the browser
+chrome.runtime.onSuspend.addListener(function()
+    {
+      // Do some simple clean-up tasks.
+      console.log('closed');
+    });
 
 // Handle click on the icon of the extension
 // Start the extension or activate an existing tab into which it is running
 chrome.browserAction.onClicked.addListener(function(tab)
     {
-      if (rrssTab == null)
+      var tabs = JSON.parse(localStorage.getItem('tabs'));
+      if (tabs.rrssTab == null)
       {
         // Create a new tab
         chrome.tabs.create({ url: '../rrss/app.html'}, function (newTab)
             {
-              rrssTab = newTab.id;
-              console.log('"rrss" started at tab ' + rrssTab + ', active tab reset to ' + restoreLastActiveTab);
-              lastActiveTab = restoreLastActiveTab;  // We need lastActiveTab before extension was started
+              tabs.rrssTab = newTab.id;
+              console.log('"rrss" started at tab ' + tabs.rrssTab);
+              localStorage.setItem('tabs', JSON.stringify(tabs));
             });
       }
       else
       {
         // Activate existing tab where the extension is already running
-        chrome.tabs.update(rrssTab, {selected: true});
-        console.log('"rrss" activated as tab ' + rrssTab);
+        chrome.tabs.update(tabs.rrssTab, {selected: true});
+        console.log('"rrss" activated as tab ' + tabs.rrssTab);
 
-        chrome.runtime.sendMessage({msg: 'feedsActivated', feedData: feedData[lastActiveTab]});
+        // Send it feed info (if any for last active tab)
+        var feedData = JSON.parse(localStorage.getItem('feedData'));
+        chrome.runtime.sendMessage({msg: 'feedsActivated', feedData: feedData[tabs.lastActiveTab]});
       }
     });
 
 // Monitor if the extension's tab has been closed
 chrome.tabs.onRemoved.addListener(function (removedTab, removeInfo)
     {
-      if (rrssTab == removedTab)
+      var tabs = JSON.parse(localStorage.getItem('tabs'));
+      if (tabs.rrssTab == removedTab)
       {
-        console.log('"rrss" closed as tab ' + rrssTab);
-        rrssTab = null;
+        console.log('"rrss" closed as tab ' + tabs.rrssTab);
+        tabs.rrssTab = null;
+        localStorage.setItem('tabs', JSON.stringify(tabs));
       }
     });
 
@@ -69,11 +111,12 @@ function isSelfURL(url)
 // Record any new tab as lastActiveTab
 chrome.tabs.onSelectionChanged.addListener(function(tabId, selectInfo)
     {
-      restoreLastActiveTab = lastActiveTab;
-      if (rrssTab != tabId)
+      var tabs = JSON.parse(localStorage.getItem('tabs'));
+      if (tabs.rrssTab != tabId)
       {
-        console.log('selected (active): ' + lastActiveTab);
-        lastActiveTab = tabId;  // Record only if this is not our own extension's main page
+        console.log('selected (active): ' + tabs.lastActiveTab);
+        tabs.lastActiveTab = tabId;
+        localStorage.setItem('tabs', JSON.stringify(tabs));
       }
       else
       {
@@ -93,25 +136,29 @@ chrome.tabs.onUpdated.addListener(function (tabId, changeInfo, tab)
       // Monitor if URL of a tab changes
       // 1. Away from "rrss" extension
       // 2. Into "rrss" extension
-      if (tabId == rrssTab)
+      var tabs = JSON.parse(localStorage.getItem('tabs'));
+      if (tabId == tabs.rrssTab)
       {
         if (!isSelfURL(tab.url))
         {
           console.log('Extension exited by URL')
-          rrssTab = null;
+          tabs.rrssTab = null;
+          localStorage.setItem('tabs', JSON.stringify(tabs));
         }
       }
       else
       {
         if (isSelfURL(tab.url))
         {
-          console.log('Extension entered by URL')
-          rrssTab = tabId;
+          console.log('Extension entered by way of URL')
+          tabs.rrssTab = tabId;
+          localStorage.setItem('tabs', JSON.stringify(tabs));
         }
       }
     });
 
-chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
+chrome.runtime.onMessage.addListener(function(request, sender, sendResponse)
+{
   if (request.msg == "feedIcon") {
     // First validate that all the URLs have the right schema.
     var input = [];
@@ -131,7 +178,9 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
 
     // We have received a list of feed urls found on the page.
     // Enable the page action icon.
+    var feedData = JSON.parse(localStorage.getItem('feedData'));
     feedData[sender.tab.id] = input;
+    localStorage.setItem('feedData', JSON.stringify(feedData));
     console.log('background_js: set feedIcon for tab ' + sender.tab.id)
     console.log(input)
     chrome.browserAction.setIcon({
@@ -163,24 +212,11 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
     //chrome.tabs.create({ url: url, index: sender.tab.index });
   } else if (request.msg == 'getFeedsList')
   {
-    console.log('"rrss" extension\'s main page asked for feeds of last active tab (' + lastActiveTab + ')')
-    sendResponse({feedData: feedData[lastActiveTab]})
+    var feedData = JSON.parse(localStorage.getItem('feedData'));
+    var tabs = JSON.parse(localStorage.getItem('tabs'));
+    console.log('"rrss" extension\'s main page asked for feeds of last active tab (' + tabs.lastActiveTab + ')');
+    sendResponse({feedData: feedData[tabs.lastActiveTab]});
   }
-});
-
-chrome.tabs.onRemoved.addListener(function(tabId)
-{
-  // console.log('remove ' + tabId)
-  delete feedData[tabId];
-});
-
-chrome.runtime.onInstalled.addListener(function() {
-  console.log('installed');
-});
-
-chrome.runtime.onSuspend.addListener(function() {
-  // Do some simple clean-up tasks.
-  console.log('closed');
 });
 
 })();
