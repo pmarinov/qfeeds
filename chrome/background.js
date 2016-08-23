@@ -60,31 +60,39 @@ chrome.runtime.onSuspend.addListener(function()
       console.log('closed');
     });
 
+// Activate extension tab
+// tabId -- id of current (or most recent) tab
+function activateRRSS(tabId)
+{
+  var tabs = JSON.parse(localStorage.getItem('tabs'));
+  if (tabs.rrssTab == null)
+  {
+    // Create a new tab
+    chrome.tabs.create({ url: '../rrss/app.html'}, function (newTab)
+        {
+          tabs.rrssTab = newTab.id;
+          console.log('"rrss" started at tab ' + tabs.rrssTab);
+          localStorage.setItem('tabs', JSON.stringify(tabs));
+        });
+  }
+  else
+  {
+    // Activate existing tab where the extension is already running
+    chrome.tabs.update(tabs.rrssTab, {selected: true});
+    console.log('"rrss" activated as tab ' + tabs.rrssTab);
+
+    // Send it feed info (if any for last active tab)
+    console.log('"rrss" extension\'s main notified for feeds of last active tab (' + tabs.lastActiveTab + ')');
+    var feedData = JSON.parse(localStorage.getItem('feedData'));
+    chrome.runtime.sendMessage({msg: 'feedsActivated', feedData: feedData[tabs.lastActiveTab]});
+  }
+}
+
 // Handle click on the icon of the extension
 // Start the extension or activate an existing tab into which it is running
 chrome.browserAction.onClicked.addListener(function(tab)
     {
-      var tabs = JSON.parse(localStorage.getItem('tabs'));
-      if (tabs.rrssTab == null)
-      {
-        // Create a new tab
-        chrome.tabs.create({ url: '../rrss/app.html'}, function (newTab)
-            {
-              tabs.rrssTab = newTab.id;
-              console.log('"rrss" started at tab ' + tabs.rrssTab);
-              localStorage.setItem('tabs', JSON.stringify(tabs));
-            });
-      }
-      else
-      {
-        // Activate existing tab where the extension is already running
-        chrome.tabs.update(tabs.rrssTab, {selected: true});
-        console.log('"rrss" activated as tab ' + tabs.rrssTab);
-
-        // Send it feed info (if any for last active tab)
-        var feedData = JSON.parse(localStorage.getItem('feedData'));
-        chrome.runtime.sendMessage({msg: 'feedsActivated', feedData: feedData[tabs.lastActiveTab]});
-      }
+      activateRRSS(tab);
     });
 
 // Monitor if the extension's tab has been closed
@@ -157,20 +165,30 @@ chrome.tabs.onUpdated.addListener(function (tabId, changeInfo, tab)
       }
     });
 
+// Checks if source is "http" or "https"
+function isValidFeedSource(href)
+{
+  var a = document.createElement('a');
+  a.href = href;
+  if (a.protocol == "http:" || a.protocol == "https:")
+    return true;
+  else
+  {
+    console.log('Warning: feed source rejected (wrong protocol): ' + href);
+    return false;
+  }
+}
+
 chrome.runtime.onMessage.addListener(function(request, sender, sendResponse)
 {
-  if (request.msg == "feedIcon") {
+  if (request.msg == "feedIcon")  // The page contains a link to a feed or feeds
+  {
     // First validate that all the URLs have the right schema.
     var input = [];
-    for (var i = 0; i < request.feeds.length; ++i) {
-      var a = document.createElement('a');
-      a.href = request.feeds[i].href;
-      if (a.protocol == "http:" || a.protocol == "https:") {
+    for (var i = 0; i < request.feeds.length; ++i)
+    {
+      if (isValidFeedSource(request.feeds[i].href))
         input.push(request.feeds[i]);
-      } else {
-        console.log('Warning: feed source rejected (wrong protocol): ' +
-                    request.feeds[i].href);
-      }
     }
 
     if (input.length == 0)
@@ -186,14 +204,28 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse)
     chrome.browserAction.setIcon({
           tabId: sender.tab.id,
           path: 'rrss/images/icon_rss_present.svg'
-          //path: {'128': 'chrome/icon_rss_present.png'}
         });
-    // chrome.pageAction.setTitle(
-    //   { tabId: sender.tab.id,
-    //     title: chrome.i18n.getMessage("rss_subscription_action_title")
-    //   });
-    // chrome.pageAction.show(sender.tab.id);
-  } else if (request.msg == "feedDocument") {
+  }
+  else if (request.msg == "feedDocument")  // The entire page is a feed XML
+  {
+    console.log('feedDocument: ' + request.href);
+
+    // Validate input, store inside feedData[]
+    var input = [];
+    if (isValidFeedSource(request.href))
+      input.push({'href': request.href});
+    else
+      return;
+    var feedData = JSON.parse(localStorage.getItem('feedData'));
+    feedData[sender.tab.id] = input;
+    localStorage.setItem('feedData', JSON.stringify(feedData));
+
+    // Mark the sender tab as last active
+    var tabs = JSON.parse(localStorage.getItem('tabs'));
+    console.log('selected (force-active): ' + sender.tab.id);
+    tabs.lastActiveTab = sender.tab.id;
+    localStorage.setItem('tabs', JSON.stringify(tabs));
+
     // We received word from the content script that this document
     // is an RSS feed (not just a document linking to the feed).
     // So, we go straight to the subscribe page in a new tab and
@@ -203,14 +235,13 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse)
     // will redirect to the subscribe page again (we don't support a
     // location.replace equivalant in the Tab navigation system).
     chrome.tabs.executeScript(sender.tab.id,
-        { code: "if (history.length > 1) " +
-                 "history.go(-1); else window.close();"
+        {
+          code: "if (history.length > 1) " +
+                "history.go(-1); else window.close();"
         });
-    var url = "subscribe.html?" + encodeURIComponent(request.href);
-    url = chrome.extension.getURL(url);
-    console.log('background_js: feedDocument' + url)
-    //chrome.tabs.create({ url: url, index: sender.tab.index });
-  } else if (request.msg == 'getFeedsList')
+    activateRRSS(sender.tab.id);
+  }
+  else if (request.msg == 'getFeedsList')
   {
     var feedData = JSON.parse(localStorage.getItem('feedData'));
     var tabs = JSON.parse(localStorage.getItem('tabs'));
