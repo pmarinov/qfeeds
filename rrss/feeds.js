@@ -2022,6 +2022,7 @@ function p_feedUpdate(feedHeaderNew, cbWriteDone)
   var totalCnt = 0;
   var unchangedCnt = 0;
   var requestsDone = false;
+  var numSkipped = 0;
   for (i = 0; i < keysNew.length; ++i)
   {
     keyNew = keysNew[i];
@@ -2029,7 +2030,10 @@ function p_feedUpdate(feedHeaderNew, cbWriteDone)
 
     // Skip it, if entry is too old
     if (feeds_ns.isTooOldRssEntry(newEntry))
+    {
+      ++numSkipped;
       continue;
+    }
 
     // Record a new entry if not already in the database
     ++cntDone;
@@ -2055,7 +2059,8 @@ function p_feedUpdate(feedHeaderNew, cbWriteDone)
   }
   requestsDone = true;
 
-  if (keysNew.length == 0)  // Nothint to write, consider operation done
+  // Nothing to write, or all skipped, consider operation done
+  if (keysNew.length == 0 || numSkipped == keysNew.length)
   {
     if (cbWriteDone != null)
     {
