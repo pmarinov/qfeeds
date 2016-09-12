@@ -545,6 +545,7 @@
 .rss_entry .body
 {
   padding-top: 4px;
+  padding-bottom: 12px;
 }
 
 .rss_entry .body_title
@@ -585,6 +586,16 @@
 {
   width: 85%;
   padding-top: 12px;
+}
+
+/*
+ * Restyle some tags that come from Bootstrap to better fit display of
+ * an RSS entry
+ */
+.rss_entry .body_entry_text blockquote
+{
+  font-size: 100%;
+  font-style: italic;
 }
 
 .rss_entry .body_entry_text a:hover
