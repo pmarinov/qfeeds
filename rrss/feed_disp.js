@@ -270,6 +270,7 @@ function feedDisplay(items, dispContext)
   self.$d.rssEntries = utils_ns.domFindInside(self.$d.dispPanel, '.rss_entry', -1);
   var expandBy = items.length - self.$d.rssEntries.length;
   var i = 0;
+  var j = 0;
   var $e = null;
   if (expandBy > 0)
   {
@@ -304,6 +305,7 @@ function feedDisplay(items, dispContext)
   var d = 0;
   var since = '';
   var is_read = false;
+  var links = [];
   for (i = 0; i < self.$d.rssEntries.length; ++i)
   {
     $rssEntry = $(self.$d.rssEntries[i]);
@@ -395,6 +397,13 @@ function feedDisplay(items, dispContext)
     // "e.m_description" is sanitized before storing into table 'rss_data', it is
     // now safe to put as HTML
     $d.bentry.html(e.m_description);
+    var links = $d.bentry.find('a');
+    for (j = 0; j < links.length; ++j)
+    {
+      /* TODO: examine if a link missed leading "http:/domain.com" portion */
+      /* Make sure links open into a new window (tab) */
+      $(links[j]).attr('target', '_blank')
+    }
 
     $rssEntry.toggleClass('hide', false);
 
