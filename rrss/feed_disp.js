@@ -306,6 +306,8 @@ function feedDisplay(items, dispContext)
   var since = '';
   var is_read = false;
   var links = [];
+  var images = [];
+  var cssStyle = '';
   for (i = 0; i < self.$d.rssEntries.length; ++i)
   {
     $rssEntry = $(self.$d.rssEntries[i]);
@@ -397,12 +399,24 @@ function feedDisplay(items, dispContext)
     // "e.m_description" is sanitized before storing into table 'rss_data', it is
     // now safe to put as HTML
     $d.bentry.html(e.m_description);
-    var links = $d.bentry.find('a');
+
+    links = $d.bentry.find('a');
     for (j = 0; j < links.length; ++j)
     {
       /* TODO: examine if a link missed leading "http:/domain.com" portion */
       /* Make sure links open into a new window (tab) */
       $(links[j]).attr('target', '_blank')
+    }
+
+    images = $d.bentry.find('img'); 
+    for (j = 0; j < images.length; ++j)
+    {
+      /* Make sure images are not unconstrained */
+      cssStyle = $(images[j]).attr('style');
+      if (cssStyle != '')
+          cssStyle = cssStyle + '; '
+      cssStyle = cssStyle + 'max-width: 90%;'
+      $(images[j]).attr('style', cssStyle)
     }
 
     $rssEntry.toggleClass('hide', false);
