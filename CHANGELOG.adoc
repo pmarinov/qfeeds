@@ -1,5 +1,15 @@
 == CHANGELOG.txt, 'rrss' - R is a reader of RSS feeds
 
+== 2016-09-11, v0.6.5, pmarinov
+
+* NEW: Parse of RDF format of feeds
+* NEW: Expire older entries from disk (indexedDB)
+* NEW: Quick start subscription option switched to "Book Reviews -- NPR"
+* bugfix: Adjust styling of tag "<blockquote" in feed entry display
+* bugfix: Set max size of images in feed entry display
+* bugfix: Handle pages that themselves are XML of a feed
+* bugfix: Make sure all link open in a new tab ("target = _blank")
+
 == 2016-06-16, v0.6.4, pmarinov
 
 * bugfix: use unprefixed "window.indexedDB"
