@@ -204,7 +204,7 @@ function p_setFeedsDomHandlers()
         self.m_feedsDB.feedAddByUrl(self.m_urlFirstTimeOffer, '',
             function()  // When feed is commited to the db, activate it
             {
-              self.p_activateDirEntry(0);
+              self.p_activateDirEntry(0, true);
             });
       });
 
@@ -352,7 +352,7 @@ function p_getFeedsCBHandlers()
           if (self.m_displayList.length > 0)
           {
             log.info("Activate entry 0");
-            self.p_activateDirEntry(0);
+            self.p_activateDirEntry(0, true);
           };
           self.$d.areaLoadingMsg.toggleClass('hide', true);
           self.m_panelMng.enableMenuEntry('ximport_opml', true);
@@ -448,6 +448,17 @@ function p_getDispCBHandlers()
           {
             self.m_feedsDB.markEntryAsRead(entryHash, isRead);
           }
+        },
+
+    // User clicked on arrow up, so display the feed as an individual feed
+    gotoFeed: function(feedUrl)
+        {
+          // Feed is subscribed, activate it
+          var idx = self.p_findDirEntry(feedUrl);
+          utils_ns.assert(idx > 0, "p_handleRecentlyViewedClick: error: inconsistent feeds directory");
+
+          log.info('activate ' + idx);
+          self.p_activateDirEntry(idx, false);
         }
   }
 
@@ -1019,7 +1030,7 @@ function p_handleRecentlyViewedClick(ev)
       utils_ns.assert(idx > 0, "p_handleRecentlyViewedClick: error: inconsistent feeds directory");
 
       log.info('activate ' + idx);
-      self.p_activateDirEntry(idx);
+      self.p_activateDirEntry(idx, true);
     }
 
     break;
@@ -1248,7 +1259,7 @@ function p_handleSubscribe(ev)
   }
   else
     log.info('subscribe: url:' + self.p_newFeedUrl);
-  self.m_feedsDB.feedAddByUrl(self.m_newFeedUrl, tags,
+    self.m_feedsDB.feedAddByUrl(self.m_newFeedUrl, tags,
       function()
       {
         // Feed's _add_ operation is complete
@@ -1264,7 +1275,7 @@ function p_handleSubscribe(ev)
           return;
 
         log.info('activate ' + idx);
-        self.p_activateDirEntry(idx);
+        self.p_activateDirEntry(idx, true);
       });
 }
 FeedsDir.prototype.p_handleSubscribe = p_handleSubscribe;
@@ -1856,7 +1867,7 @@ function onFocus()
   else
   {
     if (self.m_currentFeedName == null && self.m_displayList.length > 0)
-      self.p_activateDirEntry(0);  // Automatically select one if nothing is current
+      self.p_activateDirEntry(0, true);  // Automatically select one if nothing is current
     else
       self.p_putCurrentFeed();  // Put (re-laod from DB) current feed based on m_currentFeed
   }
@@ -1935,7 +1946,8 @@ FeedsDir.prototype.p_feedFindFolder = p_feedFindFolder;
 // Set pCurrentFeed/Name to one of the entries in the feed directory
 // If feed is inside a directory, activate the directory not the feed
 // param: num -- which entry to make current
-function p_activateDirEntry(num)
+// param: activateFolder -- activate the folder to which a feed belongs, instead of the feed itself
+function p_activateDirEntry(num, activateFolder)
 {
   var self = this;
   utils_ns.assert(num < self.m_displayList.length, "p_activateDirEntry: 'num' out of bounds");
@@ -1983,11 +1995,11 @@ function p_activateDirEntry(num)
     {
       // Feed is inside a folder, check if folder is closed
       fo = self.m_displayList[foNum];
-      if (!fo.m_isOpen)
+      if (!fo.m_isOpen && activateFolder)
       {
         // Activate the folder instead of the feed
         console.log('Inside a closed folder, activate folder');
-        self.p_activateDirEntry(foNum);
+        self.p_activateDirEntry(foNum, true);
         return;
       }
     }
@@ -2055,7 +2067,7 @@ function p_handleDirClick(ev)
       // not a folder: fall back to showing an entry
     }
 
-    self.p_activateDirEntry(i);
+    self.p_activateDirEntry(i, true);
     break;
   }
 }

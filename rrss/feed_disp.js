@@ -132,7 +132,10 @@ function p_handleDispClick(ev)
   var $barUrl = null;
   var $barIconRead = null;
   var $barIconUnread = null;
+  var $unfoldedToFeed = null;
+  var $unfoldedToFeedUrl = null;
   var $rssEntry = null;
+  var feedUrl = null;
   for (i = 0; i < self.$d.rssEntries.length; ++i)  // items: feeds contents entries
   {
     $rssEntry = $(self.$d.rssEntries[i]);
@@ -143,6 +146,17 @@ function p_handleDispClick(ev)
 
     log.info('click on ' + i);
 
+    $unfoldedToFeed = utils_ns.domFindInside($rssEntry, '.xbody_to_feed');
+    if (utils_ns.clickIsInside($unfoldedToFeed, ev.pageX, ev.pageY))
+    {
+      $unfoldedToFeedUrl = utils_ns.domFindInside($rssEntry, '.xbody_feed_source_url');
+      feedUrl = $unfoldedToFeedUrl.attr('href');
+      log.info('click on go_to_feed area ' + i, ' feed is: ' + feedUrl);
+      self.m_cb.gotoFeed(feedUrl);
+      break;
+    }
+
+    // Process click on the bar area
     $bar = utils_ns.domFindInside($rssEntry, '.xbar');
     if (!utils_ns.clickIsInside($bar, ev.pageX, ev.pageY))
       continue;
@@ -152,7 +166,7 @@ function p_handleDispClick(ev)
     {
       log.info('click on link area ' + i);
       self.p_markAsRead(i, true, false);
-      continue;
+      break;
     }
 
     $barIconRead = utils_ns.domFindInside($rssEntry, '.xmarked_read');
@@ -160,7 +174,7 @@ function p_handleDispClick(ev)
     {
       log.info('click on marked_read area ' + i);
       self.p_markAsRead(i, false, false);
-      continue;
+      break;
     }
 
     $barIconUnread = utils_ns.domFindInside($rssEntry, '.xmarked_unread');
@@ -168,7 +182,7 @@ function p_handleDispClick(ev)
     {
       log.info('click on marked_unread area ' + i);
       self.p_markAsRead(i, true, false);
-      continue;
+      break;
     }
 
     log.info('click on fold/unfold area ' + i);
@@ -386,8 +400,7 @@ function feedDisplay(items, dispContext)
     $d.btitle.text(e.m_title);
     $d.btitle.attr('href', e.m_link);
 
-    $d.burl = utils_ns.domFindInside($d.body, '.xbody_url');
-    $d.burl.attr('href', e.m_link);
+    $d.bToFeed = utils_ns.domFindInside($d.body, '.xbody_to_feed');
 
     $d.bfeed = utils_ns.domFindInside($d.body, '.xbody_feed_url');
     $d.bfeedsrc = utils_ns.domFindInside($d.body, '.xbody_feed_source_url');
