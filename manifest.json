@@ -1,8 +1,9 @@
 {
 "manifest_version": 2,
 
-"name": "rrss",
-"description": "R is a reader of RSS feeds",
+"name": "rrss -- R is a reader of RSS feeds",
+"short_name": "rrss",
+"description": "Reader of RSS feeds, w/GDrive for synchronization",
 "version": "0.6.5",
 
 "oauth2":
