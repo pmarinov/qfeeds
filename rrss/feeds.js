@@ -2440,6 +2440,7 @@ function p_fetchRss(urlRss, cbDone, cbWriteDone)
 Feeds.prototype.p_fetchRss = p_fetchRss;
 
 // object Feeds.suspendFetchLoop
+// This is the method to start or cancel the fetch loop
 // Set the delay before next iteration of the poll loop
 function suspendFetchLoop(flag, fetchWhen)
 {
@@ -2454,6 +2455,10 @@ function suspendFetchLoop(flag, fetchWhen)
   else
   {
     log.info('fatch loop RESUMED, ' + fetchWhen);
+
+    // Reset crawler index of the fetch loop
+    self.m_pollIndex = 0;
+
     self.m_loopIsSuspended = false;
     if (fetchWhen >= 0)
       self.p_reschedulePoll(fetchWhen);

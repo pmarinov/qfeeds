@@ -329,6 +329,15 @@ function p_setFeedsDomHandlers()
       {
         self.p_gotoPgOlder();
       });
+
+  self.$d.btnReload.on('click', function (e)
+      {
+        self.m_feedsDB.suspendFetchLoop(false, 0);  // Resume fetch loop, start fetching now
+      });
+  self.$d.btnCancelFetch.on('click', function (e)
+      {
+        self.m_feedsDB.suspendFetchLoop(true, 0);  // Suspend fetch loop
+      });
 }
 FeedsDir.prototype.p_setFeedsDomHandlers = p_setFeedsDomHandlers;
 
@@ -399,8 +408,11 @@ function p_getFeedsCBHandlers()
 
     onRssFetchProgress: function(percent)
         {
-          if (percent == -1)  // Goes into disabled state
+          if (percent == -1)  // Goes into disabled state (canceled)
+          {
+            self.p_showReload(true);
             self.$d.fetchProgressHolder.toggleClass('hide', true);
+          }
 
           if (percent == 0)  // start
           {
