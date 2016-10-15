@@ -78,6 +78,12 @@
   margin-top: -2px;
   width: 18px;
   cursor: pointer;
+  opacity: 0.50;
+}
+
+.left_pane .icon_reload:hover
+{
+  opacity: 1.0;
 }
 
 .left_pane .icon_cancel
@@ -85,6 +91,12 @@
   margin-top: -6px;
   width: 18px;
   cursor: pointer;
+  opacity: 0.50;
+}
+
+.left_pane .icon_cancel:hover
+{
+  opacity: 1.0;
 }
 
 .left_pane .indent1

@@ -48,6 +48,8 @@ function FeedsDir($dirPanel, feedDisp, panelMng)
     areaAddPromptFirstTime: utils_ns.domFind('#xclick_add_first_time_area'),
     areaAddPrompt: utils_ns.domFind('#xclick_add_area'),
     btnAddBooks: utils_ns.domFind('#xadd_books'),
+    btnReload: utils_ns.domFind('#xicon_reload'),
+    btnCancelFetch: utils_ns.domFind('#xicon_cancel'),
     areaAddRss: utils_ns.domFind('#xadd_feed_area'),
     feedContainer: utils_ns.domFind('#xdisplay_feed_container'),
     iconFolder: utils_ns.domFind('#ximg_folder'),
@@ -330,6 +332,25 @@ function p_setFeedsDomHandlers()
 }
 FeedsDir.prototype.p_setFeedsDomHandlers = p_setFeedsDomHandlers;
 
+// object FeedsDir.p_showReload
+// Show or hide Reload button
+function p_showReload(flag)
+{
+  var self = this;
+
+  if (flag)
+  {
+    self.$d.btnReload.toggleClass('hide', false);
+    self.$d.btnCancelFetch.toggleClass('hide', true);
+  }
+  else
+  {
+    self.$d.btnReload.toggleClass('hide', true);
+    self.$d.btnCancelFetch.toggleClass('hide', false);
+  }
+}
+FeedsDir.prototype.p_showReload = p_showReload;
+
 // object FeedsDir.p_getFeedsCBHandlers
 // Return list of Feeds CallBacks handlers
 function p_getFeedsCBHandlers()
@@ -382,12 +403,16 @@ function p_getFeedsCBHandlers()
             self.$d.fetchProgressHolder.toggleClass('hide', true);
 
           if (percent == 0)  // start
+          {
+            self.p_showReload(false);
             self.$d.fetchProgressHolder.toggleClass('hide', false);
+          }
 
           self.$d.fetchProgress.attr('style', 'width: ' + percent + '%;');
 
           if (percent == 100)  // end
           {
+            self.p_showReload(true);
             // Postglow for 1 second :-)
             setTimeout(function ()
                 {
