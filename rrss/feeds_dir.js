@@ -1998,6 +1998,10 @@ function p_activateDirEntry(num, activateFolder)
   var foNum = 0;
   f = self.m_displayList[num];
 
+  // Any pending completion of operation Unsubscribe
+  if (self.m_unsubscribedFeedUrl != null)
+    self.p_completeUnsubscription();
+
   // Switching to another feed
   if (self.m_currentFeed != f)
     self.p_onFocusLostFeed();
