@@ -1075,6 +1075,15 @@ function p_handleRecentlyViewedClick(ev)
 }
 FeedsDir.prototype.p_handleRecentlyViewedClick = p_handleRecentlyViewedClick;
 
+// object FeedsDir.p_wipeXMLDisplayArea
+// DOM load from syntax highlighting of XML could be significant, wipe if when no longer needed
+function p_wipeXMLDisplayArea()
+{
+  var self = this;
+  self.$d.xmlCode.html(''); // Nice
+}
+FeedsDir.prototype.p_wipeXMLDisplayArea = p_wipeXMLDisplayArea;
+
 // object FeedsDir.p_feedView
 // Display a feed with buttons for Subscribe
 // Feed is fetched directly from the web site, not from IndexedDB
@@ -1997,6 +2006,9 @@ function p_activateDirEntry(num, activateFolder)
   var fo = null;
   var foNum = 0;
   f = self.m_displayList[num];
+
+  // In case we come from a display for subscription operation (offload from DOM structures)
+  self.p_wipeXMLDisplayArea();
 
   // Any pending completion of operation Unsubscribe
   if (self.m_unsubscribedFeedUrl != null)
