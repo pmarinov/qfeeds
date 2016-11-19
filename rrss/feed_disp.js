@@ -119,6 +119,43 @@ function markAsRead(entryHash, isRead)
 }
 FeedDisp.prototype.markAsRead = markAsRead;
 
+// object FeedDisp.setAsCurrent
+// Display a new item as current
+function setAsCurrent(newActive)
+{
+  var self = this;
+
+  utils_ns.assert(newActive >= 0 && newActive < self.$d.rssEntries.length,
+                  "p_markAsActive: newActive is out of range");
+
+  var d = self.m_currentDispContext;
+  utils_ns.assert(d instanceof DispContext, "p_handleDispClick: x instanceof DispContext");
+  var $body = null;
+  var $bar = null;
+  var $rssEntry = self.$d.rssEntries[d.m_currentItem];
+
+  // Unmark any previously active item
+  if (d.m_currentItem != -1)
+  {
+    // Deselect the top bar area
+    $bar = utils_ns.domFindInside($rssEntry, '.xbar');
+    $bar.toggleClass('selected', false);
+
+    if (d.m_currentItem != newActive)  // Hide old one only if we are moving into a new one
+    {
+      $body = utils_ns.domFindInside($rssEntry, '.xbody');
+      $body.toggleClass('hide', true);
+    }
+  }
+
+  // Highlight the newly active
+  d.m_currentItem = newActive;
+  $rssEntry = self.$d.rssEntries[d.m_currentItem];
+  $bar = utils_ns.domFindInside($rssEntry, '.xbar');
+  $bar.toggleClass('selected', true);
+}
+FeedDisp.prototype.setAsCurrent = setAsCurrent;
+
 // object FeedDisp.p_handleDispClick
 // Handles mouse click anywhere on the display of the feeds contents
 function p_handleDispClick(ev)
@@ -136,6 +173,7 @@ function p_handleDispClick(ev)
   var $unfoldedToFeedUrl = null;
   var $rssEntry = null;
   var feedUrl = null;
+  var newCurrent = -1;
   for (i = 0; i < self.$d.rssEntries.length; ++i)  // items: feeds contents entries
   {
     $rssEntry = $(self.$d.rssEntries[i]);
@@ -160,6 +198,12 @@ function p_handleDispClick(ev)
     $bar = utils_ns.domFindInside($rssEntry, '.xbar');
     if (!utils_ns.clickIsInside($bar, ev.pageX, ev.pageY))
       continue;
+
+    d = self.m_currentDispContext;
+    utils_ns.assert(d instanceof DispContext, "p_handleDispClick: x instanceof DispContext");
+
+    // Highlight this entry as current
+    newCurrent = i;
 
     $barUrl = utils_ns.domFindInside($rssEntry, '.xurl');
     if (utils_ns.clickIsInside($barUrl, ev.pageX, ev.pageY))
@@ -187,9 +231,6 @@ function p_handleDispClick(ev)
 
     log.info('click on fold/unfold area ' + i);
 
-    d = self.m_currentDispContext;
-    utils_ns.assert(d instanceof DispContext, "p_handleDispClick: x instanceof DispContext");
-
     if (d.m_currentItem == i)  // Already current, then toggle
     {
       $body = utils_ns.domFindInside($rssEntry, '.xbody');
@@ -197,21 +238,17 @@ function p_handleDispClick(ev)
     }
     else
     {
-      // Hide the any active item
-      if (d.m_currentItem != -1)
-      {
-        $body = utils_ns.domFindInside(self.$d.rssEntries[d.m_currentItem], '.xbody');
-        $body.toggleClass('hide', true);
-      }
-
+      // Unfold
       $body = utils_ns.domFindInside($rssEntry, '.xbody');
       $body.toggleClass('hide', false);
-      d.m_currentItem = i;
     }
 
     self.p_markAsRead(i, true, false);
     break;
   }
+
+  if (newCurrent != -1)
+    self.setAsCurrent(newCurrent);
 }
 FeedDisp.prototype.p_handleDispClick = p_handleDispClick;
 
@@ -391,6 +428,7 @@ function feedDisplay(items, dispContext)
 
     // Show bar in bold if entry is unread
     $d.bar.toggleClass("unread", !is_read);
+    $d.bar.toggleClass('selected', false);  // Start in state "not current"
 
     // Fill in the body
     $d.body = utils_ns.domFindInside($rssEntry, '.xbody');

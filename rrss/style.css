@@ -490,9 +490,10 @@
   cursor: pointer;
 }
 
+/* Matches the shade of gray of the right-hand side panel */
 .rss_entry .selected
 {
-  font-weight: bold;
+  background-color: rgb(238, 238, 238);
 }
 
 .rss_entry .body
