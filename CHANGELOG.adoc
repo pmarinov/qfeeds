@@ -1,5 +1,12 @@
 == CHANGELOG.txt, 'rrss' - R is a reader of RSS feeds
 
+== 2016-12-06, v0.6.7, pmarinov
+
+* NEW: Action "Reload" + "Cancel"
+* NEW: highlight of current feed entry
+* bugfix: complete "Unsubscribe" even when returning to same folder
+* bugfix: eliminate slowdown in syntax highlighting of XML of feeds
+
 == 2016-10-02, v0.6.6, pmarinov
 
 * NEW: Easy short cut to go to individual feed when in a folder

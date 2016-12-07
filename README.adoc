@@ -22,7 +22,7 @@ Features::
 
 = Try it
 
-Version: 0.6.6 +
+Version: 0.6.7 +
 Status: Beta +
 Chrome webstore: +
 https://chrome.google.com/webstore/detail/rrss/kdjijdhlleambcpendblfhdmpmfdbcbd

@@ -4,7 +4,7 @@
 "name": "rrss -- R is a reader of RSS feeds",
 "short_name": "rrss",
 "description": "Reader of RSS feeds, w/GDrive for synchronization",
-"version": "0.6.6",
+"version": "0.6.7",
 
 "oauth2":
 {
