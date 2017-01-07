@@ -2289,6 +2289,68 @@ function p_preFirstTimePrefetch()
 }
 FeedsDir.prototype.p_preFirstTimePrefetch = p_preFirstTimePrefetch;
 
+// object FeedsDir.compareDirEntries
+// Helpef function:
+// comparator for sorting of entries of RSSHeaders so that folders are in alphabetical order
+// and inside the folders the feeds are sorted alphabetically by title
+function compareDirEntries(entry1, entry2)
+{
+  var self = this;
+
+  // Make unoform entries convenient for comparison
+  var e1 = { m_isFolder: false, m_folder: null, m_feedTitle: null };
+  var e2 = { m_isFolder: false, m_folder: null, m_feedTitle: null };
+
+  if (entry1.m_isFolder)
+  {
+    e1.m_folder = entry1.m_name;
+    e1.m_isFolder = true;
+  }
+  else
+  {
+    if (entry1.m_header.m_tags != "")
+      e1.m_folder = entry1.m_header.m_tags;
+    e1.m_feedTitle = entry1.m_header.m_title;
+  }
+
+  if (entry2.m_isFolder)
+  {
+    e2.m_folder = entry2.m_name;
+    e2.m_isFolder = true;
+  }
+  else
+  {
+    if (entry2.m_header.m_tags != "")
+      e2.m_folder = entry2.m_header.m_tags;
+    e2.m_feedTitle =  entry2.m_header.m_title;
+  }
+
+  // If entries are in the same folder, compare the titles
+  if (e1.m_folder == e2.m_folder)
+  {
+    // NOTE: e1.m_folder and/or e2.m_folder might be null
+    if (e1.m_isFolder)   // Folder name should be at the top of the group
+      return -1;
+    else if (e2.m_isFolder)
+      return 1;
+    else if (e1.m_feedTitle == e2.m_feedTitle)
+      return 0;
+    else if (e1.m_feedTitle < e2.m_feedTitle)
+      return -1;
+    else
+      return 1; // e1.m_feedTitle > e2.m_feedTitle
+  }
+  else if (e1.m_folder == null)  // Entries with no folder should go to the end
+    return 1;
+  else if (e2.m_folder == null)
+    return -1;
+  else if (e1.m_folder < e2.m_folder)
+    return -1;
+  else
+    return 1;
+}
+FeedsDir.prototype.compareDirEntries = compareDirEntries;
+
 // object FeedsDir.p_displayFeedsList
 // Show feeds and folders on the left-hand side panel
 // Build the displayList
@@ -2384,6 +2446,14 @@ function p_displayFeedsList()
     if (header.m_tags == '' || header.m_tags == null)
       self.m_displayList.push(feed);
   }
+
+  // Sort the display list
+  // 1. Folders in alphabetical order
+  // 2. Entries in alphabetical order inside folders
+  self.m_displayList.sort(function (d1, d2)
+      {
+        return self.compareDirEntries(d1, d2);
+      });
 
   // Can the domList accomodate all entries in feedsList?
   if (self.m_displayList.length > self.$d.list.length)
