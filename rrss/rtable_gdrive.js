@@ -361,9 +361,26 @@ function RTablesGDrive(rtables, cbDone, cbDisplayProgress)
                   // Load the short-cut file
                   cbDisplayProgress(10);
                   log.info('rtable: Opening Apps/rrss/' + g_documentName + '...')
-                  self.p_loadRTFile(results.items[0].id, cbDone, cbDisplayProgress);
+
+                  // Handle case of the creation of more than one stream (file) under the same name by Google Drive
+                  // Is it not clear why this is happening, we are only interested in the oldest file
+                  var i = 0;
+                  var foldest = results.items[0];
+                  var d1 = 0;
+                  var d2 = 0;
+                  for (i = 0; i < results.items.length; ++i)
+                  {
+                    d1 = Date.parse(foldest.createdDate);
+                    d2 = Date.parse(results.items[i].createdDate)
+                    if (d2 < d1)
+                      foldest = results.items[i];
+                  }
                   if (results.items.length > 1)
-                    log.warning('RTableGDrive: more than one short cut file for ' + g_documentName);
+                  {
+                    log.warn('RTableGDrive: more than one (total: ' + results.items.length + ') short cut files for \''
+                             + g_documentName + '\', using the oldest only');
+                  }
+                  self.p_loadRTFile(foldest.id, cbDone, cbDisplayProgress);
                 }
                 else
                 {
