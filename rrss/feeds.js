@@ -46,6 +46,7 @@ function Feeds()
   self.m_timeoutID = null;
   self.m_loopIsSuspended = true;
   self.m_pollIntervalSec = 60 * 60;  // Interval between feeds poll in seconds
+  self.m_fetchOrder = [];  // array of objects FetchEntryDescriptor
 
   self.m_db = null;
   self.m_rss_entry_cnt = 0;
@@ -2052,7 +2053,7 @@ function p_feedUpdate(feedHeaderNew, cbWriteDone)
            {
              if (totalCnt > 0)
                log.info(totalCnt + " new entries recorded in table 'rss_data', " + unchangedCnt + ' unchanged');
-             cbWriteDone();
+             cbWriteDone(totalCnt);
            }
          }
        });
@@ -2065,7 +2066,7 @@ function p_feedUpdate(feedHeaderNew, cbWriteDone)
     if (cbWriteDone != null)
     {
       log.info("0 new entries recorded in table 'rss_data', 0 unchanged");
-      cbWriteDone();
+      cbWriteDone(totalCnt);
     }
   }
 
@@ -2415,13 +2416,15 @@ function p_fetchRss(urlRss, cbDone, cbWriteDone)
         }
 
         var target = self.p_feedUpdate(feed,
-            function()  // CB: write operation completed
+            function(numNewEntries)  // CB: write operation completed
             {
+              if (numNewEntries > 0)
+                log.trace(urlRss + ': ' + numNewEntries + ' new entries');
               // This CB is useful for when a newly added feed needs
               // to be displayed for the first time, it relies on
               // the fact that the data is already in the IndexedDB
               if (cbWriteDone != null)
-                cbWriteDone();
+                cbWriteDone(numNewEntries);
             });
         if (target != null)
         {
@@ -2481,6 +2484,19 @@ function p_reschedulePoll(delayInSeconds)
 }
 Feeds.prototype.p_reschedulePoll = p_reschedulePoll;
 
+// object FetchEntryDescriptor [constructor]
+// Describes one entry in the list of fetch order of rss entries
+function FetchEntryDescriptor(url, folder, notify)
+{
+  this.m_url = url;
+  this.m_folder = folder;  // Folder to which a feed belongs or 'null'
+  this.m_notify = notify;
+  this.m_updated = false;  // Records if new entries are fetched for this feed URL
+
+  return this;
+}
+Feeds.prototype.FetchEntryDescriptor = FetchEntryDescriptor;
+
 // object Feeds.p_poll
 // fetch loop
 // schedule new fetch operation at the end of the previous
@@ -2501,10 +2517,18 @@ function p_poll(self)
   }
 
   if (self.m_pollIndex == 0)  // progress 0%
+  {
     self.m_feedsCB.onRssFetchProgress(0);
+    // Begin by obtaining fetch order
+    //
+    // It matches the sort order by which folders and feeds are
+    // displayed to the user. This way notifications can be displayed
+    // for fresh feeds data as soon as folder/feed is completed
+    self.m_fetchOrder = self.m_feedsCB.getFetchOrder();
+  }
 
   // Some unsubscriptions might have take place in the interim
-  if (self.m_pollIndex >= self.m_rssFeeds.length)
+  if (self.m_pollIndex >= self.m_fetchOrder.length)
   {
     self.m_feedsCB.onRssFetchProgress(100);  // progress 100%
     self.m_pollIndex = 0;
@@ -2512,19 +2536,20 @@ function p_poll(self)
     return;
   }
 
-  if (self.m_rssFeeds[self.m_pollIndex].m_remote_state == feeds_ns.RssSyncState.IS_LOCAL_ONLY)
-    log.warn("p_poll: remote state");
-
-  var urlRss = self.m_rssFeeds[self.m_pollIndex].m_url;
+  var index = self.m_pollIndex;
+  var urlRss = self.m_fetchOrder[index].m_url;
   log.info('fetch: ' + self.m_pollIndex + ' url: ' + urlRss);
   ++self.m_pollIndex;
 
   var i = 0;
-  self.p_fetchRss(urlRss, function()
+  self.p_fetchRss(urlRss, function ()  // cbDone
       {
-        self.m_feedsCB.onRssFetchProgress((self.m_pollIndex / self.m_rssFeeds.length) * 100);
+        // Update progress indicator
+        self.m_feedsCB.onRssFetchProgress((self.m_pollIndex / self.m_fetchOrder.length) * 100);
+
+        // Schedule next fetch operation
         var delay = 0;  // Don't wait in fetching the next feed
-        if (self.m_pollIndex >= self.m_rssFeeds.length)
+        if (self.m_pollIndex >= self.m_fetchOrder.length)
         {
           // Reached the end of the poll loop
           self.m_pollIndex = 0;
@@ -2537,7 +2562,16 @@ function p_poll(self)
         }
         self.p_reschedulePoll(delay);
       },
-      null);
+      function (numNewEntries)  // cbWriteDone
+      {
+        // Register if the fetch operation has brought in new entries
+        if (numNewEntries > 0)
+          self.m_fetchOrder[index].m_updated = true;
+
+        // See if notification is needed
+        if (self.m_fetchOrder[index].m_notify)
+          self.m_feedsCB.onRssNotifyFresh(self.m_fetchOrder[index]);
+      });
 }
 Feeds.prototype.p_poll = p_poll;
 

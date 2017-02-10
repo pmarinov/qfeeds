@@ -122,6 +122,7 @@ function FeedsDir($dirPanel, feedDisp, panelMng)
   self.m_feeds = {};  // map of DirEntryFeed
   self.m_recentlyViewed = []; // array of RssHeaders, feeds accessed via the "Add" button
   self.m_displayList = [];
+  self.m_fetchOrder = { order: [], revmap: {}, revmapfo: {} };  // fetch order is a derivative of displayList[]
   self.m_currentFeedName = null;
   self.m_currentFeed = null;
   self.m_currentFeedEntries = null;  // map of hashes of RSSEntries
@@ -397,6 +398,15 @@ function p_getFeedsCBHandlers()
           self.p_displayFeedsList();
         },
 
+    onRssNotifyFresh: function(fe)  // fe object FetchEntryDescriptor()
+        {
+          log.trace("CB: onRssNotifyFresh...");
+
+          // We only care to redraw feed directory
+          // info about notification's state for fresh data will come from m_fetchOrder
+          self.p_displayFeedsList();
+        },
+
     onRssRemoved: function(listRemoved)
         {
           log.info("CB: onRssRemoved...");
@@ -458,12 +468,171 @@ function p_getFeedsCBHandlers()
           // The feed is already properly displayed
           // TODO: but if there is no other feed, activate this as current
           log.warn('TODO: activate feed ' + urlNewFeed);
+        },
+
+    // Produce a list for fetch order of the poll loop. This list matches the order by which feeds
+    // are displayed in folders, this way notifications can be dispatched at the end of each folder
+    // or feed to indicate (a start next to feed/folder) any new fetched entries.
+    getFetchOrder: function()
+        {
+          var i = 0;
+          var x = null;
+          var fe = null;
+          var fetchList = [];
+          var revmap = {};  // key = url, value = index_in_fetchList
+          var revmapfo = {}; // key = folder_name, value = index_in_fetchlist_of_first_entry
+          var folder = null;
+          var prevFolder = null;
+          var notify = false;
+          var len = 0;
+          var prev = 0;
+          var index = 0;
+          for (i = 0; i < self.m_displayList.length; ++i)
+          {
+            prevFolder = folder;
+            x = self.m_displayList[i];
+
+            // Check if by walking the display list we've switched from one folder to another
+            if (x.m_isFolder)
+            {
+              // Folder: track the name (not adding entry to fetchList[]
+              utils_ns.assert(x instanceof DirEntryFolder, 'getFetchOrder: x instanceof DirEntryFolder');
+              folder = x.m_name;
+              // record in reverse map for quick access of folders that start at this location in the list
+              index = fetchList.length;
+              revmapfo[folder] = index;
+              prev  = 0;  // Previous is at the top of the list (no offset needed)
+            }
+            else
+            {
+              // RSS feed, inside folder or outside folder
+
+              // Verify if we've reached entries outside any folder
+              if (x.m_header.m_tags == '' || x.m_header.m_tags == null)
+                folder = null;
+
+              notify = false;
+              if (folder == null)  // For entries that are outside a folder, notify always
+                notify = true;
+              fe = new self.m_feedsDB.FetchEntryDescriptor(x.m_header.m_url, folder, notify);
+              index = fetchList.length;
+              fetchList.push(fe);
+              revmap[x.m_header.m_url] = index;  // Record in reverse map for quick access of feed by URL
+              prev = 1;  // Previous is one entry from the top
+            }
+
+            // Transitioning from one folder to another => set flat to notify at the end of the previous folder
+            if (folder != prevFolder)
+            {
+              len = fetchList.length;
+              if (len - prev - 1 > 0)
+              {
+                // Mark to notify the previous
+                fetchList[len - prev - 1].m_notify = true;
+              }
+            }
+          }
+
+          // Diagnostic output during debugging
+          if (false)
+          {
+            for (i = 0; i < fetchList.length; ++i)
+            {
+              var f = 'none';
+              x = fetchList[i];
+              if (x.m_folder != null)
+                f = x.m_folder;
+              console.log(f + ': ' + x.m_notify + ', ' + x.m_url);
+            }
+          }
+
+          self.m_fetchOrder.order = fetchList;
+          self.m_fetchOrder.revmap = revmap;
+          self.m_fetchOrder.revmapfo = revmapfo;
+          return fetchList;
         }
   };
 
   return feedsCB;
 }
 FeedsDir.prototype.p_getFeedsCBHandlers = p_getFeedsCBHandlers;
+
+// object FeedsDir.p_feedHasFreshEntries
+// Check if feed is flagged to have received fresh entries during poll operation
+function p_feedHasFreshEntries(url)
+{
+  var self = this;
+
+  var ix = self.m_fetchOrder.revmap[url];
+  if (ix === undefined)  // New feed was added during the polling, not yet reflected in m_fetchOrder
+    return false;
+
+  return self.m_fetchOrder.order[ix].m_updated;
+}
+FeedsDir.prototype.p_feedHasFreshEntries = p_feedHasFreshEntries;
+
+// object FeedsDir.p_folderHasFreshEntries
+// Check if at least one entry in a folder is flagged to have received fresh entries during poll operation
+function p_folderHasFreshEntries(name)
+{
+  var self = this;
+
+  var ix = self.m_fetchOrder.revmapfo[name];
+  if (ix === undefined)  // New folder was added during the polling, not yet reflected in m_fetchOrder
+    return false;
+
+  // Walk all entries from that folder
+  // All entries from a folder a groupped together, 'ix' is the first entry from that folder
+  var x = null;
+  while (ix < self.m_fetchOrder.order.length)
+  {
+    x = self.m_fetchOrder.order[ix];
+    if (x.m_folder != name)  // We have walked all entries for a folder?
+      return false;
+    if (x.m_updated)  // Fresh content for an entry?
+      return true;
+    ++ix;
+  }
+  return false;
+}
+FeedsDir.prototype.p_folderHasFreshEntries = p_folderHasFreshEntries;
+
+// object FeedsDir.p_feedMarkNotFresh
+// When user opens a folder, it needs to be marked as no longer fresh
+function p_feedMarkNotFresh(url)
+{
+  var self = this;
+
+  var ix = self.m_fetchOrder.revmap[url];
+  if (ix === undefined)  // New feed was added during the polling, not yet reflected in m_fetchOrder
+    return false;
+
+  self.m_fetchOrder.order[ix].m_updated = false;
+}
+FeedsDir.prototype.p_feedMarkNotFresh = p_feedMarkNotFresh;
+
+// object FeedsDir.p_folderMarkNotFresh
+// When user opens a folder, all entries in it are marked as no longer fresh
+function p_folderMarkNotFresh(name)
+{
+  var self = this;
+
+  var ix = self.m_fetchOrder.revmapfo[name];
+  if (ix === undefined)  // New folder was added during the polling, not yet reflected in m_fetchOrder
+    return false;
+
+  // Walk all entries from that folder
+  var x = null;
+  while (ix < self.m_fetchOrder.order.length)
+  {
+    x = self.m_fetchOrder.order[ix];
+    if (x.m_folder != name)  // We have walked all entries for a folder?
+      return false;
+    x.m_updated = false;  // Force mark as not fresh
+    ++ix;
+  }
+}
+FeedsDir.prototype.p_folderMarkNotFresh = p_folderMarkNotFresh;
 
 // object FeedsDir.p_getDispCBHandlers
 // Returns handlers for callbacks for feedsDisp object
@@ -2038,6 +2207,8 @@ function p_activateDirEntry(num, activateFolder)
     }
     self.m_currentFeedName = f.m_name;
     self.m_currentFeed = f;
+    // Remove marker that shows fresh entries were fetched
+    self.p_folderMarkNotFresh(f.m_name);
   }
   else
   {
@@ -2059,6 +2230,8 @@ function p_activateDirEntry(num, activateFolder)
     // Not in a folder or folder is open, proceeed to activate the feed
     self.m_currentFeedName = f.m_header.m_url;
     self.m_currentFeed = f;
+    // Remove marker that shows fresh entries were fetched
+    self.p_feedMarkNotFresh(f.m_header.m_url);
   }
 
   // put current feed based on m_currentFeed
@@ -2156,7 +2329,8 @@ function DirEntryFolder(folderName, dispContext)
 }
 
 // object FeedsDir.p_findUpdatedFolders
-// Add any new folder from foldersList
+// Add any new folder to m_folders
+// (This way the state of all already existing folders is preserved -- opened/closed, etc.)
 function p_findUpdatedFolders()
 {
   var self = this;
@@ -2475,6 +2649,7 @@ function p_displayFeedsList()
   var $ico_fo_closed = null;
   var $ico_rss = null;
   var $ico = null;
+  var $ico_indicator_fresh = null;
   var $indent = null;
   var isCurrent = false;
   var isTagged = true;
@@ -2491,6 +2666,7 @@ function p_displayFeedsList()
     $ico_fo_open = utils_ns.domFindInside($e, '.ximg_folder_open');
     $ico_fo_closed = utils_ns.domFindInside($e, '.ximg_folder_closed');
     $ico_rss = utils_ns.domFindInside($e, '.ximg_rss');
+    $ico_indicator_fresh = utils_ns.domFindInside($e, '.xentry_indicator_fresh');
     $ico = null;
     if (x.m_isFolder)
     {
@@ -2519,6 +2695,12 @@ function p_displayFeedsList()
       }
       $ico_rss.toggleClass('hide', true);
       $indent.toggleClass('hide', true);
+      $ico_indicator_fresh.toggleClass('hide', true);
+
+      if (self.p_folderHasFreshEntries(x.m_name))
+        $ico_indicator_fresh.toggleClass('hide', false);
+      else
+        $ico_indicator_fresh.toggleClass('hide', true);
     }
     else
     {
@@ -2531,7 +2713,7 @@ function p_displayFeedsList()
         isTagged = false;  // Not
 
       if (isTagged)
-      { 
+      {
         // If in a folder, hide/unhide depending on the state of the folder     
         $e = $(self.$d.list[i]);
         $e.toggleClass('hide', !isOpen);
@@ -2550,6 +2732,11 @@ function p_displayFeedsList()
       $ico_fo_open.toggleClass('hide', true);
       $ico_fo_closed.toggleClass('hide', true);
       $indent.toggleClass('hide', !isTagged);
+
+      if (self.p_feedHasFreshEntries(fe.m_url))
+        $ico_indicator_fresh.toggleClass('hide', false);
+      else
+        $ico_indicator_fresh.toggleClass('hide', true);
     }
 
     // Don't show in bold if this is not the current active pane

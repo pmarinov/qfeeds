@@ -66,6 +66,12 @@
   font-weight: bold;
 }
 
+.left_pane .indicator_fresh
+{
+  margin-left: 1px;
+  float: left;
+}
+
 .left_pane .add_btn_holder
 {
   overflow: hidden;
