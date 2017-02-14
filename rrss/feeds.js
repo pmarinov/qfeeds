@@ -45,7 +45,7 @@ function Feeds()
   self.m_pollIndex = 0;
   self.m_timeoutID = null;
   self.m_loopIsSuspended = true;
-  self.m_pollIntervalSec = 60 * 60;  // Interval between feeds poll in seconds
+  self.m_pollIntervalSec = 120 * 60;  // Interval between feeds poll in seconds (2h)
   self.m_fetchOrder = [];  // array of objects FetchEntryDescriptor
 
   self.m_db = null;
