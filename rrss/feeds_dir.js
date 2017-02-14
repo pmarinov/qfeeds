@@ -487,6 +487,7 @@ function p_getFeedsCBHandlers()
           var len = 0;
           var prev = 0;
           var index = 0;
+          var updated = false;
           for (i = 0; i < self.m_displayList.length; ++i)
           {
             prevFolder = folder;
@@ -516,6 +517,12 @@ function p_getFeedsCBHandlers()
                 notify = true;
               fe = new self.m_feedsDB.FetchEntryDescriptor(x.m_header.m_url, folder, notify);
               index = fetchList.length;
+              // Carry any value of status "updated" from the previous poll loop
+              updated = false;
+              if (self.m_fetchOrder.order.length > 0)
+                updated = self.p_feedHasFreshEntries(x.m_header.m_url);
+              fe.m_updated = updated;
+              // Add to fetch list
               fetchList.push(fe);
               revmap[x.m_header.m_url] = index;  // Record in reverse map for quick access of feed by URL
               prev = 1;  // Previous is one entry from the top
