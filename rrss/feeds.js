@@ -1632,6 +1632,7 @@ function p_feedRecordEntry(feedUrl, newEntry, cbWriteDone)
       {
         var data = req.result;
         var needsWrite = false;
+        var isRead = false;  // Could be set to read if it already had been read remotely
         if (data === undefined)
           needsWrite = true;
         else if (data.m_remote_state == feeds_ns.RssSyncState.IS_REMOTE_ONLY)
@@ -1642,6 +1643,7 @@ function p_feedRecordEntry(feedUrl, newEntry, cbWriteDone)
           needsWrite = true;
           newEntry2.m_is_read = data.m_is_read;
           newEntry2.m_remote_state = feeds_ns.RssSyncState.IS_SYNCED;
+          isRead = data.m_is_read;
         }
         if (needsWrite)
         {
@@ -1660,18 +1662,18 @@ function p_feedRecordEntry(feedUrl, newEntry, cbWriteDone)
               {
                 var data = reqAdd.result;
                 log.trace('db: entry (' + s + ') added: [' + newEntry2.m_link + ']');
-                cbWriteDone(0);
+                cbWriteDone(0, isRead);
               }
           reqAdd.onerror = function(event)
               {
                 log.error('db: entry (' + s + ') error [' + newEntry2.m_link + ']');
                 log.error('db: entry (' + s + ') error msg: ' + reqAdd.error.message);
-                cbWriteDone(1);
+                cbWriteDone(1, isRead);
               }
         }
         else
         {
-           cbWriteDone(3);
+           cbWriteDone(3, isRead);
           //log.info('db: entry (' + s + ') already in [' + newEntry2.m_link + ']');
         }
       }
@@ -2020,6 +2022,7 @@ function p_feedUpdate(feedHeaderNew, cbWriteDone)
   var keyNew = '';
   var newEntry = null;
   var cntDone = 0;
+  var cntFresh = 0;
   var totalCnt = 0;
   var unchangedCnt = 0;
   var requestsDone = false;
@@ -2039,10 +2042,14 @@ function p_feedUpdate(feedHeaderNew, cbWriteDone)
     // Record a new entry if not already in the database
     ++cntDone;
     self.p_feedRecordEntry(target.m_url, newEntry,
-       function(state)  // CB: write operation completed
+       function(state, isRead)  // CB: write operation completed
        {
          if (state == 0)  // New entry added to the table 'rss_data'?
+         {
+           if (!isRead)
+             ++cntFresh;
            ++totalCnt;
+         }
          if (state == 3)  // Unchanged?
            ++unchangedCnt;
 
@@ -2053,7 +2060,7 @@ function p_feedUpdate(feedHeaderNew, cbWriteDone)
            {
              if (totalCnt > 0)
                log.info(totalCnt + " new entries recorded in table 'rss_data', " + unchangedCnt + ' unchanged');
-             cbWriteDone(totalCnt);
+             cbWriteDone(totalCnt, cntFresh);
            }
          }
        });
@@ -2066,7 +2073,7 @@ function p_feedUpdate(feedHeaderNew, cbWriteDone)
     if (cbWriteDone != null)
     {
       log.info("0 new entries recorded in table 'rss_data', 0 unchanged");
-      cbWriteDone(totalCnt);
+      cbWriteDone(totalCnt, cntFresh);
     }
   }
 
@@ -2416,15 +2423,18 @@ function p_fetchRss(urlRss, cbDone, cbWriteDone)
         }
 
         var target = self.p_feedUpdate(feed,
-            function(numNewEntries)  // CB: write operation completed
+            function(numNewEntries, numFreshEntries)  // CB: write operation completed
             {
               if (numNewEntries > 0)
-                log.trace(urlRss + ': ' + numNewEntries + ' new entries');
+              {
+                log.trace(urlRss + ': ' + numNewEntries + ' new entries, ' +
+                          numFreshEntries + ' fresh entries');
+              }
               // This CB is useful for when a newly added feed needs
               // to be displayed for the first time, it relies on
               // the fact that the data is already in the IndexedDB
               if (cbWriteDone != null)
-                cbWriteDone(numNewEntries);
+                cbWriteDone(numNewEntries, numFreshEntries);
             });
         if (target != null)
         {
@@ -2562,10 +2572,10 @@ function p_poll(self)
         }
         self.p_reschedulePoll(delay);
       },
-      function (numNewEntries)  // cbWriteDone
+      function (numNewEntries, numFreshEntries)  // cbWriteDone
       {
         // Register if the fetch operation has brought in new entries
-        if (numNewEntries > 0)
+        if (numFreshEntries > 0)
           self.m_fetchOrder[index].m_updated = true;
 
         // See if notification is needed
