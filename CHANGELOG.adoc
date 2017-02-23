@@ -1,5 +1,11 @@
 == CHANGELOG.txt, 'rrss' - R is a reader of RSS feeds
 
+== 2017-02-22, v0.7.0, pmarinov
+
+* NEW: Use '*' to indicate feeds with fresh content after fetching
+* NEW: Sort entries in the panel for folders and feeds
+* bugfix: In case of (occasioanal) two files on GDrive always use older one
+
 == 2016-12-06, v0.6.7, pmarinov
 
 * NEW: Action "Reload" + "Cancel"
