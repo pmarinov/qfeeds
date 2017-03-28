@@ -213,7 +213,7 @@ function p_loadRTFile(rtFileID, cbDone, cbDisplayProgress)
 RTablesGDrive.prototype.p_loadRTFile = p_loadRTFile;
 
 // object RTableGDrive.p_createAndLoadRTFile
-function p_createAndLoadRTFile(parentFolderID, cbDone)
+function p_createAndLoadRTFile(parentFolderID, cbDone, cbDisplayProgress)
 {
   var self = this;
 
@@ -233,7 +233,7 @@ function p_createAndLoadRTFile(parentFolderID, cbDone)
   // 1: Create the shortcut file
   gapi.client.drive.files.insert(resource).execute(function (resp)
       {
-        self.p_loadRTFile(resp.id, cbDone);
+        self.p_loadRTFile(resp.id, cbDone, cbDisplayProgress);
       });
 }
 RTablesGDrive.prototype.p_createAndLoadRTFile = p_createAndLoadRTFile;
