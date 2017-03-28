@@ -253,6 +253,7 @@ function p_setFeedsDomHandlers()
             hideUndoArea: true,
             hideAreaInfoFeed: true,
             hideAreaInfoFolder: true,
+            hideAreaFeedErrors: true,
             hideXMLDisplay: true,
             hideIconInfo: false,
             hideIconSettings: false,
