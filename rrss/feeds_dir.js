@@ -2726,7 +2726,16 @@ function p_displayFeedsList()
         $e.toggleClass('hide', !isOpen);
       }
 
-      $a.text(fe.m_title);
+      if (fe.m_title == null)
+      {
+        // Use URL for display purposes if the title is still empty
+        // (title is filled in during first fetch loop)
+        $a.text(fe.m_url);
+      }
+      else
+      {
+        $a.text(fe.m_title);
+      }
       $a.attr('title', fe.m_link);
       if (x.m_numUnread != 0)
         $unread.text(x.m_numUnread.toString());
