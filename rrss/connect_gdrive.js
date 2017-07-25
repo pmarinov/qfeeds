@@ -156,7 +156,7 @@ function p_gdriveLoginLogout(isInteractive)
               //callback(chrome.runtime.lastError);
               log.error(chrome.runtime.lastError);
               self.m_accessToken = null;
-              self.m_cb.onClientqReady(1, accessToken);
+              self.m_cb.onClientReady(1, accessToken);
               self.m_cb.onProgress(100);
               return;
             };
