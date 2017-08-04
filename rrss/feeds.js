@@ -39,6 +39,8 @@ function Feeds()
         self.p_entriesCalcSize();
       });
 
+  self.m_hook_once_per_day = [];
+
   self.m_prefs = {};  // App's preferences
 
   // Poll loop
@@ -490,6 +492,13 @@ function getStats()
     var elapsedHours = elapsedTimeMs / (60.0 * 60.0 * 1000);
     strSinceLastExpireCycle = utils_ns.numberWith2Decimals(elapsedHours) + ' hours';
   }
+  var strSinceLastOncePerDay = '(never executed)'
+  elapsedTimeMs = self.p_timeSinceLastOncePerDay();  // In milliseconds
+  if (elapsedTimeMs != -1)  // No date was yet recorded, first time call
+  {
+    var elapsedHours = elapsedTimeMs / (60.0 * 60.0 * 1000);
+    strSinceLastOncePerDay = utils_ns.numberWith2Decimals(elapsedHours) + ' hours';
+  }
 
   var entryFeeds =
   {
@@ -507,7 +516,11 @@ function getStats()
       {
         name: 'Size on disk',
         value: sizeStr
-      }
+      },
+      {
+        name: 'Time since last hook "once per day"',
+        value: strSinceLastOncePerDay
+      },
     ]
   }
 
@@ -1828,6 +1841,76 @@ function updateEntriesAll(cbUpdate)
 }
 Feeds.prototype.updateEntriesAll = updateEntriesAll;
 
+// object Feeds.p_timeSinceLastOncePerDay
+// Computes time in milliseconds since the last time the "once_per_day" hook was run
+function p_timeSinceLastOncePerDay()
+{
+  var self = this;
+
+  var strDateExpirationCycle = self.prefGet('m_local.feeds.timestamp_last_once_per_day');
+  if (strDateExpirationCycle === undefined)
+    return -1;  // This preference record is empty, this is the first time
+
+  var timeStampLastCycle = parseInt(strDateExpirationCycle);
+  utils_ns.assert(!isNaN(timeStampLastCycle), 'Invalid timestamp: ' + strDateExpirationCycle);
+
+  var now = new Date();
+  var elapsedTime = now.getTime() - timeStampLastCycle;
+
+  return elapsedTime;
+}
+Feeds.prototype.p_timeSinceLastOncePerDay = p_timeSinceLastOncePerDay;
+
+// object Feeds.p_recordTimeOncePerDay
+// Records the current time in the key 'm_local.feeds.timestamp_last_once_per_day'
+function p_recordTimeOncePerDay()
+{
+  var self = this;
+
+  var strDate = ((new Date()).getTime()).toString();
+  self.prefSet('m_local.feeds.timestamp_last_once_per_day', strDate);
+}
+Feeds.prototype.p_recordTimeOncePerDay = p_recordTimeOncePerDay;
+
+// object Feeds.p_isTimeForOncePerDay
+function p_isTimeForOncePerDay()
+{
+  var self = this;
+
+  var elapsedTime = self.p_timeSinceLastOncePerDay();
+  if (elapsedTime == -1)  // No date was yet recorded, first time call
+    return true;
+
+  var msDay = 24 * 60 * 60 * 1000;  // Miliseconds in 24 hours
+  if (elapsedTime > msDay)
+    return true;
+  else
+    return false;
+}
+Feeds.prototype.p_isTimeForOncePerDay = p_isTimeForOncePerDay;
+
+// object Feeds.p_oncePerDay
+// If 24h or more have expired since last time it will execute hook "once_per_day"
+function p_oncePerDay()
+{
+  var self = this;
+
+  if (!self.p_isTimeForOncePerDay())
+  {
+    log.info('p_isTimeForOncePerDay: skip');
+    return;
+  }
+
+  self.p_recordTimeOncePerDay();
+
+  log.info('Hook "once_per_day"...');
+
+  // Execute hook
+  for (i = 0; i < self.m_hook_once_per_day.length; ++i)
+    self.m_hook_once_per_day[i]()
+}
+Feeds.prototype.p_oncePerDay = p_oncePerDay;
+
 // object Feeds.p_timeSinceLastDBExpireCycle
 // Computes time in milliseconds since the last time the expiration cycle for recoreds was run
 function p_timeSinceLastDBExpireCycle()
@@ -1849,7 +1932,6 @@ function p_timeSinceLastDBExpireCycle()
 Feeds.prototype.p_timeSinceLastDBExpireCycle = p_timeSinceLastDBExpireCycle;
 
 // object Feeds.p_isTimeToExpireDB
-// Increment the value of preference key 'm_local.app.expired_remote_records'
 function p_isTimeToExpireDB()
 {
   var self = this;
@@ -2535,6 +2617,11 @@ function p_poll(self)
     // displayed to the user. This way notifications can be displayed
     // for fresh feeds data as soon as folder/feed is completed
     self.m_fetchOrder = self.m_feedsCB.getFetchOrder();
+
+    //
+    // This is a good opportunity to check if it is time for
+    // the hook "once_per_day"
+    self.p_oncePerDay();
   }
 
   // Some unsubscriptions might have take place in the interim
