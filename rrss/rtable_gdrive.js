@@ -207,7 +207,16 @@ function p_loadRTFile(rtFileID, cbDone, cbDisplayProgress)
           g_cbNewTokenNeeded();
         }
         else
+        {
           utils_ns.domError(msg);
+          // 2017-07-05:
+          // After some time GDrive starts throwing a sequence of inexplicable errors of type "not_found",
+          // the network traffic was for URLs https://drive.google.com/otservice/bind which would return 400
+          // followed by https://drive.google.com/otservice/bind
+          // A call to g_cbNewTokenNeeded() seems to have fixed the inexplicable problem.
+          g_authenticated = false;
+          g_cbNewTokenNeeded();
+        }
       });
 }
 RTablesGDrive.prototype.p_loadRTFile = p_loadRTFile;

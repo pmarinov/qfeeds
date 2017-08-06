@@ -1906,6 +1906,7 @@ function p_oncePerDay()
   log.info('Hook "once_per_day"...');
 
   // Execute hook
+  var i = 0;
   for (i = 0; i < self.m_hook_once_per_day.length; ++i)
     self.m_hook_once_per_day[i]()
 }
