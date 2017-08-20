@@ -78,7 +78,8 @@ function getStats()
     bytes: self.m_bytesUsed,
     records: 0,
     table: '\'Apps/rrss/rtables.rrss\'',
-    maxBytes: '10 MB'
+    maxBytes: '10 MB',
+    cntToken: self.m_tokenCnt
   }
 
   var i = 0;
@@ -151,6 +152,7 @@ function p_loadRTFile(rtFileID, cbDone, cbDisplayProgress)
             })();
           }
           cbDisplayProgress(11);
+          self.m_loaded = true;
           cbDone(1);
         }
         catch (e)  // Error in my code, display it, then re-throw
@@ -196,6 +198,24 @@ function p_loadRTFile(rtFileID, cbDone, cbDisplayProgress)
       },
       function (rtError) // errorFn
       {
+        if (self.m_loaded)
+        {
+          if (rtError.type == 'not_found')
+          {
+            // Count how many times passed by the work-around section of the code
+            ++self.m_tokenCnt;
+
+            // 2017-07-05:
+            // After some time GDrive starts throwing a sequence of inexplicable errors of type "not_found",
+            // the network traffic was for URLs https://drive.google.com/otservice/bind which would return 400
+            // followed by https://drive.google.com/otservice/bind
+            // A call to g_cbNewTokenNeeded() seems to have fixed the inexplicable problem.
+            g_authenticated = false;
+            g_cbNewTokenNeeded();
+            return;
+          }
+        }
+
         cbDone(0);
 
         var msg = 'rtable: "' + rtError.type + '", isFatal=' + rtError.isFatal + ', "' + rtError.message + '"';
@@ -209,13 +229,6 @@ function p_loadRTFile(rtFileID, cbDone, cbDisplayProgress)
         else
         {
           utils_ns.domError(msg);
-          // 2017-07-05:
-          // After some time GDrive starts throwing a sequence of inexplicable errors of type "not_found",
-          // the network traffic was for URLs https://drive.google.com/otservice/bind which would return 400
-          // followed by https://drive.google.com/otservice/bind
-          // A call to g_cbNewTokenNeeded() seems to have fixed the inexplicable problem.
-          g_authenticated = false;
-          g_cbNewTokenNeeded();
         }
       });
 }
@@ -351,6 +364,8 @@ function RTablesGDrive(rtables, cbDone, cbDisplayProgress)
 
   self.m_tables = rtables;
   self.m_bytesUsed = 0;
+  self.m_loaded = false;
+  self.m_tokenCnt = 0;  // Count how many times passed by the work-around section of the code
 
   // Create or open folder "App/rss"
   cbDisplayProgress(8);

@@ -468,6 +468,10 @@ function getStats()
         {
           name: 'Number of expired',
           value: cntExpired + ' (from this instance only)'
+        },
+        {
+          name: 'GDrive workaround counter',
+          value: gdriveStats.cntToken
         }
       ]
     }
