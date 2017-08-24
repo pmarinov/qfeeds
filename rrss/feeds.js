@@ -472,6 +472,10 @@ function getStats()
         {
           name: 'GDrive workaround counter',
           value: gdriveStats.cntToken
+        },
+        {
+          name: 'GDrive non-fatal HTTP400',
+          value: gdriveStats.cnt400
         }
       ]
     }

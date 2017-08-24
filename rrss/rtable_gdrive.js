@@ -79,7 +79,8 @@ function getStats()
     records: 0,
     table: '\'Apps/rrss/rtables.rrss\'',
     maxBytes: '10 MB',
-    cntToken: self.m_tokenCnt
+    cntToken: self.m_tokenCnt,
+    cnt400: self.m_400Cnt
   }
 
   var i = 0;
@@ -213,6 +214,16 @@ function p_loadRTFile(rtFileID, cbDone, cbDisplayProgress)
             g_authenticated = false;
             g_cbNewTokenNeeded();
             return;
+          }
+          else if (rtError.isFatal == false)
+          {
+            // Supress display of an error for non-fatal errors
+            if (rtError.type == 'server_error')
+            {
+              // Keep count for screen Stats
+              ++self.m_400Cnt;
+              return;
+            }
           }
         }
 
@@ -366,6 +377,7 @@ function RTablesGDrive(rtables, cbDone, cbDisplayProgress)
   self.m_bytesUsed = 0;
   self.m_loaded = false;
   self.m_tokenCnt = 0;  // Count how many times passed by the work-around section of the code
+  self.m_400Cnt = 0;  // Count how many times the error HTTP400 (non-fatal) occurred
 
   // Create or open folder "App/rss"
   cbDisplayProgress(8);
