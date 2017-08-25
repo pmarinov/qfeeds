@@ -27,6 +27,16 @@ Status: Beta +
 Chrome webstore: +
 https://chrome.google.com/webstore/detail/rrss/kdjijdhlleambcpendblfhdmpmfdbcbd
 
+= Implementation plan
+
+* Implement automatic OPML backup on GDrive folder "Apps/rrss/backup_feeds.opml"
+* Implement Mark As Read
+* Implement display of unread counters
+
+= Help needed
+
+* Anybody interested in porting it to Firefox?
+
 = License
 
 "rrss" is {freesoftware}[free software] -- this means that everyone may
