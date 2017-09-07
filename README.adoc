@@ -22,7 +22,7 @@ Features::
 
 = Try it
 
-Version: 0.8.0 +
+Version: 0.9.0 +
 Status: Beta +
 Chrome webstore: +
 https://chrome.google.com/webstore/detail/rrss/kdjijdhlleambcpendblfhdmpmfdbcbd
@@ -35,7 +35,7 @@ https://chrome.google.com/webstore/detail/rrss/kdjijdhlleambcpendblfhdmpmfdbcbd
 
 = Help needed
 
-* Anybody interested in porting it to Firefox?
+* Anybody interested in verifying that it works on Firefox?
 
 = License
 
