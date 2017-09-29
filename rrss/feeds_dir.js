@@ -362,6 +362,96 @@ function p_showReload(flag)
 }
 FeedsDir.prototype.p_showReload = p_showReload;
 
+// object FeedsDir.p_getFetchOrder
+function p_getFetchOrder()
+{
+  var self = this;
+
+  var i = 0;
+  var x = null;
+  var fe = null;
+  var fetchList = [];
+  var revmap = {};  // key = url, value = index_in_fetchList
+  var revmapfo = {}; // key = folder_name, value = index_in_fetchlist_of_first_entry
+  var folder = null;
+  var prevFolder = null;
+  var notify = false;
+  var len = 0;
+  var prev = 0;
+  var index = 0;
+  var updated = false;
+  for (i = 0; i < self.m_displayList.length; ++i)
+  {
+    prevFolder = folder;
+    x = self.m_displayList[i];
+
+    // Check if by walking the display list we've switched from one folder to another
+    if (x.m_isFolder)
+    {
+      // Folder: track the name (not adding entry to fetchList[]
+      utils_ns.assert(x instanceof DirEntryFolder, 'getFetchOrder: x instanceof DirEntryFolder');
+      folder = x.m_name;
+      // record in reverse map for quick access of folders that start at this location in the list
+      index = fetchList.length;
+      revmapfo[folder] = index;
+      prev  = 0;  // Previous is at the top of the list (no offset needed)
+    }
+    else
+    {
+      // RSS feed, inside folder or outside folder
+
+      // Verify if we've reached entries outside any folder
+      if (x.m_header.m_tags == '' || x.m_header.m_tags == null)
+        folder = null;
+
+      notify = false;
+      if (folder == null)  // For entries that are outside a folder, notify always
+        notify = true;
+      fe = new self.m_feedsDB.FetchEntryDescriptor(x.m_header.m_url, folder, notify);
+      index = fetchList.length;
+      // Carry any value of status "updated" from the previous poll loop
+      updated = false;
+      if (self.m_fetchOrder.order.length > 0)
+        updated = self.p_feedHasFreshEntries(x.m_header.m_url);
+      fe.m_updated = updated;
+      // Add to fetch list
+      fetchList.push(fe);
+      revmap[x.m_header.m_url] = index;  // Record in reverse map for quick access of feed by URL
+      prev = 1;  // Previous is one entry from the top
+    }
+
+    // Transitioning from one folder to another => set flat to notify at the end of the previous folder
+    if (folder != prevFolder)
+    {
+      len = fetchList.length;
+      if (len - prev - 1 > 0)
+      {
+        // Mark to notify the previous
+        fetchList[len - prev - 1].m_notify = true;
+      }
+    }
+  }
+
+  // Diagnostic output during debugging
+  if (false)
+  {
+    for (i = 0; i < fetchList.length; ++i)
+    {
+      var f = 'none';
+      x = fetchList[i];
+      if (x.m_folder != null)
+        f = x.m_folder;
+      console.log(f + ': ' + x.m_notify + ', ' + x.m_url);
+    }
+  }
+
+  self.m_fetchOrder.order = fetchList;
+  self.m_fetchOrder.revmap = revmap;
+  self.m_fetchOrder.revmapfo = revmapfo;
+  return fetchList;
+}
+FeedsDir.prototype.p_getFetchOrder = p_getFetchOrder;
+
 // object FeedsDir.p_getFeedsCBHandlers
 // Return list of Feeds CallBacks handlers
 function p_getFeedsCBHandlers()
@@ -476,88 +566,7 @@ function p_getFeedsCBHandlers()
     // or feed to indicate (a start next to feed/folder) any new fetched entries.
     getFetchOrder: function()
         {
-          var i = 0;
-          var x = null;
-          var fe = null;
-          var fetchList = [];
-          var revmap = {};  // key = url, value = index_in_fetchList
-          var revmapfo = {}; // key = folder_name, value = index_in_fetchlist_of_first_entry
-          var folder = null;
-          var prevFolder = null;
-          var notify = false;
-          var len = 0;
-          var prev = 0;
-          var index = 0;
-          var updated = false;
-          for (i = 0; i < self.m_displayList.length; ++i)
-          {
-            prevFolder = folder;
-            x = self.m_displayList[i];
-
-            // Check if by walking the display list we've switched from one folder to another
-            if (x.m_isFolder)
-            {
-              // Folder: track the name (not adding entry to fetchList[]
-              utils_ns.assert(x instanceof DirEntryFolder, 'getFetchOrder: x instanceof DirEntryFolder');
-              folder = x.m_name;
-              // record in reverse map for quick access of folders that start at this location in the list
-              index = fetchList.length;
-              revmapfo[folder] = index;
-              prev  = 0;  // Previous is at the top of the list (no offset needed)
-            }
-            else
-            {
-              // RSS feed, inside folder or outside folder
-
-              // Verify if we've reached entries outside any folder
-              if (x.m_header.m_tags == '' || x.m_header.m_tags == null)
-                folder = null;
-
-              notify = false;
-              if (folder == null)  // For entries that are outside a folder, notify always
-                notify = true;
-              fe = new self.m_feedsDB.FetchEntryDescriptor(x.m_header.m_url, folder, notify);
-              index = fetchList.length;
-              // Carry any value of status "updated" from the previous poll loop
-              updated = false;
-              if (self.m_fetchOrder.order.length > 0)
-                updated = self.p_feedHasFreshEntries(x.m_header.m_url);
-              fe.m_updated = updated;
-              // Add to fetch list
-              fetchList.push(fe);
-              revmap[x.m_header.m_url] = index;  // Record in reverse map for quick access of feed by URL
-              prev = 1;  // Previous is one entry from the top
-            }
-
-            // Transitioning from one folder to another => set flat to notify at the end of the previous folder
-            if (folder != prevFolder)
-            {
-              len = fetchList.length;
-              if (len - prev - 1 > 0)
-              {
-                // Mark to notify the previous
-                fetchList[len - prev - 1].m_notify = true;
-              }
-            }
-          }
-
-          // Diagnostic output during debugging
-          if (false)
-          {
-            for (i = 0; i < fetchList.length; ++i)
-            {
-              var f = 'none';
-              x = fetchList[i];
-              if (x.m_folder != null)
-                f = x.m_folder;
-              console.log(f + ': ' + x.m_notify + ', ' + x.m_url);
-            }
-          }
-
-          self.m_fetchOrder.order = fetchList;
-          self.m_fetchOrder.revmap = revmap;
-          self.m_fetchOrder.revmapfo = revmapfo;
-          return fetchList;
+          return self.p_getFetchOrder();
         }
   };
 
