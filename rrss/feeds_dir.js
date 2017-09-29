@@ -363,6 +363,12 @@ function p_showReload(flag)
 FeedsDir.prototype.p_showReload = p_showReload;
 
 // object FeedsDir.p_getFetchOrder
+// Prepare a list for fetch operation or for export in OPML
+//
+// The list is sorted by folder name, in each folder entries are
+// sorted alphabetically by title. At the end are entries without
+// folder. This matches the way entries are displayed in the
+// left-hand-side panel.
 function p_getFetchOrder()
 {
   var self = this;
@@ -408,6 +414,7 @@ function p_getFetchOrder()
       if (folder == null)  // For entries that are outside a folder, notify always
         notify = true;
       fe = new self.m_feedsDB.FetchEntryDescriptor(x.m_header.m_url, folder, notify);
+      fe.m_title = x.m_header.m_title;
       index = fetchList.length;
       // Carry any value of status "updated" from the previous poll loop
       updated = false;

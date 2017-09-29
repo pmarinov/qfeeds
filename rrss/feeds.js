@@ -2593,6 +2593,7 @@ function FetchEntryDescriptor(url, folder, notify)
   this.m_folder = folder;  // Folder to which a feed belongs or 'null'
   this.m_notify = notify;
   this.m_updated = false;  // Records if new entries are fetched for this feed URL
+  this.m_title = null;  // Title is set if entry has a title
 
   return this;
 }
