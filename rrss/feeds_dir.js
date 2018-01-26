@@ -105,6 +105,7 @@ function FeedsDir($dirPanel, feedDisp, panelMng)
     btnNewerBtn2: utils_ns.domFind('#ximg_btn_prev2'),
     btnOlderBtn2: utils_ns.domFind('#ximg_btn_next2'),
     totalPg2: utils_ns.domFind('#xtitle_total_pg2'),
+    btnExport: utils_ns.domFind('#xexport_opml'),
     list: utils_ns.domFindInside($dirPanel, '.xentry', -1)
   };
   self.$d.listRecent = utils_ns.domFindInside(self.$d.containerRecentlyViwed, '.xrecent_entry', -1);
@@ -339,6 +340,11 @@ function p_setFeedsDomHandlers()
   self.$d.btnCancelFetch.on('click', function (e)
       {
         self.m_feedsDB.suspendFetchLoop(true, 0);  // Suspend fetch loop
+      });
+
+  self.$d.btnExport.on('click', function (e)
+      {
+        self.p_exportOPMLAll();
       });
 }
 FeedsDir.prototype.p_setFeedsDomHandlers = p_setFeedsDomHandlers;
@@ -580,6 +586,79 @@ function p_getFeedsCBHandlers()
   return feedsCB;
 }
 FeedsDir.prototype.p_getFeedsCBHandlers = p_getFeedsCBHandlers;
+
+// object FeedsDir.p_composeOPML
+// GeneratesOPML format for a list of feeds
+function p_composeOPML(feedsList)
+{
+  var self = this;
+
+  var i = 0;
+  var entry = null;
+  console.log('opml: ' + feedsList.length + ' entries');
+  var curFolder = '';
+  var opml = [
+'<?xml version="1.0" encoding="UTF-8"?>',
+'<opml version="1.0">',
+'    <head>',
+'        <title>RSS subscriptions</title>',
+'    </head>',
+'    <body>'
+  ]
+  var indent = 8;
+  for (i = 0; i < feedsList.length; ++i)
+  {
+    entry = feedsList[i];
+    utils_ns.assert(entry instanceof self.m_feedsDB.FetchEntryDescriptor,
+        'p_composeOPML: x instanceof FetchEntryDescriptor');
+
+    if (curFolder != entry.m_folder)
+    {
+      if (curFolder != '')  // If we have already started a prev. folder, close the outline
+      {
+        indent -= 4;
+        opml.push(utils_ns.indentedString(indent, '</outline>'));
+      }
+      curFolder = entry.m_folder;
+      console.log('opml: "' + curFolder + '"');
+      if (curFolder != null)  // 'null' for entries without any folder
+      {
+        opml.push(utils_ns.indentedString(indent, '<outline title="' + curFolder + '" text="' + curFolder + '">'));
+        indent += 4;
+      }
+    }
+
+    opml.push(utils_ns.indentedString(indent, '<outline title="' + entry.m_title + '"'));
+    opml.push(utils_ns.indentedString(indent + 4, 'text="' + entry.m_title + '"'));
+    opml.push(utils_ns.indentedString(indent + 4, 'type="rss"'));
+    opml.push(utils_ns.indentedString(indent + 4, 'xmlUrl="' + entry.m_url + '"/>'));
+  }
+  Array.prototype.push.apply(opml, [
+'    </body>',
+'</opml>'
+  ]);
+
+  return opml;
+}
+FeedsDir.prototype.p_composeOPML = p_composeOPML;
+
+// object FeedsDir.p_exportOPMLAll
+// Generate an OPML of all subscribed RSS feeds and offer to save to disk
+function p_exportOPMLAll()
+{
+  var self = this;
+  var listFetchOrder = self.p_getFetchOrder();
+
+  var opmlData = self.p_composeOPML(listFetchOrder);
+  var text = opmlData.join('\n');
+  var blob = new Blob([text], {type: 'text/plain;charset=UTF-8'});
+  chrome.downloads.download({
+      url: window.URL.createObjectURL(blob),
+      filename: 'feeds.opml',
+      saveAs: true
+  })
+}
+FeedsDir.prototype.p_exportOPMLAll = p_exportOPMLAll;
 
 // object FeedsDir.p_feedHasFreshEntries
 // Check if feed is flagged to have received fresh entries during poll operation

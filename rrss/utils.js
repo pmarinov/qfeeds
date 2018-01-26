@@ -92,6 +92,17 @@ function parseStrictDateStr(strDate)
   return new Date(y, m, d);
 }
 
+// Inserts space to indent a string
+function indentedString(indent, str)
+{
+  var i = 0;
+  var s = [];
+  for (i = 0; i < indent; ++i)
+    s.push(' ');
+  s.push(str);
+  return s.join('');
+}
+
 function domError(msg)
 {
   log.error(msg);
@@ -372,6 +383,7 @@ utils_ns.parseDate = parseDate;
 utils_ns.dateToStr = dateToStr;
 utils_ns.dateToStrStrict = dateToStrStrict;
 utils_ns.parseStrictDateStr = parseStrictDateStr;
+utils_ns.indentedString = indentedString;
 utils_ns.domError = domError;
 utils_ns.domFindInside = domFindInside;
 utils_ns.domFind = domFind;
