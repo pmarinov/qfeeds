@@ -1,5 +1,9 @@
 == CHANGELOG.txt, 'rrss' - R is a reader of RSS feeds
 
+== 2018-02-03, v0.10.0, pmarinov
+
+* new: Export OPML
+
 == 2017-09-06, v0.9.0, pmarinov
 
 * bugfix: work-around for persistent GDrive errors of "not_found"
