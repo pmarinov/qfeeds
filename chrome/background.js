@@ -73,13 +73,6 @@ chrome.tabs.onRemoved.addListener(function(tabId)
       localStorage.setItem('feedData', JSON.stringify(feedData));
     });
 
-// Not clear, closing the background page or closing the browser
-chrome.runtime.onSuspend.addListener(function()
-    {
-      // Do some simple clean-up tasks.
-      console.log('closed');
-    });
-
 // Activate extension tab
 // tabId -- id of current (or most recent) tab
 function activateRRSS(tabId)
