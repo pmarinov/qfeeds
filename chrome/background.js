@@ -23,6 +23,13 @@
 // * If icon clicked and current tab has a feed, send it via a message to extension
 // * Use localStorage to survive unloading of the event (background) page
 
+
+// Local storage is needed on Google Chrome where the background page
+// is event driven and its data is removed from memory after a small
+// period of inactivity.
+//
+// Firefox doesn't support non-persistent background page, local
+// storage is redundant but is compatible with Google Chrome
 function resetLocalStorage()
 {
   var tabs =
@@ -41,6 +48,9 @@ function resetLocalStorage()
 (function ()
 {
 
+console.log('On browser loaded, resetLocalStorage()');
+resetLocalStorage();
+
 // Get tabs record safely
 // (handle wiped storage)
 function getTabsRec()
@@ -55,13 +65,6 @@ function getTabsRec()
   }
   return tabs;
 }
-
-// Extension installed (browser is started)
-chrome.runtime.onInstalled.addListener(function()
-    {
-      console.log('installed');
-      resetLocalStorage();
-   });
 
 // A tab was closed
 chrome.tabs.onRemoved.addListener(function(tabId)
@@ -91,7 +94,9 @@ function activateRRSS(tabId)
   else
   {
     // Activate existing tab where the extension is already running
-    chrome.tabs.update(tabs.rrssTab, {selected: true});
+    console.log('Existing tab ' + tabs.rrssTab);
+    // Chrome deprecated: chrome.tabs.update(tabs.rrssTab, {selected: true});
+    chrome.tabs.update(tabs.rrssTab, {active: true});
     console.log('"rrss" activated as tab ' + tabs.rrssTab);
 
     // Send it feed info (if any for last active tab)
@@ -125,13 +130,15 @@ function isSelfURL(url)
 {
   if (url == 'chrome-extension://kdjijdhlleambcpendblfhdmpmfdbcbd/rrss/app.html')
     return true;
-  else
-    return false;
+  if (url == 'moz-extension://d9585aca-b726-4305-b925-743007851f14/rrss/app.html')
+    return true;
+  return false;
 }
 
 // Record any new tab as lastActiveTab
-chrome.tabs.onSelectionChanged.addListener(function(tabId, selectInfo)
+chrome.tabs.onActivated.addListener(function(activeInfo, selectInfo)
     {
+      var tabId = activeInfo.tabId;
       var tabs = getTabsRec();
       if (tabs.rrssTab != tabId)
       {
