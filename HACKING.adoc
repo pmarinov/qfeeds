@@ -1,11 +1,14 @@
 // HACKING.adoc for rrss
+:toc:
 
-= About
+= Hacking guide for contributors =
+
+== About ==
 
 This file contains notes to explain how to start debugging or
 developing of "rrss".
 
-= Install
+== Install ==
 
 . Download the libraries: go to "lib/", if empty run "./get_libs.sh"
 . Start Google Chrome browser
@@ -16,3 +19,63 @@ developing of "rrss".
   select the directory by name (contents of the extension is inside it)
 . Open "New tab", go to "Apps" section (or enter URL: chrome://apps)
 . Click "rrss" to start it
+
+== Firefox ==
+
+There are two ways to work on extensions in Firefox.
+
+The quick way is to load the extension temporarely for the duration of
+the current session. This has to be repeated every time Firefox is
+started, all data from the previous session is lost.
+
+A persistent installation is better suited for the development of
+_r-rss_. The steps for that are:
+
+* *Download* Firefox Developer Edition: https://www.mozilla.org/en-US/firefox/developer/
+
+* *Untar* into a temp (work) folder
++
+....
+cd ~/tmp
+tar -xvf ~/Downloads/firefox-60.0b3.tar.bz2
+....
+
+* Start from that folder, this will also *create the profile upon first start*
++
+....
+cd ~/tmp/firefox
+./firefox
+....
+
+* Exit Firefox
+
+* *Find* the profile folder
++
+....
+$ cd ~/.mozilla/firefox/
+$ find . -name \*dev-edition\*
+./l062qyl2.dev-edition-default
+
+$ cd l062qyl2.dev-edition-default/extensions/
+....
+
+* Create *a pointer file* here, it should look like this:
++
+....
+$ cat \{2df366ca-28d2-11e8-9c70-b7b0d99bd061\} 
+/home/peterm/work/rrss_moz
+....
++
+The name matches the field _id_ from _manifest.json_, inside the file
+is only the path to where the current actively edited sources reside
+
+* Once *the setup of devel version is done* Firefox can be started conveniently with:
+....
+$ (cd ~/tmp/firefox; ./firefox;)&
+....
+
+* To *reload the extension* after edits, Ctrl+R
+
+* To *reload the extension* after edits of _manifest.json_, restart Firefox Developer
+Edition
+

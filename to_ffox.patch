@@ -1,0 +1,149 @@
+git stdiff -r -u rrss/lib/get_libs.sh rrss_moz/lib/get_libs.sh
+--- rrss/lib/get_libs.sh	2016-04-16 13:32:13.944821125 -0700
++++ rrss_moz/lib/get_libs.sh	2018-04-22 19:27:47.299595811 -0700
+@@ -1,14 +1,13 @@
+ #!/bin/bash
+ 
+-# Dropbox API
+-if [ -d "dropbox-js-datastore-sdk-1.1.0" ]
++# jQuery
++if [ -f "Dropbox-sdk.js" ]
+ then
+-  echo "'dropbox-js-datastore-sdk-1.1.0' already downloaded. skipping."
++  echo "'Dropbox-sdk.js' already downloaded. skipping."
+ else
+-  echo "Downloading 'dropbox.js'..."
+-  wget https://www.dropbox.com/developers/downloads/sdks/datastore/js/dropbox-js-datastore-sdk-1.1.0.zip
+-  unzip dropbox-js-datastore-sdk-1.1.0.zip
+-  rm  dropbox-js-datastore-sdk-1.1.0.zip
++  echo "Downloading 'Dropbox-sdk.js'..."
++  curl -O https://unpkg.com/dropbox@4.0.3/dist/Dropbox-sdk.js
++  curl -O https://unpkg.com/dropbox@4.0.3/dist/Dropbox-sdk.js.map
+ fi
+ 
+ # jQuery
+diff -r -u rrss/rrss/app.html rrss_moz/rrss/app.html
+--- rrss/rrss/app.html	2018-02-03 19:18:35.509113868 -0800
++++ rrss_moz/rrss/app.html	2018-04-22 14:56:17.718751214 -0700
+@@ -19,8 +19,9 @@
+   <script src="../lib/bootstrap-3.2.0-dist/js/bootstrap.js" type="text/javascript"></script>
+ 
+   <script src="../lib/loglevel.js" type="text/javascript"></script>
+-  <script src="https://apis.google.com/js/api.js" type="text/javascript"></script>
++  <!-- <script src="https://apis.google.com/js/api.js" type="text/javascript"></script> -->
+   <!-- <script src="../lib/dropbox-js-datastore-sdk-1.1.0/lib/dropbox-datastores-1.1.0.js"></script> -->
++  <script src="../lib/Dropbox-sdk.js"></script>
+   <script src="../lib/components/core.js"></script>
+   <script src="../lib/components/sha1.js"></script>
+ 
+@@ -36,10 +37,10 @@
+   <!-- APP -->
+   <link href="style.css" rel="stylesheet" type="text/css">
+   <script src="utils.js" type="text/javascript"></script>
+-  <script src="rtable_gdrive.js" type="text/javascript"></script>
+-  <script src="connect_gdrive.js" type="text/javascript"></script>
++  <!-- <script src="rtable_gdrive.js" type="text/javascript"></script> -->
++  <!-- <script src="connect_gdrive.js" type="text/javascript"></script> -->
+   <!-- <script src="rtable_dbox.js" type="text/javascript"></script> -->
+-  <!-- <script src="connect_dbox.js" type="text/javascript"></script> -->
++  <script src="connect_dbox.js" type="text/javascript"></script>
+   <script src="rss_parser.js" type="text/javascript"></script>
+   <script src="feeds.js" type="text/javascript"></script>
+   <script src="feeds_dir.js" type="text/javascript"></script>
+diff -r -u rrss/rrss/app.js rrss_moz/rrss/app.js
+--- rrss/rrss/app.js	2018-05-21 22:10:39.900282967 -0700
++++ rrss_moz/rrss/app.js	2018-05-21 22:10:16.557581160 -0700
+@@ -51,6 +51,13 @@
+             return;
+           self.m_feedsDir.p_feedView(request.feedData[0].href);
+         }
++        if (request.msg == 'oauthConnectToken')
++        {
++          log.info('app: message "oauthConnectToken"')
++          // log.info('token: ' + request.content);
++          for (i = 0; i < self.m_hookAuthCompleted.length; ++i)
++            self.m_hookAuthCompleted[i](request.content)
++        }
+       });
+ 
+   var m_oldOnError = window.onerror;
+@@ -83,8 +90,8 @@
+       }
+ 
+   // Establish compatible indexDB based on the browser
+-  // log.setLevel('info');
+-  log.setLevel('warn');
++  log.setLevel('info');
++  // log.setLevel('warn');
+   log.info("app: Obtaining indexDB handler...");
+ 
+   if (!window.indexedDB)
+@@ -108,6 +115,8 @@
+   self.m_feedsDB = null;
+   self.m_gdriveConnect = null;
+ 
++  self.m_hookAuthCompleted = [];
++
+   self.m_initSeq = [];  // A vector of init steps executed in order
+   self.m_initCnt = 0;
+   self.m_initSeq.push(function()
+@@ -174,12 +183,18 @@
+   self.m_initSeq.push(function()
+       {
+         // Now connect to Dropbox
+-        // self.m_connectDropbox = new feeds_ns.ConnectDBox(self.p_getConnectDBoxCBHandlers());
+-        // Now connect to Google Drive
++        // var cb = self.p_getConnectDBoxCBHandlers();
++        // self.m_connectDropbox = new feeds_ns.ConnectDBox(cb);
+         var cb = self.p_getConnectGDriveHandlers();
+         var startWithLoggedIn = self.m_feedsDB.prefGet("m_local.app.logged_in");
+         log.info('app: startWithLoggedIn = ' + startWithLoggedIn);
+-        self.m_gdriveConnect = new feeds_ns.ConnectGDrive(cb, startWithLoggedIn);
++        var dummy = new feeds_ns.ConnectDBox(cb, startWithLoggedIn);
++        // Now connect to Google Drive
++        // var cb = self.p_getConnectGDriveHandlers();
++        // var startWithLoggedIn = self.m_feedsDB.prefGet("m_local.app.logged_in");
++        // log.info('app: startWithLoggedIn = ' + startWithLoggedIn);
++        // self.m_gdriveConnect = new feeds_ns.ConnectGDrive(cb, startWithLoggedIn);
++
+         self.p_initSeqNext();
+       });
+   self.m_initSeq.push(function()
+@@ -243,6 +258,10 @@
+         {
+           if (code == 0)
+           {
++            self.m_feedsDB.prefSet("m_local.app.logged_in", true);
++
++            if (false)
++            {
+             feeds_ns.RTablesInit(accessToken, function()
+                 {
+                   feeds_ns.RTablesAddListenerReconnect(function ()
+@@ -257,6 +276,11 @@
+                   self.m_feedsDir.remoteStoreConnected(displayProgress);
+                 },
+                 displayProgress);
++            }
++          }
++          else
++          {
++            self.m_feedsDB.prefSet("m_local.app.logged_in", false);
+           }
+         },
+ 
+@@ -281,7 +305,13 @@
+     // Store preferences
+     setPref: function(pref, value)
+         {
+-          self.m_feedsDB.prefSet("m_local.app.logged_in", value);
++          self.m_feedsDB.prefSet(pref, value);
++        },
++
++    // Hook to when the app receives OAuth completion token
++    addToHookAuthCompleted: function(func)
++        {
++          self.m_hookAuthCompleted.push(func);
+         },
+   };
+ 

@@ -40,7 +40,6 @@ The implementation plan of RRSS has changed its emphasis towards migration to Dr
 
 * Make it work on Firefox
 * MIGRATE to Dropbox as an alternative to the deprecated Google Drive Real Time API
-* Implement automatic OPML backup on GDrive folder "Apps/rrss/backup_feeds.opml"
 * Implement Mark As Read
 * Implement display of unread counters
 
