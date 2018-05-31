@@ -1,5 +1,10 @@
 == CHANGELOG.txt, 'rrss' - R is a reader of RSS feeds
 
+== 2018-05-30, v0.11.0, pmarinov
+
+* bugfix: Sometimes the extension fails to open when clicking on the
+  extension's icon
+
 == 2018-02-03, v0.10.0, pmarinov
 
 * new: Export OPML

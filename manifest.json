@@ -1,8 +1,8 @@
 {
 "manifest_version": 2,
 
-"name": "rrss -- R is a reader of RSS feeds",
-"version": "0.10.0",
+"name": "r-rss feeds reader",
+"version": "0.11.0",
 "short_name": "rrss",
 "description": "Reader of RSS feeds, w/GDrive for synchronization",
 

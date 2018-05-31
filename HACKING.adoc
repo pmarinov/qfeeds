@@ -70,6 +70,7 @@ The name matches the field _id_ from _manifest.json_, inside the file
 is only the path to where the current actively edited sources reside
 
 * Once *the setup of devel version is done* Firefox can be started conveniently with:
++
 ....
 $ (cd ~/tmp/firefox; ./firefox;)&
 ....
