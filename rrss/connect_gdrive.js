@@ -140,6 +140,9 @@ function p_gdriveLoginLogout(isInteractive)
 {
   var self = this;
 
+  self.m_cb.onProgress(100);
+  return;
+
   if (self.m_authenticated)
   {
     self.p_gdriveLogout();
