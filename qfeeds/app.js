@@ -176,10 +176,10 @@ function App()
         // Now connect to Dropbox
         // self.m_connectDropbox = new feeds_ns.ConnectDBox(self.p_getConnectDBoxCBHandlers());
         // Now connect to Google Drive
-        var cb = self.p_getConnectGDriveHandlers();
-        var startWithLoggedIn = self.m_feedsDB.prefGet("m_local.app.logged_in");
-        log.info('app: startWithLoggedIn = ' + startWithLoggedIn);
-        self.m_gdriveConnect = new feeds_ns.ConnectGDrive(cb, startWithLoggedIn);
+        // var cb = self.p_getConnectGDriveHandlers();
+        // var startWithLoggedIn = self.m_feedsDB.prefGet("m_local.app.logged_in");
+        // log.info('app: startWithLoggedIn = ' + startWithLoggedIn);
+        // self.m_gdriveConnect = new feeds_ns.ConnectGDrive(cb, startWithLoggedIn);
         self.p_initSeqNext();
       });
   self.m_initSeq.push(function()

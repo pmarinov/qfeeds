@@ -1,4 +1,8 @@
-== CHANGELOG.txt, 'rrss' - R is a reader of RSS feeds
+== CHANGELOG.txt, QFeeds
+
+== 2020-04-04, vx.x.x, pmarinov
+* NEW: Rename to QFeeds
+* NEW: Disable connection to GDrive
 
 == 2018-05-30, v0.11.0, pmarinov
 

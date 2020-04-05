@@ -1,4 +1,4 @@
-// HACKING.adoc for rrss
+// HACKING.adoc for QFeeds
 :toc:
 
 = Hacking guide for contributors =
@@ -6,7 +6,7 @@
 == About ==
 
 This file contains notes to explain how to start debugging or
-developing of "rrss".
+developing of QFeeds.
 
 == Install ==
 

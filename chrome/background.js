@@ -34,7 +34,7 @@ function resetLocalStorage()
 {
   var tabs =
   {
-    rrssTab: null,  // Integer ID of tab into which "rrss" is running
+    qfeedsTab: null,  // Integer ID of tab into which QFeeds is running
     lastActiveTab: 0
   };
   localStorage.setItem('tabs', JSON.stringify(tabs));
@@ -78,29 +78,29 @@ chrome.tabs.onRemoved.addListener(function(tabId)
 
 // Activate extension tab
 // tabId -- id of current (or most recent) tab
-function activateRRSS(tabId)
+function activateQFeeds(tabId)
 {
   var tabs = getTabsRec();
-  if (tabs.rrssTab == null)
+  if (tabs.qfeedsTab == null)
   {
     // Create a new tab
-    chrome.tabs.create({ url: '../rrss/app.html'}, function (newTab)
+    chrome.tabs.create({ url: '../qfeeds/app.html'}, function (newTab)
         {
-          tabs.rrssTab = newTab.id;
-          console.log('"rrss" started at tab ' + tabs.rrssTab);
+          tabs.qfeedsTab = newTab.id;
+          console.log('QFeeds started at tab ' + tabs.qfeedsTab);
           localStorage.setItem('tabs', JSON.stringify(tabs));
         });
   }
   else
   {
     // Activate existing tab where the extension is already running
-    console.log('Existing tab ' + tabs.rrssTab);
-    // Chrome deprecated: chrome.tabs.update(tabs.rrssTab, {selected: true});
-    chrome.tabs.update(tabs.rrssTab, {active: true});
-    console.log('"rrss" activated as tab ' + tabs.rrssTab);
+    console.log('Existing tab ' + tabs.qfeedsTab);
+    // Chrome deprecated: chrome.tabs.update(tabs.qfeedsTab, {selected: true});
+    chrome.tabs.update(tabs.qfeedsTab, {active: true});
+    console.log('QFeeds activated as tab ' + tabs.qfeedsTab);
 
     // Send it feed info (if any for last active tab)
-    console.log('"rrss" extension\'s main notified for feeds of last active tab (' + tabs.lastActiveTab + ')');
+    console.log('QFeeds extension\'s main notified for feeds of last active tab (' + tabs.lastActiveTab + ')');
     var feedData = JSON.parse(localStorage.getItem('feedData'));
     chrome.runtime.sendMessage({msg: 'feedsActivated', feedData: feedData[tabs.lastActiveTab]});
   }
@@ -110,17 +110,17 @@ function activateRRSS(tabId)
 // Start the extension or activate an existing tab into which it is running
 chrome.browserAction.onClicked.addListener(function(tab)
     {
-      activateRRSS(tab);
+      activateQFeeds(tab);
     });
 
 // Monitor if the extension's tab has been closed
 chrome.tabs.onRemoved.addListener(function (removedTab, removeInfo)
     {
       var tabs = getTabsRec();
-      if (tabs.rrssTab == removedTab)
+      if (tabs.qfeedsTab == removedTab)
       {
-        console.log('"rrss" closed as tab ' + tabs.rrssTab);
-        tabs.rrssTab = null;
+        console.log('QFeeds closed as tab ' + tabs.qfeedsTab);
+        tabs.qfeedsTab = null;
         localStorage.setItem('tabs', JSON.stringify(tabs));
       }
     });
@@ -128,9 +128,9 @@ chrome.tabs.onRemoved.addListener(function (removedTab, removeInfo)
 // Checks if an URL is extension's URL
 function isSelfURL(url)
 {
-  if (url == 'chrome-extension://kdjijdhlleambcpendblfhdmpmfdbcbd/rrss/app.html')
+  if (url == 'chrome-extension://kdjijdhlleambcpendblfhdmpmfdbcbd/qfeeds/app.html')
     return true;
-  if (url == 'moz-extension://d9585aca-b726-4305-b925-743007851f14/rrss/app.html')
+  if (url == 'moz-extension://d9585aca-b726-4305-b925-743007851f14/qfeeds/app.html')
     return true;
   return false;
 }
@@ -140,7 +140,7 @@ chrome.tabs.onActivated.addListener(function(activeInfo, selectInfo)
     {
       var tabId = activeInfo.tabId;
       var tabs = getTabsRec();
-      if (tabs.rrssTab != tabId)
+      if (tabs.qfeedsTab != tabId)
       {
         console.log('selected (active): ' + tabs.lastActiveTab);
         tabs.lastActiveTab = tabId;
@@ -162,15 +162,15 @@ chrome.tabs.onUpdated.addListener(function (tabId, changeInfo, tab)
       if (! (changeInfo.status == 'loading' || changeInfo.status == 'complete'))
         return;
       // Monitor if URL of a tab changes
-      // 1. Away from "rrss" extension
-      // 2. Into "rrss" extension
+      // 1. Away from QFeeds extension
+      // 2. Into QFeeds extension
       var tabs = getTabsRec();
-      if (tabId == tabs.rrssTab)
+      if (tabId == tabs.qfeedsTab)
       {
         if (!isSelfURL(tab.url))
         {
           console.log('Extension exited by URL')
-          tabs.rrssTab = null;
+          tabs.qfeedsTab = null;
           localStorage.setItem('tabs', JSON.stringify(tabs));
         }
       }
@@ -179,7 +179,7 @@ chrome.tabs.onUpdated.addListener(function (tabId, changeInfo, tab)
         if (isSelfURL(tab.url))
         {
           console.log('Extension entered by way of URL')
-          tabs.rrssTab = tabId;
+          tabs.qfeedsTab = tabId;
           localStorage.setItem('tabs', JSON.stringify(tabs));
         }
       }
@@ -225,7 +225,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse)
     console.log(input)
     chrome.browserAction.setIcon({
           tabId: sender.tab.id,
-          path: 'rrss/images/icon_rss_present.svg'
+          path: 'qfeeds/images/icon_rss_present.svg'
         });
   }
   else if (request.msg == "feedDocument")  // The entire page is a feed XML
@@ -261,13 +261,13 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse)
           code: "if (history.length > 1) " +
                 "history.go(-1); else window.close();"
         });
-    activateRRSS(sender.tab.id);
+    activateQFeeds(sender.tab.id);
   }
   else if (request.msg == 'getFeedsList')
   {
     var tabs = getTabsRec();
     var feedData = JSON.parse(localStorage.getItem('feedData'));
-    console.log('"rrss" extension\'s main page asked for feeds of last active tab (' + tabs.lastActiveTab + ')');
+    console.log('QFeeds extension\'s main page asked for feeds of last active tab (' + tabs.lastActiveTab + ')');
     sendResponse({feedData: feedData[tabs.lastActiveTab]});
   }
 });

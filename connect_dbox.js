@@ -278,7 +278,7 @@ function dboxLoginLogout()
     const APIKEY = '1xjfqq4b6gvpsq8';
     self.m_client = new window.Dropbox.Dropbox({clientId: APIKEY});
     const fullReceiverPath =
-      'moz-extension://d9585aca-b726-4305-b925-743007851f14/rrss/oauth_receiver_dbox.html';
+      'moz-extension://d9585aca-b726-4305-b925-743007851f14/qfeeds/oauth_receiver_dbox.html';
     let authUrl =
       self.m_client.getAuthenticationUrl(fullReceiverPath, 'zzclient', 'token');
 

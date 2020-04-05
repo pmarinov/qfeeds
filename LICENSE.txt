@@ -1,4 +1,4 @@
-LICENSE.txt, 'rrss' - R is a reader of RSS feeds
+LICENSE.txt
 ------------------------------------------------
 
 

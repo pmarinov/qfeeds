@@ -1,4 +1,4 @@
-== CONTRIBUTORS.txt, 'rrss' - R is a reader of RSS feeds
+== CONTRIBUTORS.txt, QFeeds
 
 Thanks to the following people for their contributions:
 

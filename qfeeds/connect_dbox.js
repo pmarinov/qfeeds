@@ -45,7 +45,7 @@ function ConnectDBox(cb)
   self.m_dropBoxClient = new Dropbox.Client({key: 'w1ghid3yiohsa69'});
   self.m_dropBoxClient.authDriver(new Dropbox.AuthDriver.ChromeExtension(
     {
-      receiverPath: 'rrss/chrome_oauth_receiver.html'
+      receiverPath: 'qfeeds/chrome_oauth_receiver.html'
     }));
 
   self.p_dboxSetLoginButton();

@@ -1,17 +1,16 @@
-// README.adoc for rrss
+// README.adoc for QFeeds
 
 :freesoftware: http://www.gnu.org/philosophy/free-sw.html
 :screenshot1: https://dl.dropboxusercontent.com/s/tmzbqb97atmcjst/rrss_feed1.png
 
-= About "rrss"
+= About QFeeds
 
-_R is a reader of RSS feeds_
+_QFeeds is a reader of RSS feeds_
 
 Features::
 
-* "rrss" (pronounced "r-rss") is an RSS reader
 * Operates in a standalone mode as a web browser extension (Google
-  Chrome)
+  Chrome, Firefox)
 * Local storage is used to keep feed subscriptions and metadata
   (IndexedDB)
 * No server side for processing of data (it is able to read intranet
@@ -34,7 +33,7 @@ https://developers.google.com/google-apps/realtime/deprecation
 
 It will remain operational until December 11, 2018.
 
-The implementation plan of RRSS has changed its emphasis towards migration to Dropbox.
+The implementation plan of QFeeds has changed its emphasis towards migration to Dropbox.
 
 = Implementation plan
 
@@ -45,9 +44,13 @@ The implementation plan of RRSS has changed its emphasis towards migration to Dr
 
 = License
 
-"rrss" is {freesoftware}[free software] -- this means that everyone may
+QFeeds is {freesoftware}[free software] -- this means that everyone may
 use it, redistribute it, and/or modify it under the terms of the BSD
 (FreeBSD) License.
 
 Copyright (c) 2015, Peter Marinov and Contributors. All rights reserved. +
 See LICENSE.txt, see CONTRIBUTORS.txt
+
+= Note
+
+The original name of this browser extension was r-rss
