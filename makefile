@@ -4,6 +4,11 @@
 
 SHELL = /bin/bash
 
+# This was tested to work with version 4.1 of GNU Make
+ifneq ($(findstring GNU, $(shell $(MAKE) -v)), GNU)
+    $(error Not a GNU Make)
+endif
+
 # ANSI encoded colors for the help screen
 BOLD = \x1b[1m
 NC = \x1b[0m
