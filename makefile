@@ -68,4 +68,24 @@ JS_LIBS = lib/bootstrap-3.2.0-dist/js/bootstrap.js \
 	 lib/sanitizer.js \
 	 lib/prism.js
 
-all: $(JS_LIBS)
+# Recursively list all web files
+# TODO: Move oauth_receiver files into a sub folder (if possible)
+find-web-files := -name "*.js" -o -name "*.html" -o -name "*.css" -o \
+     -name "*.png" -o -name "*.svg" -o \
+	 -name "*.eot" -o -name "*.ttf" -o -name "*.woff"
+app-files-find := $(shell find ./lib $(find-web-files)) \
+    $(shell find ./chrome $(find-web-files)) \
+    $(shell find ./qfeeds $(find-web-files)) \
+
+# Output of `find` begins with './', remove it
+app-files := $(subst ./,,$(app-files-find))
+# App files for specific browsers in individual folders
+app-files-firefox := $(subst ./,firefox-qfeeds/,$(app-files-find))
+app-files-chrome := $(subst ./,chrome-qfeeds/,$(app-files-find))
+
+# All files in ./chrome-qfeeds, depends on corresponding files in main folder ./
+$(app-files-chrome): chrome-qfeeds/%:%
+	mkdir -p $(dir $@)
+	cp -p $(subst chrome-qfeeds/,./,$@) $@
+
+all: $(JS_LIBS) $(app-files-chrome)
