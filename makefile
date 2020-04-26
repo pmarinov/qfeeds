@@ -2,6 +2,10 @@
 #
 # Based on ideas by Joel Dueck, see: https://github.com/otherjoel/try-pollen
 
+# Fist: make libs
+# Then: make all
+# Help: make
+
 SHELL = /bin/bash
 
 # This was tested to work with version 4.1 of GNU Make
@@ -50,7 +54,7 @@ lib/sanitizer.js:
 	@echo "[ Downloading sanitizer.js ]"
 	cd lib && curl --silent --remote-name --location "$(Caja-HTML-Sanitezer-URL)/sanitizer.js"
 	cd lib && curl --silent --remote-name --location "$(Caja-HTML-Sanitezer-URL)/lib/uri.js"
-	cd lib && curl --silent --remote-name --location "$(Caja-HTML-Sanitezer-URL)/lib/lib/html4.js"
+	cd lib && curl --silent --remote-name --location "$(Caja-HTML-Sanitezer-URL)/lib/html4.js"
 	cd lib && patch -u sanitizer.js < ../sanitizer.js.patch
 
 lib/prism.js:
@@ -88,4 +92,19 @@ $(app-files-chrome): chrome-qfeeds/%:%
 	mkdir -p $(dir $@)
 	cp -p $(subst chrome-qfeeds/,./,$@) $@
 
-all: $(JS_LIBS) $(app-files-chrome)
+chrome-qfeeds/manifest.json: manifest_chrome.json
+	@echo "[ Preparing $@ ]"
+	cp -p $< $@
+
+libs: $(JS_LIBS)
+	@echo "[ $@ Done ]"
+libs: ## Download external libs into folder "libs/"
+
+all: $(app-files-chrome) chrome-qfeeds/manifest.json
+all: ## Regenerate browser extensions into folders "chrome-qfeeds/" and "firefox-qfeeds/"
+
+# Self-documenting make file (http://marmelab.com/blog/2016/02/29/auto-documented-makefile.html)
+help: ## Displays this help screen
+	@sed -E -n -e "s%^([-a-zA-Z_ ]+:).*## (.*)%${BOLD}\1${NC}\t\2%p" makefile
+
+.DEFAULT_GOAL := help
