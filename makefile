@@ -96,11 +96,21 @@ chrome-qfeeds/manifest.json: manifest_chrome.json
 	@echo "[ Preparing $@ ]"
 	cp -p $< $@
 
+# All files in ./firefox-qfeeds, depends on corresponding files in main folder ./
+$(app-files-firefox): firefox-qfeeds/%:%
+	mkdir -p $(dir $@)
+	cp -p $(subst firefox-qfeeds/,./,$@) $@
+
+firefox-qfeeds/manifest.json: manifest_firefox.json
+	@echo "[ Preparing $@ ]"
+	cp -p $< $@
+
 libs: $(JS_LIBS)
 	@echo "[ $@ Done ]"
 libs: ## Download external libs into folder "libs/"
 
-all: $(app-files-chrome) chrome-qfeeds/manifest.json
+all: $(app-files-chrome) chrome-qfeeds/manifest.json \
+     $(app-files-firefox) firefox-qfeeds/manifest.json
 all: ## Regenerate browser extensions into folders "chrome-qfeeds/" and "firefox-qfeeds/"
 
 # Self-documenting make file (http://marmelab.com/blog/2016/02/29/auto-documented-makefile.html)

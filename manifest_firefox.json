@@ -1,0 +1,61 @@
+{
+"manifest_version": 2,
+
+"name": "r-rss feeds reader",
+"version": "0.10.0",
+"short_name": "rrss",
+"description": "Reader of RSS feeds, w/GDrive for synchronization",
+
+"applications":
+{
+  "gecko":
+  {
+    "id": "{2df366ca-28d2-11e8-9c70-b7b0d99bd061}",
+    "strict_min_version": "42.0"
+  }
+},
+
+"icons":
+{
+  "128": "chrome/icon_rss.png"
+},
+
+"web_accessible_resources":
+[
+  "rrss/oauth_receiver_dbox.html",
+  "rrss/oauth_receiver_dbox.js"
+],
+
+"permissions":
+[
+  "identity",
+  "storage",
+  "downloads",
+  "tabs",
+  "http://*/",
+  "https://*/"
+],
+
+"content_security_policy": "script-src 'self'; object-src 'self'",
+
+"content_scripts": [ {
+      "js": [ "chrome/sniff_common.js", "chrome/doc_start.js" ],
+      "matches": [ "http://*/*", "https://*/*" ],
+      "run_at": "document_start"
+   }, {
+      "js": [ "chrome/sniff_common.js", "chrome/feed_finder.js" ],
+      "matches": [ "http://*/*", "https://*/*" ]
+   } ],
+
+"browser_action":
+{
+  "default_title": "rrss (devel)",
+  "default_icon" : "chrome/icon_rss.png"
+},
+
+"background":
+{
+   "scripts": [ "chrome/background.js" ]
+}
+
+}
