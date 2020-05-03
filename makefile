@@ -65,12 +65,21 @@ lib/prism.js:
 	cd lib && tar -xzvf prism_for_rrss.tar.gz
 	cd lib && rm prism_for_rrss.tar.gz
 
+lib/Dropbox-sdk.js:
+	mkdir -p lib
+	@echo "[ Downloading Dropbox-sdk.js ]"
+	cd lib && curl  --silent --remote-name --location \
+	    "https://unpkg.com/dropbox@4.0.3/dist/Dropbox-sdk.js"
+	cd lib && curl  --silent --remote-name --location \
+	    "https://unpkg.com/dropbox@4.0.3/dist/Dropbox-sdk.js.map"
+
 JS_LIBS = lib/bootstrap-3.2.0-dist/js/bootstrap.js \
      lib/jquery-2.0.2.js \
      lib/components/sha1.js \
 	 lib/loglevel.js \
 	 lib/sanitizer.js \
-	 lib/prism.js
+	 lib/prism.js \
+	 lib/Dropbox-sdk.js
 
 # Recursively list all web files
 # TODO: Move oauth_receiver files into a sub folder (if possible)
