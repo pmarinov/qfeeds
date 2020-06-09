@@ -8,44 +8,64 @@
 This file contains notes to explain how to start debugging or
 developing of QFeeds.
 
-== Install ==
+== Prepare ==
 
-. Download the libraries: go to "lib/", if empty run "./get_libs.sh"
-. Start Google Chrome browser
-. Invoke Menu | Tools | Extensions (or enter URL: chrome://extensions)
-. From Extensions page enable "Developer mode"
-. Click "Load unpacked extension"
-. Navigate to the directory where you put "rrss",
+* Run `make libs`
+
+* Run `make all`
+
+* This produces 2 local folders: `firefox-qfeeds` and `chrome-qfeeds`
+
+== Chrome ==
+
+* Start Google Chrome browser
+
+* Invoke _Menu_ | _Tools_ | _Extensions_ (or enter URL: `chrome://extensions`)
+
+* From page Extensions enable _Developer mode_
+
+* Click _Load unpacked extension_
+
+* Navigate to the directory `chrome-qfeeds`,
   select the directory by name (contents of the extension is inside it)
-. Open "New tab", go to "Apps" section (or enter URL: chrome://apps)
-. Click "rrss" to start it
+
+* The icon of QFeeds should appear in the areas for extensions
 
 == Firefox ==
 
 There are two ways to work on extensions in Firefox.
 
-The quick way is to load the extension temporarely for the duration of
-the current session. This has to be repeated every time Firefox is
-started, all data from the previous session is lost.
+The *quick way* is to load the extension temporarely for the duration
+of the current session. This has to be repeated every time Firefox is
+started, all data from the previous session is *lost*.
 
-A persistent installation is better suited for the development of
-_r-rss_. The steps for that are:
+A *persistent installation* is better suited for the development work
+of _QFeeds_. The steps for that are:
 
-* *Download* Firefox Developer Edition: https://www.mozilla.org/en-US/firefox/developer/
+* *Download* Firefox Developer Edition:
+   https://www.mozilla.org/en-US/firefox/developer/
 
-* *Untar* into a temp (work) folder
+* *Untar* into a local folder
 +
 ....
-cd ~/tmp
+mkdir -p ~/.local/bin
+cd ~/.local/bin
 tar -xvf ~/Downloads/firefox-60.0b3.tar.bz2
 ....
 
-* Start from that folder, this will also *create the profile upon first start*
+* Start from that folder, this will also *create the profile upon
+first start*
 +
 ....
-cd ~/tmp/firefox
+cd ~/.local/bin/firefox
 ./firefox
 ....
+
+* *Enable usigned* extensions
++
+. Enter URL `about:config`
+. search for `xpinstall.signatures.required`
+. Toggle it to `false`
 
 * Exit Firefox
 
@@ -62,21 +82,33 @@ $ cd l062qyl2.dev-edition-default/extensions/
 * Create *a pointer file* here, it should look like this:
 +
 ....
-$ cat \{2df366ca-28d2-11e8-9c70-b7b0d99bd061\} 
-/home/peterm/work/rrss_moz
+$ cat \{2df366ca-28d2-11e8-9c70-b7b0d99bd061\}
+/home/peterm/work/qfeeds/firefox-qfeeds/
 ....
 +
-The name matches the field _id_ from _manifest.json_, inside the file
-is only the path to where the current actively edited sources reside
+*Important* considerations
++
+. Use full path to home folder, not `~`
++
+. The name of the poiter file *matches* the field _id_ from _manifest.json_
++
+. The trailing slash is important
++
+. This *pointer file* is a left-over technique from the time of the
+now *deprecated* XUL-format extensions. It is described here:
+https://developer.mozilla.org/en-US/docs/Archive/Add-ons/Setting_up_extension_development_environment[Setting
+up extension development environment] (mozilla.org), see section
+"Firefox extension proxy file"
 
-* Once *the setup of devel version is done* Firefox can be started conveniently with:
+* Once *the setup of devel version is done* Firefox Developer Edition
+  can be started conveniently with:
 +
 ....
-$ (cd ~/tmp/firefox; ./firefox;)&
+$ (cd ~/.local/bin/firefox; ./firefox;)&
 ....
 
 * To *reload the extension* after edits, Ctrl+R
 
-* To *reload the extension* after edits of _manifest.json_, restart Firefox Developer
+* To *reload the extension* after edits of `manifest.json`, restart Firefox Developer
 Edition
 

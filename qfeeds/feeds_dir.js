@@ -154,6 +154,10 @@ function connectToFeedsDb(feedsDB)
 FeedsDir.prototype.connectToFeedsDb = connectToFeedsDb;
 
 // object FeedsDir.remoteStoreConnected
+// Invoked when session with Dropbox has been established
+//
+// Passes the call to m_feedsDB
+// (It loads the remote tables for subscription and marked-as-read)
 function remoteStoreConnected(cbDisplayProgress)
 {
   var self = this;

@@ -36,9 +36,10 @@ function RssError(title, info)
 var RssSyncState =
 {
   IS_SYNCED: 0,
-  IS_REMOTE_ONLY: 1,
+  IS_REMOTE_ONLY: 1,  // TODO: Dropbox: Consider flexible handling instead of a special state
   IS_LOCAL_ONLY: 2,
-  IS_PENDING_SYNC: 3
+  IS_PENDING_SYNC: 3, // TODO: Obsoleted on Dropbox rtables, remove from here
+  IS_SYNC_IN_PROGRESS: 4
 }
 
 // object RssEntry [constructor]

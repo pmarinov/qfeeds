@@ -214,6 +214,12 @@ Array.prototype.binarySearch = function(find, comparator)
   return -(low + 1);
 };
 
+// Return a copy of all elements of the array
+Array.prototype.copy = function()
+{
+  return this.slice();
+}
+
 // Find list of that start with _prefix_
 function listOfFields(obj, prefix)
 {
@@ -376,6 +382,52 @@ function numberWith2Decimals(v)
   return parseFloat(Math.round(v * 100) / 100).toFixed(2)
 }
 
+function StateMachine(state)
+{
+  let self = this;
+
+  self.m_states = {};
+  self.m_curState = null;
+  self.m_prevState = null;
+  self.m_ctx = {};  // Dictionary to store context information
+  return this;
+}
+
+function add(name, stateCb)
+{
+  let self = this;
+
+  self.m_states[name] = stateCb;
+}
+StateMachine.prototype.add = add;
+
+function advance(toState)
+{
+  let self = this;
+
+  let i = 0
+  assert(self.m_states[toState] !== undefined,
+      'Unknown state "' + toState + '"');
+  self.m_prevState = self.m_curState;
+  self.m_curState = toState;
+
+  setTimeout(function ()
+  {
+      // log.info('state:  ' + self.m_curState);
+      var step = self.m_states[self.m_curState];
+      step();
+  }, 0);  // Delay 0, just yield
+}
+StateMachine.prototype.advance = advance;
+
+function stringify()
+{
+  let self = this;
+
+  return self.m_curState + ' (' + self.m_prevState + ')';
+}
+StateMachine.prototype.stringify = stringify;
+
 utils_ns.assert = assert;
 utils_ns.roughSizeOfObject = roughSizeOfObject;
 utils_ns.hasFields = hasFields;
@@ -393,5 +445,6 @@ utils_ns.copyFields = copyFields;
 utils_ns.marshal = marshal;
 utils_ns.numberWithCommas = numberWithCommas;
 utils_ns.numberWith2Decimals = numberWith2Decimals;
+utils_ns.StateMachine = StateMachine;
 
 })();

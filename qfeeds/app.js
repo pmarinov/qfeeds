@@ -51,6 +51,13 @@ function App()
             return;
           self.m_feedsDir.p_feedView(request.feedData[0].href);
         }
+        if (request.msg == 'oauthConnectToken')
+        {
+          log.info('app: message "oauthConnectToken"')
+          // log.info('token: ' + request.content);
+          for (i = 0; i < self.m_hookAuthCompleted.length; ++i)
+            self.m_hookAuthCompleted[i](request.content)
+        }
       });
 
   var m_oldOnError = window.onerror;
@@ -83,8 +90,8 @@ function App()
       }
 
   // Establish compatible indexDB based on the browser
-  // log.setLevel('info');
-  log.setLevel('warn');
+  log.setLevel('info');
+  // log.setLevel('warn');
   log.info("app: Obtaining indexDB handler...");
 
   if (!window.indexedDB)
@@ -107,6 +114,8 @@ function App()
   self.m_feedsDir = null;
   self.m_feedsDB = null;
   self.m_gdriveConnect = null;
+
+  self.m_hookAuthCompleted = [];
 
   self.m_initSeq = [];  // A vector of init steps executed in order
   self.m_initCnt = 0;
@@ -174,12 +183,11 @@ function App()
   self.m_initSeq.push(function()
       {
         // Now connect to Dropbox
-        // self.m_connectDropbox = new feeds_ns.ConnectDBox(self.p_getConnectDBoxCBHandlers());
-        // Now connect to Google Drive
-        // var cb = self.p_getConnectGDriveHandlers();
-        // var startWithLoggedIn = self.m_feedsDB.prefGet("m_local.app.logged_in");
-        // log.info('app: startWithLoggedIn = ' + startWithLoggedIn);
-        // self.m_gdriveConnect = new feeds_ns.ConnectGDrive(cb, startWithLoggedIn);
+        var cb = self.p_getHandlersRemoteStatus();
+        var startWithLoggedIn = self.m_feedsDB.prefGet("m_local.app.logged_in");
+        log.info('app: startWithLoggedIn = ' + startWithLoggedIn);
+        var dummy = new feeds_ns.ConnectDBox(cb, startWithLoggedIn);
+
         self.p_initSeqNext();
       });
   self.m_initSeq.push(function()
@@ -229,20 +237,28 @@ function p_setDefaultPref()
 }
 App.prototype.p_setDefaultPref = p_setDefaultPref;
 
-// object App.p_getConnectGDriveHandlers()
+// object App.p_getHandlersRemoteStatus()
 // A bridge between GDrive status and other elements (UI or Database)
-function p_getConnectGDriveHandlers()
+function p_getHandlersRemoteStatus()
 {
   var self = this;
 
-  var connectGDriveCB =
+  var remoteStatusCB =
   {
     // If user logins into Dropbox this function is called
     // when access object is ready
-    onClientReady: function(code, accessToken, displayProgress)
+    onClientReady: function(code, connectionObj, displayProgress)
         {
+          // TODO:
+          // !! accessToken => connectionObject !!
           if (code == 0)
           {
+            self.m_feedsDB.prefSet("m_local.app.logged_in", true);
+
+            feeds_ns.RTablesConnect(connectionObj, remoteStatusCB);
+            self.m_feedsDir.remoteStoreConnected(displayProgress);
+            if (false)
+            {
             feeds_ns.RTablesInit(accessToken, function()
                 {
                   feeds_ns.RTablesAddListenerReconnect(function ()
@@ -257,6 +273,11 @@ function p_getConnectGDriveHandlers()
                   self.m_feedsDir.remoteStoreConnected(displayProgress);
                 },
                 displayProgress);
+            }
+          }
+          else
+          {
+            self.m_feedsDB.prefSet("m_local.app.logged_in", false);
           }
         },
 
@@ -281,13 +302,25 @@ function p_getConnectGDriveHandlers()
     // Store preferences
     setPref: function(pref, value)
         {
-          self.m_feedsDB.prefSet("m_local.app.logged_in", value);
+          self.m_feedsDB.prefSet(pref, value);
+        },
+
+    // Store preferences
+    getPref: function(pref)
+        {
+          return self.m_feedsDB.prefGet(pref);
+        },
+
+    // Hook to when the app receives OAuth completion token
+    addToHookAuthCompleted: function(func)
+        {
+          self.m_hookAuthCompleted.push(func);
         },
   };
 
-  return connectGDriveCB;
+  return remoteStatusCB;
 }
-App.prototype.p_getConnectGDriveHandlers = p_getConnectGDriveHandlers;
+App.prototype.p_getHandlersRemoteStatus = p_getHandlersRemoteStatus;
 
 // object PanelMng.p_activatePane()
 // Activate one object into the right-hand side area (Feeds, About, etc.)

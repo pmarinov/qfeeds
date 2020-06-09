@@ -1,7 +1,7 @@
 // connect_dbox.js, -*- mode: javascript; -*-
 //
 // This software is distributed under the terms of the BSD License.
-// Copyright (c) 2014, Peter Marinov and Contributors
+// Copyright (c) 2018, Peter Marinov and Contributors
 // see LICENSE.txt, CONTRIBUTORS.txt
 
 //
@@ -20,54 +20,72 @@ if (typeof feeds_ns === 'undefined')
 
 // object ConnectDBox.ConnectDBox [constructor]
 // Connect to Dropbox
-// - Connects to Dropbox is user is already authenticated
+// - Connects to Dropbox if user is already authenticated
 // - Handle Login/Logout button
-// - Shows user info and progress
-function ConnectDBox(cb)
+// - Shows user info
+// - Keeps Dropbox API access token
+function ConnectDBox(cb, startWithLoggedIn)
 {
   var self = this;
 
   self.$d =
   {
-    btnDropbox: utils_ns.domFind('#xdropbox'),
-    userDropbox: utils_ns.domFind('#xdropbox_user')
+    btnDropbox: utils_ns.domFind('#xgdrive'),
+    userDropbox: utils_ns.domFind('#xgoogle_user')
   };
 
   // Callback handlers
   self.m_cb = cb;
 
-  // progress 0%
-  self.m_cb.onDBoxProgress(0);
-
   self.m_user_email = '';
   self.m_user_name = '';
 
-  self.m_dropBoxClient = new Dropbox.Client({key: 'w1ghid3yiohsa69'});
-  self.m_dropBoxClient.authDriver(new Dropbox.AuthDriver.ChromeExtension(
+  self.m_client = null;
+  self.m_rawToken = null;
+  self.m_authToken = null;
+  self.m_accountID = null;
+
+  // Local storage key to store the token
+  self.m_dboxTokenKey = 'dropbox.token';
+
+  // If we have the token already in localStorage use it
+  if (startWithLoggedIn)
+  {
+    // Activate the token only after the object ConnectDBox is created
+    setTimeout(function ()
     {
-      receiverPath: 'qfeeds/chrome_oauth_receiver.html'
-    }));
+      self.m_rawToken = localStorage.getItem(self.m_dboxTokenKey);
+      if (self.m_rawToken != null)
+      {
+        self.p_parseToken();
+        self.p_setToken();
+      }
+    }, 0);  // Delay 0, just yield
+  };
 
   self.p_dboxSetLoginButton();
 
-  // Try to finish OAuth authorization.
+  // Verify connection and set this flag
   self.m_authenticated = false;
 
-  // progress 20%
-  self.m_cb.onDBoxProgress(20);
-  self.m_dropBoxClient.authenticate({interactive: false},
-    function (error, client)
-    {
-      // progress 60%
-      self.m_cb.onDBoxProgress(60);
-      self.p_dboxConnectCB(error, client);
-    });
+  // Keep track of which new tab was opened for Dropbox to login the user
+  // Close it once the token is ours
+  self.m_authenticationTab = -1;
 
+  // Login/Logout button
   self.$d.btnDropbox.on('click',
     function (e)
     {
       self.dboxLoginLogout();
     });
+
+  // Plug to message listener hook for completion of OAuth's UI interaction
+  self.m_cb.addToHookAuthCompleted(function(token)
+    {
+      p_completeOAuth(self, token);
+    });
+
+  Object.preventExtensions(this);
 }
 
 // object ConnectDBox.p_dboxConnectCB()
@@ -82,15 +100,14 @@ function p_dboxConnectCB(error, client)
   }
   else
   {
-    console.log('auth_pass1: authenticated1');
-    self.m_dropBoxClient = client;
-    if (self.m_dropBoxClient.isAuthenticated())
+    self.m_client = client;
+    if (self.m_client.isAuthenticated())
     {
       // progress 80%
       self.m_cb.onDBoxProgress(80);
       self.m_authenticated = true;
       console.log('auth_pass1: OK');
-      self.m_cb.onDBoxClientReady(self.m_dropBoxClient);
+      self.m_cb.onDBoxClientReady(self.m_client);
       self.p_dboxSetLoginButton();
       self.p_dboxGetAccountInfo();
     }
@@ -105,25 +122,23 @@ function p_dboxConnectCB(error, client)
 ConnectDBox.prototype.p_dboxConnectCB = p_dboxConnectCB;
 
 // object ConnectDBox.p_dboxGetAccountInfo()
-function p_dboxGetAccountInfo()
+function p_dboxGetAccountInfo(cb)
 {
-  var self = this;
+  let self = this;
 
-  self.m_dropBoxClient.getAccountInfo({httpCache: true},
-    function(error, accountInfo, accountInfoData)
-    {
-      // progress 100%
-      self.m_cb.onDBoxProgress(100);
-      if (error)
-        console.log('get_acc1: error ' + error);
-      else
+  self.m_client.usersGetCurrentAccount()
+      .then(function(response)
       {
-        self.m_user_name = accountInfoData.display_name;
-        self.m_user_email = accountInfoData.email;
-        console.log('get_acc1: accountInfo OK, (' + accountInfoData.email + ')');
-        self.p_dboxSetLoginButton();
-      }
-    });
+        self.m_user_name = response.display_name;
+        self.m_user_email = response.email;
+        cb(1);
+      })
+      .catch(function(error)
+      {
+        log.error('dropbox: getAccountInfo:');
+        log.error(error);
+        cb(0);
+      });
 }
 ConnectDBox.prototype.p_dboxGetAccountInfo = p_dboxGetAccountInfo;
 
@@ -134,19 +149,8 @@ function p_dboxSetLoginButton()
 
   if (self.m_authenticated)
   {
-    if (false)
-    {
-      // TODO: remove, quick demo, file access
-      self.m_dropBoxClient.writeFile('hello.txt', 'Hello, World!', function () {
-          alert('File written!');
-      });
-    }
-
     self.$d.btnDropbox.text('Logout \u2192');
-    if (self.m_user_email != '')
-      self.$d.userDropbox.text('(' + self.m_user_email + ')');
-    else
-      self.$d.userDropbox.text('(Connecting...)');
+    self.$d.userDropbox.text('(' + self.m_user_email + ')');
   }
   else
   {
@@ -156,6 +160,114 @@ function p_dboxSetLoginButton()
 }
 ConnectDBox.prototype.p_dboxSetLoginButton = p_dboxSetLoginButton;
 
+// object ConnectDBox.p_parseToken
+// Parses `m_rawToken'
+// Example string:
+// #access_token=40hlw...&token_type=bearer&state=zzclient&uid=118...\
+// &account_id=dbid%3AAABBxNhMU...
+function p_parseToken()
+{
+  var self = this;
+
+  var i = 0;
+  var c = self.m_rawToken.split('&');
+  var entry = '';
+  for (i = 0; i < c.length; ++i)
+  {
+    entry = c[i];
+
+    if (entry.startsWith('#access_token='))
+      self.m_authToken = entry.replace('#access_token=', '');
+
+    if (entry.startsWith('account_id='))
+      self.m_accountID = decodeURI(entry.replace('account_id=', ''));
+  }
+}
+ConnectDBox.prototype.p_parseToken = p_parseToken;
+
+// object ConnectDBox.p_setLoggedOut
+function p_setLoggedOut()
+{
+  let self = this;
+
+  self.m_authenticated = false;
+  self.m_rawToken = null;
+  self.m_authToken = null;
+  self.m_accountID = null;
+  localStorage.removeItem(self.m_dboxTokenKey);
+}
+ConnectDBox.prototype.p_setLoggedOut = p_setLoggedOut;
+
+// object ConnectDBox.p_verifyLoginState
+// Verify if Dropbox connection is good by obtaining user info
+function p_verifyLoginState()
+{
+  let self = this;
+
+  self.p_dboxGetAccountInfo(function(status)
+      {
+        if (status == 1)
+        {
+          log.info('dropbox: login good.');
+          self.m_authenticated = true;
+          let connectionObj = {
+            dbox_client: self.m_client
+          };
+          self.m_cb.onClientReady(0, connectionObj, function(progress)
+              {
+                self.m_cb.onProgress(progress);
+              });
+        }
+        else
+        {
+          // Tell the main app the Dropbox connection is not active
+          log.info('dropbox: login not active.');
+          self.p_setLoggedOut();
+          self.m_cb.onClientReady(1, null, null);
+        };
+
+        self.p_dboxSetLoginButton();
+      });
+}
+ConnectDBox.prototype.p_verifyLoginState = p_verifyLoginState;
+
+const APIKEY = '25sck7n54cqhfq8';
+
+// object ConnectDBox.p_setToken
+function p_setToken()
+{
+  let self = this;
+
+  self.m_client = new window.Dropbox.Dropbox(
+      {
+        accessToken: self.m_authToken,
+        clientId: APIKEY
+      });
+  self.p_verifyLoginState();
+}
+ConnectDBox.prototype.p_setToken = p_setToken;
+
+// object ConnectDBox.p_completeOAuth
+// A callback to handle message from Dropbox's OAuth page
+function p_completeOAuth(self, token)
+{
+  self.m_rawToken = token;
+  self.p_parseToken();
+
+  log.info('dropbox: login complete, closing tab#: ' + self.m_authenticationTab);
+
+  utils_ns.assert(self.m_authenticationTab >= 0, 'p_completeOAuth: invalid tab id ' + self.m_authenticationTab);
+
+  chrome.tabs.remove(self.m_authenticationTab);
+  self.m_authenticationTab = -1;
+
+  // Store token in localStorage
+  // dropbox.token=self.m_rawToken
+  localStorage.setItem(self.m_dboxTokenKey, self.m_rawToken);
+
+  self.p_setToken();
+}
+
 // object ConnectDBox.dboxLoginLogout
 // Handles click on Login/Logout button
 function dboxLoginLogout()
@@ -164,30 +276,30 @@ function dboxLoginLogout()
 
   if (self.m_authenticated)
   {
-    self.m_authenticated = false;
-    self.m_user_name = '';
-    self.m_user_email = '';
+    log.info("dropbox: LoginLogout => logout");
+    self.p_setLoggedOut();
     self.p_dboxSetLoginButton();
-
-    self.m_dropBoxClient.signOut(false,
-      function(error)
-      {
-        if (error)
-           console.log('sign_out1: error ' + error);
-        else
-           console.log('sign_out1: OK');
-     });
   }
   else
   {
-    console.log("auth2: start");
-    self.m_dropBoxClient.authenticate({interactive: true},
-      function (error, client)
-      {
-        console.log("auth2: callback");
-        self.p_dboxConnectCB(error, client);
-      });
-  }
+    log.info("dropbox: LoginLogout => login start");
+
+    self.m_client = new window.Dropbox.Dropbox({clientId: APIKEY});
+    const fullReceiverPath =
+      'moz-extension://ccf49d46-563b-485a-a796-8c23da8278fd/qfeeds/oauth_receiver_dbox.html';
+    let authUrl =
+      self.m_client.getAuthenticationUrl(fullReceiverPath, 'zzclient', 'token');
+
+    chrome.tabs.create({ url: authUrl}, function (newTab)
+        {
+          self.m_authenticationTab = newTab.id;
+          log.info('dropbox: New tab for authentication of Dropbox: ' + newTab.id);
+        });
+    // Control is passed to the newly create tab
+    //
+    // User interaction is passed over to Dropbox, it will come back
+    // in p_completeOAuth() (via app.js message listener)
+  };
 }
 ConnectDBox.prototype.dboxLoginLogout = dboxLoginLogout;
 

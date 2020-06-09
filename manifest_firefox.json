@@ -22,8 +22,8 @@
 
 "web_accessible_resources":
 [
-  "rrss/oauth_receiver_dbox.html",
-  "rrss/oauth_receiver_dbox.js"
+  "qfeeds/oauth_receiver_dbox.html",
+  "qfeeds/oauth_receiver_dbox.js"
 ],
 
 "permissions":

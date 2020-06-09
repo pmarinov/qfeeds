@@ -17,350 +17,690 @@ if (typeof feeds_ns === 'undefined')
 
 (function ()
 {
-
 "use strict";
 
-// Handle to Dropbox's datastore
-var g_datastore = null;
-var g_client = null;
+let g_connectionObj = null;
+let g_dbox = null;
+let g_utilsCB  = null;
 
-var g_cbRecordsChanged = null;
-
-// Listg of all remote tables, of type:
-// { table: string (name), id: integer }
-var g_tables = [];
-
-// object RTableDBox.RTableDBox [constructor]
-// Used for access of remote table stored in Dropbox
-// _fields_ is the list of all fields of objects inserted in the table
-// _key_ name of primary key, used as Dropbox ID
-// Set _key_ to '' to activate automatically generated IDs by Dropbox
-function RTableDBox(name, fields, key)
+function JournalEntry(tableRow, action)
 {
-  var self = this;
+  this.m_row = tableRow;
+  this.m_action = action;
 
-  utils_ns.assert(g_datastore != null, 'RTableDBox: g_datastore is null');
-  self.m_table = g_datastore.getTable(name);
-  self.m_tableId = self.m_table.getId();
-  self.m_fields = fields;
-  self.m_key = key;
+  return this;
+}
 
-  g_tables.push(self);
+// object RTables.insert()
+// Insert an entry into a remote table
+function insert(remoteTableName, tableRow)
+{
+  let self = this;
+  let ctx = self.m_rtables[remoteTableName].m_ctx;
 
-  // Record status for listeners
-  self.RECORD_UPDATED = 1;
-  self.RECORD_DELETED = 2;
-  self.RECORD_LOCAL = 3;  // feedback from local RTable.insert/delete actions
+  let x = new JournalEntry(tableRow, self.TAG_ACTION_SET);
+  ctx.newJournal.push(x);
+}
+RTables.prototype.insert = insert;
+
+// object RTables.p_rescheduleWriteBack
+function p_rescheduleWriteBack()
+{
+  let self = this;
+
+  // Reschedule
+  if (self.m_writeBack != null)
+    clearTimeout(self.m_writeBack);
+
+  // Setup the handler of periodic write operations
+  self.m_writeBack = setTimeout(writeBackHandler, 5 * 1000, self);
+}
+RTables.prototype.p_rescheduleWriteBack = p_rescheduleWriteBack;
+
+// object [global] writeBackHandler()
+// Set to be invoked periodically by a timer,
+// checks if local journals are dirty and sends them to Dropbox
+function writeBackHandler(self)
+{
+  if (self.m_writeBackInProgress)
+  {
+    self.p_rescheduleWriteBack();
+    return;
+  }
+
+  self.m_writeBackInProgress = true;
+
+  let tableNames = Object.keys(self.m_rtables);
+  for (let i = 0; i < tableNames.length; ++i)
+  {
+    let tableName = tableNames[i];
+    let rtable = self.m_rtables[tableName];
+    let ctx = rtable.m_ctx;
+
+    // No new entries
+    if (ctx.newJournal.length == 0)
+      continue;
+
+    // String presentation of all journal entries
+    // (Append "new" after "remote")
+    let entries = [];
+    for (let j = 0; j < ctx.remoteJournal.length; ++j)
+      entries.push(JSON.stringify(ctx.remoteJournal[j]));
+    for (let j = 0; j < ctx.newJournal.length; ++j)
+      entries.push(JSON.stringify(ctx.newJournal[j]));
+
+    // String representation of the entire file on Dropbox
+    let strAll = '{\n' +
+        '"formatVersion": ' + ctx.formatVersion + ',\n' +
+        '"entries": [\n' + entries.join(',\n') + '\n]\n' +
+      '}\n';
+
+    let writeMode = null;
+    let strPrevVer = 'none';
+    let revJournal = g_utilsCB.getPref(ctx.prefRevJournal);
+
+    if (revJournal === undefined || revJournal == 'empty')
+    {
+      // Journal file doesn't exist remotely
+      writeMode = 'overwrite';
+      log.info('dropbox: writeBackHandler() -- new journal');
+    }
+    else
+    {
+      // Overwrite an existing revision (revJournal)
+      // Make sure the version we have locally matches the remote one
+      log.info('dropbox: writeBackHandler() -- update journal rev: ' + revJournal);
+      writeMode =  {
+        '.tag': 'update',
+        'update': revJournal,
+      };
+      strPrevVer = String(revJournal);
+    }
+
+    g_dbox.filesUpload(
+        {
+          contents: strAll,
+          path: '/' + ctx.fnameJournal,
+          mode: writeMode,
+          strict_conflict: true,
+          autorename: false,
+          mute: true
+        })
+        .then(function(response)
+            {
+              // console.log(response);
+              log.info('dropbox: RTables.writeBackHandler(' +
+                tableName + '), total dump length: ' + strAll.length + ', ' +
+                'prev: ' + strPrevVer + ', new: ' + response.rev);
+
+              // Keep track of the new revision of the file on Dropbox
+              g_utilsCB.setPref(ctx.prefRevJournal, response.rev);
+
+              // Move newJournal[] at the end of remoteJournal[]
+              for (let j = 0; j < ctx.newJournal.length; ++j)
+                ctx.remoteJournal.push(ctx.newJournal[j]);
+
+              // Call event handler to reflect which entries are safe
+              ctx.cbEvents({
+                event: 'MARK_AS_SYNCHED',
+                tableName: ctx.tableName,
+                entries: ctx.newJournal.copy()
+              });
+              // Empty newJournal (everything is in remoteJournal now)
+              ctx.newJournal = [];
+            })
+        .catch(function(response)
+            {
+              if (response.status == 409 && response.error.error_summary.startsWith('path/conflict/file'))
+              {
+                // Data file doesn't exist on Dropbox
+                log.info('dropbox: revision conflict detected for "' + ctx.fnameJournal  + '"');
+                g_utilsCB.setPref(ctx.prefRevJournal, 'empty');
+              }
+              else
+              {
+                log.error('dropbox: getMetadata for journal "' + ctx.fnameJournal + '"');
+                log.error(response);
+              }
+
+              log.error('dropbox: filesUpload');
+              console.log(response);
+              // Callback FAILURE
+              // We will retry in the next iteration
+            });
+  }
+
+  self.m_writeBackInProgress = false;
+  self.p_rescheduleWriteBack();
+}
+
+// object loadStateMachine [factory]
+// Ceates a state machine that handles operation load
+//
+// remoteTableName -- name of a table for which to handle operation load
+function loadStateMachine(objRTables, remoteTableName)
+{
+  let state = new utils_ns.StateMachine();
+
+  state.add('IDLE', function ()
+      {
+        log.info('dropbox: [' + remoteTableName + '] state ' + state.stringify());
+      });
+
+  state.add('START_FULL_LOAD', function ()
+      {
+        //
+        // FULL_LOAD: Start sequence for loading updated state from Dropbox
+        log.info('dropbox: [' + remoteTableName + '] state ' + state.stringify());
+        let ctx = objRTables.m_rtables[remoteTableName].m_ctx;
+
+        // Reset fresh revisions
+        ctx.freshRevJournal = null;
+        ctx.freshRevFState = null;
+
+        // Download remote full state (if any fresh detected)
+        ctx.tempFullState = [];
+        ctx.tempJournal = [];  // Assume nothing new (for APPLY_REMOTE_STATE)
+        ctx.tempJournalJSON = null;
+
+        // Start the state machine sequence
+        state.advance('GET_REV_JOURNAL');
+      });
+
+  state.add('GET_REV_JOURNAL', function ()
+      {
+        //
+        // GET_REV_JOURNAL: Get revision of the journal file
+        log.info('dropbox: [' + remoteTableName + '] state ' + state.stringify());
+        let ctx = objRTables.m_rtables[remoteTableName].m_ctx;
+
+        // Root is the App folder on Dropbox
+        let baseName = ctx.fnameJournal;
+        let tableFName = '/' + baseName;
+        g_dbox.filesGetMetadata(
+            {
+              path: tableFName,
+              include_media_info: false,
+              include_deleted: false,
+              include_has_explicit_shared_members: false
+            })
+            .then(function(response)
+                {
+                  log.info('dropbox: getMetadata for journal "' + baseName + '", '
+                      + 'rev: ' + response.rev + ', size: ' + response.size);
+                  // console.log(response);
+
+                  ctx.freshRevJournal = response.rev;
+                  state.advance('GET_REV_FSTATE');
+                })
+            .catch(function(response)
+                {
+                  if (response.status == 409 && response.error.error_summary.startsWith('path/not_found'))
+                  {
+                    // Data file doesn't exist on Dropbox
+                    log.info('dropbox: NOT FOUND detected for "' + baseName  + '"');
+                    g_utilsCB.setPref(ctx.prefRevJournal, 'empty');
+                    ctx.freshRevJournal = null;
+                  }
+                  else
+                  {
+                    log.error('dropbox: getMetadata for journal "' + baseName + '"');
+                    log.error(response);
+                  }
+                  state.advance('GET_REV_FSTATE');
+                });
+      });
+
+  state.add('GET_REV_FSTATE', function ()
+      {
+        //
+        // GET_REV_FSTATE: Get revision of the full state file
+        log.info('dropbox: [' + remoteTableName + '] state ' + state.stringify());
+        let ctx = objRTables.m_rtables[remoteTableName].m_ctx;
+
+        // Root is the App folder on Dropbox
+        let baseName = ctx.fnameFState;
+        let tableFName = '/' + baseName;
+        g_dbox.filesGetMetadata(
+            {
+              path: tableFName,
+              include_media_info: false,
+              include_deleted: false,
+              include_has_explicit_shared_members: false
+            })
+            .then(function(response)
+                {
+                  log.info('dropbox: getMetadata for fstate "' + baseName + '", '
+                      + 'rev: ' + response.rev + ', size: ' + response.size);
+                  // console.log(response);
+
+                  ctx.freshRevFState = response.rev;
+                  state.advance('LOAD_DATA_JOURNAL');
+                })
+            .catch(function(response)
+                {
+                  if (response.status == 409 && response.error.error_summary.startsWith('path/not_found'))
+                  {
+                    // Data file doesn't exist on Dropbox
+                    log.info('dropbox: NOT FOUND detected for "' + baseName  + '"');
+                    g_utilsCB.setPref(ctx.prefRevFState, 'empty');
+                    ctx.freshRevFState = null;
+                  }
+                  else
+                  {
+                    log.error('dropbox: getMetadata for fstate "' + baseName + '"');
+                    log.error(response);
+                  }
+
+                  state.advance('LOAD_DATA_JOURNAL');
+                });
+      });
+
+  state.add('LOAD_DATA_JOURNAL', function ()
+      {
+        //
+        // LOAD_DATA_JOURNAL: Load journal data from Dropbox
+        // (In case local state is out of sync)
+        log.info('dropbox: [' + remoteTableName + '] state ' + state.stringify());
+        let ctx = objRTables.m_rtables[remoteTableName].m_ctx;
+        let shouldLoad = false;
+
+        if (ctx.freshRevJournal == null)
+        {
+          // No remote journal file
+          log.info('dropbox: [' + remoteTableName + '] No remote journal');
+
+          // Clear local copy of remote journal
+          ctx.remoteJournal = [];
+        }
+        else
+        {
+          // There is remote journal file, check if we need to load it
+
+          let revJournal = g_utilsCB.getPref(ctx.prefRevJournal);
+          if (revJournal === undefined || revJournal == 'empty')
+          {
+            // Nothing held locally
+            log.info('dropbox: [' + remoteTableName + '] No locally loaded remote journal (first time to load)');
+            shouldLoad = true;
+          }
+          else
+          {
+            // We have both remote version AND local version
+            if (revJournal == ctx.freshRevJournal)
+            {
+              // Restore journal from locally stored string
+              log.info('dropbox: [' + remoteTableName + '] Restore from locally stored JSON');
+
+              let journalJSON = g_utilsCB.getPref(ctx.prefRevJournalRemoteJSON);
+              utils_ns.assert(journalJSON !== undefined, "dropbox: Corrupted storage of " + ctx.prefRevJournalRemoteJSON);
+              if (journalJSON === undefined)
+              {
+                state.advance('IDLE');
+                return;
+              }
+
+              ctx.remoteJournal = JSON.parse(journalJSON);
+
+              // Nothin to load (remote rev is the same as last time)
+              state.advance('LOAD_DATA_FULL_STATE');
+
+              // This step of the state machine is completed
+              return;
+            }
+            else
+            {
+              // Local version and remote versions are different
+              shouldLoad = true;
+              log.info('dropbox: [' + remoteTableName + '] New remote journal detected');
+            }
+          }
+        }
+
+        if (shouldLoad)
+        {
+          // There is remote journal, load it
+          log.info('dropbox: [' + remoteTableName + '] Loadig remote journal...');
+
+          g_dbox.filesDownload(
+              {
+                path: '/' + ctx.fnameJournal,
+              })
+              .then(function(response)
+                  {
+                    log.info('dropbox: filesDownload, journal, rev: ' + response.rev);
+                    // console.info(response);
+
+                    // Store this new remote revision
+                    g_utilsCB.setPref(ctx.prefRevJournal, response.rev);
+
+                    // In the off-chance that remote rev has changed during
+                    // the steps in this state machine
+                    ctx.freshRevJournal = response.rev;
+
+                    // Parse JSON and keep a copy in local ctx
+                    let blob = response.fileBlob;
+                    let reader = new FileReader();
+                    reader.addEventListener("loadend", function()
+                        {
+                          // TODO: test with bad JSON
+                          // TODO: Check that essential fields are present
+                          // TODO: Check that size makes sense
+                          let data = JSON.parse(reader.result);
+                          ctx.tempJournal = data['entries'];
+                          ctx.tempJournalJSON = reader.result;
+                          state.advance('LOAD_DATA_FULL_STATE');
+                        });
+                    // Activate listener "loadend"
+                    reader.readAsText(blob);
+                  })
+              .catch(function(response)
+                  {
+                    log.error('dropbox: filesDownload');
+                    log.error(response);
+
+                    // Global error handler for all database errors
+                    utils_ns.domError("dropbox: filesDownload('" + ctx.fnameJournal + "'), " +
+                        "error: " + response.error.error_summary);
+
+                    // Retry later
+                    state.advance('IDLE');
+                  });
+        }
+      });
+
+  state.add('LOAD_DATA_FULL_STATE', function ()
+      {
+        //
+        // LOAD_DATA_FULL_STATE: Loads full state file data
+        // (In case local state is out of sync)
+        log.info('dropbox: [' + remoteTableName + '] state ' + state.stringify());
+        let ctx = objRTables.m_rtables[remoteTableName].m_ctx;
+        let shouldLoad = false;
+
+        if (ctx.freshRevFState == null)
+        {
+          // No remote full-state file
+          log.info('dropbox: [' + remoteTableName + '] No remote full state file, write one');
+
+          // Nothin to load (remote file is not found)
+          state.advance('IDLE');
+
+          // Clear local copy of remote journal
+          // (prepare for full state write)
+          ctx.remoteJournal = [];
+
+          // Invoke callback to initiate writing of full state to Dropbox
+          ctx.cbEvents({
+            event: 'WRITE_FULL_STATE',
+            tableName: ctx.tableName
+          });
+        }
+        else
+        {
+          // There is remote journal file, check if we need to load it
+
+          let revFState = g_utilsCB.getPref(ctx.prefRevFState);
+          if (revFState === undefined || revFState == 'empty')
+          {
+            // Nothing held locally
+            log.info('dropbox: [' + remoteTableName + '] No locally full-state (first time to load)');
+            shouldLoad = true;
+          }
+          else
+          {
+            // We have both remote version AND local version
+            if (revFState == ctx.freshRevFState)
+            {
+              log.info('dropbox: [' + remoteTableName + '] No new full-state data');
+
+              // Nothin to load (remote rev is the same as last time), advance
+              state.advance('APPLY_REMOTE_STATE');
+
+              // This step of the state machine is completed
+              return;
+            }
+            else
+            {
+              // Local version and remote versions are different
+              shouldLoad = true;
+              log.info('dropbox: [' + remoteTableName + '] New remote full-state detected');
+            }
+          }
+        }
+
+        if (shouldLoad)
+        {
+          log.info('dropbox: [' + remoteTableName + '] Loading remote full-state...');
+
+          g_dbox.filesDownload(
+            {
+              path: '/' + ctx.fnameFState,
+            })
+            .then(function(response)
+                {
+                  log.info('dropbox: filesDownload, fstate, rev: ' + response.rev);
+                  // console.info(response);
+
+                  // Store this new remote revision
+                  g_utilsCB.setPref(ctx.prefRevFState, response.rev);
+
+                  // In the off-chance that remote rev has changed during
+                  // the steps in this state machine
+                  ctx.freshRevFState = response.rev;
+
+                  // Parse JSON and keep a copy in local ctx
+                  let blob = response.fileBlob;
+                  let reader = new FileReader();
+                  reader.addEventListener("loadend", function()
+                      {
+                        // TODO: test with bad JSON
+                        // TODO: Check that essential fields are present
+                        // TODO: Check that size makes sense
+                        let data = JSON.parse(reader.result);
+                        ctx.tempFullState = data['entries'];
+                        state.advance('APPLY_REMOTE_STATE');
+                      });
+                  // Activate listener "loadend"
+                  reader.readAsText(blob);
+                })
+            .catch(function(response)
+                {
+                  log.error('dropbox: filesDownload');
+                  console.log(error);
+
+                  // Global error handler for all database errors
+                  utils_ns.domError("dropbox: filesDownload('" + ctx.fnameFState + "'), " +
+                      "error: " + response.error.error_summary);
+
+                  // Retry later
+                  state.advance('IDLE');
+                });
+        }
+      });
+
+  state.add('APPLY_REMOTE_STATE', function ()
+      {
+        //
+        // APPLY_REMOTE_STATE: Loads full state file data (if necessary)
+        log.info('dropbox: [' + remoteTableName + '] state ' + state.stringify());
+        let ctx = objRTables.m_rtables[remoteTableName].m_ctx;
+
+        //
+        // If remote data was loaded it will be reflected in tempFullState and tempJournal,
+        // apply it to local data state
+
+        if (ctx.tempFullState.length > 0)
+        {
+          // Invoke callback to initiate writing of full state to Dropbox
+          ctx.cbEvents({
+            event: 'SYNC_FULL_STATE',
+            tableName: ctx.tableName,
+            data: ctx.tempFullState
+          });
+
+          ctx.tempFullState = [];
+        }
+
+        if (ctx.tempJournal.length > 0)
+        {
+          // TODO: Apply
+
+          ctx.remoteJournal = ctx.tempJournal;
+
+          // JSON is preserved to be used between sessions
+          g_utilsCB.setPref(ctx.prefRevJournalRemoteJSON, ctx.tempJournalJSON);
+          ctx.tempJournal = [];
+        }
+        state.advance('IDLE');
+      });
+
+  // Set the state machine at initial state 'FULL_LOAD'
+  state.advance('START_FULL_LOAD');
+  return state;
+}
+
+// object RTables.writeFullState()
+// Overwrites remote tables with a full new state
+function writeFullState(tableName, entries, cbDone)
+{
+  let self = this;
+
+  let ctx = self.m_rtables[tableName].m_ctx;
+
+  // String representation of the entire file on Dropbox
+  let strAll = '{\n' +
+      '"formatVersion": ' + ctx.formatVersion + ',\n' +
+      '"entries": [\n' + entries.join(',\n') + '\n]\n' +
+    '}\n';
+
+  let writeMode = null;
+  let strPrevVer = 'none';
+  let revFState = g_utilsCB.getPref(ctx.prefRevFState);
+
+  if (revFState === undefined || revFState == 'empty')
+    writeMode = 'overwrite';
+  else
+  {
+    // Write over an existing revision (revFState)
+    writeMode =  {
+      '.tag': 'update',
+      'update': revFState,
+    };
+    strPrevVer = String(revFState);
+  }
+
+  g_dbox.filesUpload(
+      {
+        contents: strAll,
+        path: '/' + ctx.fnameFState,
+        mode: writeMode,
+        strict_conflict: true,
+        autorename: false,
+        mute: true
+      })
+      .then(function(response)
+          {
+            console.info('RTables.writeFullState[' +
+              tableName + '], total dump length: ' + strAll.length + ', ' +
+              'prev: ' + strPrevVer + ', new: ' + response.rev);
+
+            // Keep track of the new revision of the file on Dropbox
+            g_utilsCB.setPref(ctx.prefRevFState, response.rev);
+            // console.log(response);
+            // Callback SUCCESS
+            cbDone(0);
+          })
+      .catch(function(error)
+          {
+            log.error('dropbox: filesUpload');
+            console.log(error);
+            // Callback FAILURE
+            cbDone(1);
+          });
+}
+RTables.prototype.writeFullState = writeFullState;
+
+// object RTables.RTable [constructor]
+function RTables(rtables, cbEvents, cbDisplayProgress)
+{
+  let self = this;
+
+  self.m_rtables = {};
+
+  self.TAG_ACTION_INSERT = 1;  // Add new entry
+  self.TAG_ACTION_SET = 2;  // Set value for an entry (if it alredy exists locally)
+  self.TAG_ACTION_DELETE = 3;  // Delete
+
+  for (let i = 0; i < rtables.length; ++i)
+  {
+    let entry = rtables[i];
+
+    self.m_rtables[entry.name] = {};
+    let rentry = self.m_rtables[entry.name];
+
+    // Context is shared between read and write state machines
+    rentry.m_ctx =
+    {
+      tableName: entry.name,
+
+      //
+      // Names of files to keep in Dropbox
+      fnameJournal: entry.name + '.journal.json',
+      fnameFState: entry.name + '.fstate.json',
+
+      formatVersion: entry.formatVersion,
+
+      //
+      // Name of the preference fields for local storage
+      // [used with setPref()/getPref()]
+      //
+      // Store revision of file journal
+      prefRevJournal: 'm_local.dbox.' + entry.name + '.journal.rev',
+      // Copy of journal JSON loaded from Dropbox
+      prefRevJournalRemoteJSON: 'm_local.dbox.' + entry.name + '.remote.journal.rev.json',
+      // Copy of journal JSON of yet uncommited JSON (not yet sent to Dropbox)
+      prefRevJournalLocalJSON: 'm_local.dbox.' + entry.name + '.local.journal.rev.json',
+      // Store revision of file full-state
+      prefRevFState: 'm_local.dbox.' + entry.name + '.fstate.rev',
+
+      // Freshly extracted versions (revisions)
+      freshRevJournal: null,
+      freshRevFState: null,
+
+      // Event handler
+      cbEvents: cbEvents,
+
+      // Journals
+      remoteJournal: [],
+      newJournal: [],
+
+      // Full state
+      // (Temporary, only until applied after load)
+      tempFullState: [],
+      tempJournal: [],
+      tempJournalJSON: null
+    };
+
+    // Instantiate read and write state machines,
+    // one per remote table
+    rentry.m_readStateM = loadStateMachine(self, entry.name);
+  }
+
+  // Setup the handler of periodic write operations
+  self.m_writeBack = setTimeout(writeBackHandler, 5 * 1000, self);
+  self.m_writeBackInProgress = false;
 
   return self;
 }
 
-// object RTableDBox.insert
-// Records an entry into the remote table
-// Updates if remoteId != ''
-// Inserts if remoteId == '', returns remoteId of the new record
-function insert(entry, remoteId)
+function RTablesConnect(_connectionObj, utilsCB)
 {
-  var self = this;
-  var rec = null;
-  var key = null;
-  var optimized = null;
-
-  if (remoteId == '')  // No remoteID, then operation insert()
-  {
-    if (self.m_key != '')  // Use own field as a primary key
-    {
-      key = entry[self.m_key];
-      // Avoid data duplication as both remote ID and key as fields contents are the same
-      optimized = utils_ns.copyFields(entry, [ self.m_key ]);
-      rec = self.m_table.getOrInsert(entry[self.m_key], optimized);
-    }
-    else  // Use automatically generated keys by Dropbox
-    {
-      rec = self.m_table.insert(entry);
-    }
-    remoteId = rec.getId();
-    log.info('rtable: inserted new ' + remoteId);
-  }
-  else  // Record already exists, has remote ID, then operation update()
-  {
-    rec = self.m_table.get(remoteId);
-    if (rec == null)
-    {
-      // This is probably not needed
-      // During development there can be discrepancy between local DB and remote DB
-      // Fallback to insert and return new remoteId
-      log.info('rtable: fall back onto insert for ' + remoteId);
-      remoteId = self.insert(entry, remoteId);
-    }
-    else
-    {
-      if (self.m_key != '')
-      {
-        optimized = utils_ns.copyFields(entry, [ self.m_key ]);
-        rec.update(optimized);
-      }
-      else
-        rec.update(entry);
-      log.info('rtable: updated ' + remoteId);
-    }
-  }
-
-  return remoteId;
-}
-RTableDBox.prototype.insert = insert;
-
-
-// object RTableDBox.readAll
-function readAll()
-{
-  var self = this;
-
-  return self.m_table.query();
-}
-RTableDBox.prototype.readAll = readAll;
-
-// object RTableDBox.deleteAll
-function deleteAll()
-{
-  var self = this;
-
-  var i = 0;
-  var recID = null;
-
-  var entries = self.m_table.query();
-
-  for (i = 0; i < entries.length; ++i)
-  {
-    recID = entries[i].getId();
-    if (entries[i].isDeleted())
-    {
-      log.info('rtable: already deleted Id ' + recID + ', done.')
-    }
-    else
-    {
-      log.info('rtable: deleting Id ' + recID + '...')
-      entries[i].deleteRecord();
-    }
-  }
-}
-RTableDBox.prototype.deleteAll = deleteAll;
-
-// object RTableDBox.deleteRec
-function deleteRec(entryKey)
-{
-  var self = this;
-  var entry = self.m_table.get(entryKey);
-  if (entry.isDeleted())
-  {
-      log.info('rtable: already deleted Id ' + recID + ', done.')
-  }
-  entry.deleteRecord();
-  log.info('rtable: deleting Id ' + entryKey + '...')
-}
-RTableDBox.prototype.deleteRec = deleteRec;
-
-// object RTableDBox.p_copyObj
-// Converts from Datastore object into rtable record object
-// This means to copy all the fields listed in m_fields + m_key
-function p_copyObj(dboxObj)
-{
-  var self = this;
-
-  var p = 0;
-  var key = 0;
-  var r = new Object();
-  for (p = 0; p < self.m_fields.length; ++p)
-  {
-    key = self.m_fields[p];
-    if (key == self.m_key)
-      r[key] = dboxObj.getId();  // Key is also an ID
-    else
-      r[key] = dboxObj.get(key);  // Dropbox.Datastore.Record.get()
-  }
-
-  return r;
-}
-RTableDBox.prototype.p_copyObj = p_copyObj;
-
-// object RTableDBox.initialSync
-// local -- dictionary of keys of local entries this way initialSync()
-//          can generate events for all that were deleted remotely too
-// local = null, won't generate delete events
-function initialSync(local)
-{
-  var self = this;
-
-  var x = 0;
-  var dboxRecs = self.m_table.query();
-  var objlist = [];
-  var rec = null;
-  var updateObj = null;
-  for (x = 0; x < dboxRecs.length; ++x)
-  {
-    rec = dboxRecs[x];
-    // Imitate generation of an updated obj
-    updateObj =
-      {
-        id: rec.getId(), // Id of this record, created by Dropbox
-        isLocal: false,  // Feeedback from locally initiated operation
-        isDeleted: false,  // The record was deletd, data is null
-        data: self.p_copyObj(rec)  // record data (based on m_fields)
-      };
-    objlist.push(updateObj);
-
-    if (local == null)
-      continue;
-
-    if (local[rec.getId()] === undefined)
-      continue;
-
-    local[rec.getId()] = 1;
-  }
-  g_cbRecordsChanged(self.m_tableId, objlist);
-
-  if (local == null)
-    return;
-
-  // Generate event _deleted_ for all that were in local but
-  // not in the remote table
-  var keys = Object.keys(local);
-  var key = null;
-  objlist = [];
-  for (x = 0; x < keys.length; ++x)
-  {
-    key = keys[x];
-    if (local[key] == 1)  // In local AND in remote
-      continue;
-
-    // local[key] is only in local, needs to be deleted
-    updateObj =
-      {
-        id: key, // Id of this record, created by Dropbox
-        isLocal: false,  // Feeedback from locally initiated operation
-        isDeleted: true,  // The record was deletd, data is null
-        data: null  // record data, no data needed for delete operation
-      };
-    objlist.push(updateObj);
-  }
-  log.info('rtable.initialSync: ' + objlist.length + ' record(s) not in remote table that will be deleted');
-  g_cbRecordsChanged(self.m_tableId, objlist);
-}
-RTableDBox.prototype.initialSync = initialSync;
-
-// Invoke registered listeners once per remote table to notify of changed records
-function recordsChanged(dstoreEvent)
-{
-  var i = 0;
-  var k = 0;
-  var p = 0;
-  var rec = null;
-  var fields = null;
-  var key = null;
-  var records = null;
-  var objlist = []
-  var isLocal = false;
-  var updatedObj = null;
-  // For each table call to notify for changed records
-  for (i = 0; i < g_tables.length; ++i)
-  {
-    // Dropbox doesn't give us a row from the table, it gives us a record
-    // which can the be used for inquiring what exactly is this event and
-    // also to access the data by calls to record.get('m_field')
-    records = dstoreEvent.affectedRecordsForTable(g_tables[i].m_tableId);
-    isLocal = dstoreEvent.isLocal();
-    fields = g_tables[i].m_fields;
-
-    // Now for this record, by using the known list of fields, produce
-    // an object
-    for (k = 0; k < records.length; ++k)
-    {
-      updatedObj =
-          {
-            id: null, // Id of this record, created by Dropbox
-            isLocal: false,  // Feeedback from locally initiated operation
-            isDeleted: false,  // The record was deletd, data is null
-            data: null  // record data (based on m_fields)
-          };
-      rec = records[k];
-      updatedObj.id = rec.getId();
-      updatedObj.data = null;
-      if (isLocal)
-      {
-        log.info('rtable: listener: ' + rec.getId() + ' locally initiated update.');
-        updatedObj.isLocal = true;
-      }
-      if (rec.isDeleted())
-      {
-        updatedObj.isDeleted = true;
-        log.info('rtable: listener: ' + rec.getId() + ' was deleted.');
-      }
-      else
-      {
-        if (!isLocal)
-          log.info('rtable: listener: ' + rec.getId() + ' was updated remotedly.');
-        updatedObj.data = new Object();
-        for (p = 0; p < fields.length; ++p)
-        {
-          key = fields[p];
-          if (key == g_tables[i].m_key)
-            updatedObj.data[key] = rec.getId();  // Key is also an ID
-          else
-            updatedObj.data[key] = rec.get(key);  // Dropbox.Datastore.Record.get()
-        }
-      }
-      objlist.push(updatedObj);
-    }
-
-    if (g_cbRecordsChanged == null)
-    {
-      log.warning('rtable: unhandled event');
-      return;
-    }
-
-    g_cbRecordsChanged(g_tables[i].m_tableId, objlist);
-    objlist = [];
-  }
+  g_connectionObj = _connectionObj;
+  g_dbox = g_connectionObj.dbox_client;
+  g_utilsCB = utilsCB;
 }
 
-// Attach one global listener to handle the datastore
-function RTableAddListener(cbRecordsChanged)
-{
-  g_cbRecordsChanged = cbRecordsChanged;
-}
-
-// Checks if Dropbox is still connected
-function RTableIsOnline()
-{
-  if (g_client == null)
-    return false;
-  else
-    return g_client.isAuthenticated();
-}
-
-// Call this once at init time to complete the initialization
-function RTableInit(dboxClient, cbReady)
-{
-  g_client = dboxClient;
-  var datastoreManager = g_client.getDatastoreManager();
-  datastoreManager.openDefaultDatastore(function (error, datastore)
-      {
-        if (error)
-        {
-            alert('Error opening default datastore: ' + error);
-            cbReady(1);
-        }
-        else
-        {
-            g_datastore = datastore;
-            g_datastore.recordsChanged.addListener(recordsChanged);
-            cbReady(0);
-        }
-      });
-}
-
-feeds_ns.RTableDBox = RTableDBox;
-feeds_ns.RTableAddListener = RTableAddListener;
-feeds_ns.RTableIsOnline = RTableIsOnline;
-feeds_ns.RTableInit = RTableInit;
+feeds_ns.RTablesConnect = RTablesConnect;
+feeds_ns.RTables = RTables;
 })();

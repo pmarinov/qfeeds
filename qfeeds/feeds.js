@@ -63,8 +63,8 @@ function Feeds()
   // (rtable ID)
   self.m_remote_read_id = -1;
 
-  // (object RTablesGDrive)
-  self.m_rtGDrive = null;
+  // (object RTables)
+  self.m_rt = null;
 
   // Setup the poll loop
   self.m_timeoutID = setTimeout(p_poll, 1, self);
@@ -247,34 +247,61 @@ function p_prefSetListener(cbUpdates)
 Feeds.prototype.p_prefSetListener = p_prefSetListener;
 
 // object RemoteEntryRead [constructor]
-// From an RssEntry constructs a RemoteEntryRead record
+// From an RssEntry constructs a RemoteEntryRead record,
+// it is one row in the remote table, the firt entry is the table key
 function RemoteEntryRead(rssEntry)
 {
-  this.m_rss_entry_hash = null;
-  this.m_rss_feed_hash = null;
-  this.m_is_read = false;
-  this.m_date = null;
+  let rss_entry_hash = null;
+  let rss_feed_hash = null;
+  let is_read = false;
+  let entry_date = null;
   if (rssEntry == null)  // An empty object was requested?
-    return this;
+    return [rss_entry_hash, rss_feed_hash, is_read, entry_date]
 
-  this.m_rss_entry_hash = rssEntry.m_hash;
+  rss_entry_hash = rssEntry.m_hash;
 
-  var h = rssEntry.m_rssurl_date.indexOf('_');
+  let h = rssEntry.m_rssurl_date.indexOf('_');
   utils_ns.assert(h >= 0, "RemoteEntryRead: invalid rssurl_date hash");
-  var rssurl_hash = rssEntry.m_rssurl_date.slice(0, h);
-  this.m_rss_feed_hash = rssurl_hash;
+  rss_feed_hash = rssEntry.m_rssurl_date.slice(0, h);
 
-  this.m_is_read = rssEntry.m_is_read;
-  this.m_date = utils_ns.dateToStrStrict(rssEntry.m_date);
+  is_read = rssEntry.m_is_read;
+  entry_date = utils_ns.dateToStrStrict(rssEntry.m_date);
   // Strip the time (after '_')
   // Date is sufficient for keeping the age of an entry
   // Date is used only for the purpose of making an entry expire and be deleted
-  var limit = this.m_date.indexOf('_')
-  this.m_date = this.m_date.slice(0, limit)
-  return this;
+  let limit = entry_date.indexOf('_')
+  entry_date = entry_date.slice(0, limit)
+  return [rss_entry_hash, rss_feed_hash, is_read, entry_date]
 }
+// Preserve old version for some time
+// TODO: remove old version
+// function RemoteEntryRead(rssEntry)
+// {
+//   this.m_rss_entry_hash = null;
+//   this.m_rss_feed_hash = null;
+//   this.m_is_read = false;
+//   this.m_date = null;
+//   if (rssEntry == null)  // An empty object was requested?
+//     return this;
 
-// object RemoteFeedUrl [constructor]
+//   this.m_rss_entry_hash = rssEntry.m_hash;
+
+//   var h = rssEntry.m_rssurl_date.indexOf('_');
+//   utils_ns.assert(h >= 0, "RemoteEntryRead: invalid rssurl_date hash");
+//   var rssurl_hash = rssEntry.m_rssurl_date.slice(0, h);
+//   this.m_rss_feed_hash = rssurl_hash;
+
+//   this.m_is_read = rssEntry.m_is_read;
+//   this.m_date = utils_ns.dateToStrStrict(rssEntry.m_date);
+//   // Strip the time (after '_')
+//   // Date is sufficient for keeping the age of an entry
+//   // Date is used only for the purpose of making an entry expire and be deleted
+//   var limit = this.m_date.indexOf('_')
+//   this.m_date = this.m_date.slice(0, limit)
+//   return this;
+// }
+
+// object [old] RemoteFeedUrl [constructor]
 // From an RssHeader constructs a RemoteFeedUrl record
 function RemoteFeedUrl(feed)
 {
@@ -309,7 +336,7 @@ function p_incExpireCount()
 }
 Feeds.prototype.p_incExpireCount = p_incExpireCount;
 
-// object Feeds.p_rtableRemoteEntryReadListener
+// object [old] Feeds.p_rtableRemoteEntryReadListener
 // Handle updates from the remote tables for 'rss_entries_read'
 function p_rtableRemoteEntryReadListener(records)
 {
@@ -561,7 +588,7 @@ function getStats()
 }
 Feeds.prototype.getStats = getStats;
 
-// object Feeds.p_rtableRemoteFeedsListener
+// object [old] Feeds.p_rtableRemoteFeedsListener
 // Handle updates from the remote tables for 'rss_subscriptions'
 function p_rtableRemoteFeedsListener(records)
 {
@@ -639,7 +666,7 @@ function p_rtableRemoteFeedsListener(records)
 }
 Feeds.prototype.p_rtableRemoteFeedsListener = p_rtableRemoteFeedsListener;
 
-// object Feeds.p_rtableListener
+// object [old] Feeds.p_rtableListener
 // Handle updates from the remote tables
 function p_rtableListener(table_id, records)
 {
@@ -659,7 +686,7 @@ function p_rtableListener(table_id, records)
 }
 Feeds.prototype.p_rtableListener = p_rtableListener;
 
-// object Feeds.p_rtableSyncEntry
+// object [old] Feeds.p_rtableSyncEntry
 // Sync one RSS entry with the remote table
 function p_rtableSyncEntry(rssEntry)
 {
@@ -688,7 +715,7 @@ function p_rtableSyncEntry(rssEntry)
 }
 Feeds.prototype.p_rtableSyncEntry = p_rtableSyncEntry;
 
-// object Feeds.p_rtableSyncFeedEntry
+// object [old] Feeds.p_rtableSyncFeedEntry
 // Sync one RSS feed (RSSHeader) entry with the remote table
 function p_rtableSyncFeedEntry(feed)
 {
@@ -730,7 +757,7 @@ function p_rtableSyncFeedEntry(feed)
 }
 Feeds.prototype.p_rtableSyncFeedEntry = p_rtableSyncFeedEntry;
 
-// object Feeds.p_rtableSyncStatusRead
+// object [old] Feeds.p_rtableSyncStatusRead
 // Walk over all RSS entry records in the local DB and send to
 // remote table:
 // 1. all that were marked as read (feeds_ns.RssSyncState.IS_LOCAL_ONLY)
@@ -771,7 +798,7 @@ function p_rtableSyncStatusRead()
 }
 Feeds.prototype.p_rtableSyncStatusRead = p_rtableSyncStatusRead;
 
-// object Feeds.p_rtableSyncRemoteSubscriptions
+// object [old] Feeds.p_rtableSyncRemoteSubscriptions
 // Walk over all RSS feed records in the local DB and send to
 // remote table if m_remote_status is feeds_ns.RssSyncState.IS_LOCAL_ONLY)
 function p_rtableSyncRemoteSubscriptions(cbDone)
@@ -809,7 +836,7 @@ function p_rtableSyncRemoteSubscriptions(cbDone)
 }
 Feeds.prototype.p_rtableSyncRemoteSubscriptions = p_rtableSyncRemoteSubscriptions;
 
-// object Feeds.p_rtableInitRemoteEntryRead
+// object [old] Feeds.p_rtableInitRemoteEntryRead
 // Initialize remote table (rtable) that stores status_read for RSS entries
 function p_rtableInitRemoteEntryRead(cbDisplayProgress)
 {
@@ -845,7 +872,7 @@ function p_rtableInitRemoteEntryRead(cbDisplayProgress)
 }
 Feeds.prototype.p_rtableInitRemoteEntryRead = p_rtableInitRemoteEntryRead;
 
-// object Feeds.p_rtableInitRemoteFeedUrl
+// object [old] Feeds.p_rtableInitRemoteFeedUrl
 // Initialize remote table (rtable) that stores url of RSS feeds
 function p_rtableInitRemoteFeedUrl(cbDisplayProgress)
 {
@@ -882,6 +909,310 @@ function p_rtableInitRemoteFeedUrl(cbDisplayProgress)
 }
 Feeds.prototype.p_rtableInitRemoteFeedUrl = p_rtableInitRemoteFeedUrl;
 
+// object none.p_demoDropboxSync
+function p_demoDropboxSync(self)
+{
+  let all = [];
+
+  self.updateEntriesAll(
+      function(rssEntry)
+      {
+        if (rssEntry == null)  // No more entries
+        {
+          feeds_ns.demoWriteAll(all);
+          return 0;
+        }
+
+        let remoteEntry = new RemoteEntryRead(rssEntry);
+        let newRemoteEntry = [
+          remoteEntry['entry'],
+          remoteEntry['feed'],
+          remoteEntry['is_read'],
+          remoteEntry['date']
+        ]
+        all.push(JSON.stringify(newRemoteEntry));
+        return 2;  // No changes to the entry, move to the next
+      });
+}
+
+// object Feeds.p_rtableSyncEntryRead
+// Sync one RSS entry (status read) with the remote table
+function p_rtableSyncEntryRead(rssEntry)
+{
+  // We can't use _instanceof_ for objects that are read from the indexedDB
+  // just check for some fields to confirm this is RssEntry object
+  utils_ns.hasFields(rssEntry, ['m_is_read', 'm_rssurl_date'], 'p_rtableSyncEntryRead');
+
+  var self = this;
+
+  if (!self.m_remote_is_connected)
+  {
+    rssEntry.m_remote_state = feeds_ns.RssSyncState.IS_LOCAL_ONLY;
+  }
+  else
+  {
+    let newRemoteEntry = new RemoteEntryRead(rssEntry);
+    self.m_rt.insert('rss_entries_read', newRemoteEntry);
+  }
+}
+Feeds.prototype.p_rtableSyncEntryRead = p_rtableSyncEntryRead;
+
+// object Feeds.p_rtableSubsSetSync
+// Walk over all RSS subscription records in the local DB,
+// for all entries marked as IS_SYNC_IN_PROGRESS set new state
+// (newSyncState will be IS_SYNCED or IS_LOCAL_ONLY)
+function p_rtableSubsSetSync(newSyncState, cbDone)
+{
+  let self = this;
+
+  self.p_feedsUpdateAll(
+      function(feed)
+      {
+        if (feed == null)  // No more entries
+        {
+          if (cbDone != null)
+            cbDone();
+          return 0;
+        }
+
+        if (feed.m_remote_state == feeds_ns.RssSyncState.IS_SYNC_IN_PROGRESS)
+        {
+          // Record all read entries in the remote table
+          let strState = '!BAD!';
+          if (newSyncState == feeds_ns.RssSyncState.IS_SYNCED)
+            strState = 'IS_SYNCED';
+          if (newSyncState == feeds_ns.RssSyncState.IS_LOCAL_ONLY)
+            strState = 'IS_LOCAL_ONLY';
+          log.trace('p_rtableSubsSetSync: mark as ' + strState + ' for (' + feed.m_url + ')');
+          feed.m_remote_state = newSyncState;
+          return 1;  // Update entry
+        }
+
+        // No changes to the entry, move to the next
+        return 2;
+      });
+}
+Feeds.prototype.p_rtableSubsSetSync = p_rtableSubsSetSync;
+
+// object Feeds.p_rtableFWSubs
+// (Full Write) Walk over all RSS subscription records in the local DB and send all of then
+// to remote table
+function p_rtableFWSubs(cbDone)
+{
+  let self = this;
+  let all = [];
+
+  self.p_feedsUpdateAll(
+      function(feed)
+      {
+        // Parameter: `feed' one subsription descriptor -- one by one
+        // this function is called for all entries in the table
+        // indexed db 'rss_subscription
+
+        if (feed == null)  // No more entries
+        {
+          // Write to remote table all the entries that were collected
+          // in local variable all[]
+          self.m_rt.writeFullState('rss_subscriptions', all, function(exitCode)
+              {
+                // Handle exit code from m_rt.writeFullState()
+                //
+                // All entries that were sent to remote table were
+                // marked with IS_SYNC_IN_PROGRESS, now they need to be
+                // marked as SYNCED or LOCAL_ONLY
+                let newSyncState = -1;
+                
+                if (exitCode == 0)  // Remote write OK?
+                  newSyncState = feeds_ns.RssSyncState.IS_SYNCED;
+                else
+                  newSyncState = feeds_ns.RssSyncState.IS_LOCAL_ONLY;
+
+                self.p_rtableSubsSetSync(newSyncState, function ()
+                  {
+                    if (cbDone != null)
+                      cbDone(exitCode);
+                  });
+              });
+          return 0;
+        }
+
+        // One row in the remote table
+        let newRemoteEntry = [feed.m_url, feed.m_tags];
+        // Collect it
+        all.push(JSON.stringify(newRemoteEntry));
+
+        // Mark for a later completion: 
+        // Upon successfull write to remote table all entries will be
+        // marked as IS_SYNCED
+        if (feed.m_remote_state != feeds_ns.RssSyncState.IS_SYNC_IN_PROGRESS)
+        {
+          // Record all read entries in the remote table
+          log.info('p_rtableFWSubs: mark as SYNC_IN_PROGRESS for [' + feed.m_url + ']');
+          feed.m_remote_state = feeds_ns.RssSyncState.IS_SYNC_IN_PROGRESS;
+          return 1;  // Update entry in IndexedDB
+        }
+
+        // No changes to the entry, move to the next
+        return 2;
+      });
+}
+Feeds.prototype.p_rtableFWSubs = p_rtableFWSubs;
+
+// object Feeds.p_rtableEntriesSetSync
+// Walk over all RSS entries (regardless of which subscription) in the
+// local DB, for entries marked as IS_SYNC_IN_PROGRESS set new state
+// (newSyncState will be IS_SYNCED or IS_LOCAL_ONLY)
+function p_rtableEntriesSetSync(newSyncState, cbDone)
+{
+  let self = this;
+
+  self.updateEntriesAll(
+      function(rssEntry)
+      {
+        if (rssEntry == null)  // No more entries
+        {
+          if (cbDone != null)
+            cbDone();
+          return 0;
+        }
+
+        if (rssEntry.m_remote_state == feeds_ns.RssSyncState.IS_SYNC_IN_PROGRESS)
+        {
+          // Record all read entries in the remote table
+          let strState = '!BAD!';
+          if (newSyncState == feeds_ns.RssSyncState.IS_SYNCED)
+            strState = 'IS_SYNCED';
+          if (newSyncState == feeds_ns.RssSyncState.IS_LOCAL_ONLY)
+            strState = 'IS_LOCAL_ONLY';
+          log.info('p_rtableSubsSetSync: mark as ' + strState + ' for (' + rssEntry.m_title + ')');
+          rssEntry.m_remote_state = newSyncState;
+          return 1;  // Update entry in the IndexedDB
+        }
+
+        // No changes to the entry, move to the next
+        return 2;
+      });
+}
+Feeds.prototype.p_rtableEntriesSetSync = p_rtableEntriesSetSync;
+
+// object Feeds.p_rtableFWEntriesRead
+// (Full Write) Walk over all RSS entries in the local DB and send all that were marked as read
+// to remote table
+// NOTE: By not sending is_read = false we temporarely save a bit of
+// space on the remote DB
+function p_rtableFWEntriesRead(cbDone)
+{
+  let self = this;
+  let all = [];
+
+  self.updateEntriesAll(
+      function(rssEntry)
+      {
+        if (rssEntry == null)  // No more entries
+        {
+          self.m_rt.writeFullState('rss_entries_read', all, function(exitCode)
+              {
+                // Handle exit code from m_rt.writeFullState()
+                //
+                // All entries that were sent to remote table were
+                // marked with IS_SYNC_IN_PROGRESS, now they need to be
+                // marked as SYNCED (remote write OK) or LOCAL_ONLY (remote write has failed)
+                let newSyncState = -1;
+                
+                if (exitCode == 0)  // Remote write OK?
+                  newSyncState = feeds_ns.RssSyncState.IS_SYNCED;
+                else
+                  newSyncState = feeds_ns.RssSyncState.IS_LOCAL_ONLY;
+
+                self.p_rtableEntriesSetSync(newSyncState, function ()
+                  {
+                    if (cbDone != null)
+                      cbDone(exitCode);
+                  });
+              });
+          return 0;
+        }
+
+        // One row in the remote table
+        let newRemoteEntry = new RemoteEntryRead(rssEntry)
+        // Collect it
+        all.push(JSON.stringify(newRemoteEntry));
+
+        // Mark for a later completion: 
+        // Upon successfull write to remote table all entries will be
+        // marked as IS_SYNCED
+        if (rssEntry.m_remote_state != feeds_ns.RssSyncState.IS_SYNC_IN_PROGRESS)
+        {
+          // Record all read entries in the remote table
+          log.info('p_rtableFWEntriesRead: mark as SYNC_IN_PROGRESS for [' + rssEntry.m_hash + ']');
+          rssEntry.m_remote_state = feeds_ns.RssSyncState.IS_SYNC_IN_PROGRESS;
+          return 1;  // Update entry in the IndexedDB
+        }
+
+        // No changes to the entry, move to the next
+        return 2;
+      });
+}
+Feeds.prototype.p_rtableFWEntriesRead = p_rtableFWEntriesRead;
+
+// object Feeds.handleRTevent()
+// Handle events from remote tables
+function handleRTEvent(self, event)
+{
+  if (event.event == 'WRITE_FULL_STATE')
+  {
+    // Overwrite remote table with a complete state
+    //
+    // This event comes when the remote table is empty
+    // (or any other reason requiring a compolete rewrite)
+    if (event.tableName == 'rss_subscriptions')
+    {
+      log.info('feeds: Full write of table `rss_subscriptions\'');
+      self.p_rtableFWSubs(function (code)
+          {
+            if (code == 0)
+            {
+              // Status write OK
+            }
+          });
+    }
+    else if (event.tableName == 'rss_entries_read')
+    {
+      log.info('feeds: Full write of table `rss_entries_read\'');
+      self.p_rtableFWEntriesRead(function (code)
+          {
+            if (code == 0)
+            {
+              // Status write OK
+            }
+          });
+    }
+    else
+    {
+      utils_ns.assert(false,
+          "handleRTEvent: event for an invalid table '" + event.tableName + "'");
+    }
+  }
+  else if (event.event == 'SYNC_FULL_STATE')
+  {
+    // Make local table reflect fully the remote table
+    // This event is generated by a change in the remote table
+    if (event.tableName == 'rss_subscriptions')
+    {
+      log.info('feeds: Full sync of table `rss_subscriptions\'');
+    }
+    else if (event.tableName == 'rss_entries_read')
+    {
+      log.info('feeds: Full sync of table `rss_entries_read\'');
+    }
+    else
+    {
+      utils_ns.assert(false,
+          "handleRTEvent: event for an invalid table '" + event.tableName + "'");
+    }
+  }
+}
+
 // object Feeds.rtableConnect
 // This method is invoked once when the application is logged into Dropbox
 function rtableConnect(cbDisplayProgress)
@@ -891,6 +1222,24 @@ function rtableConnect(cbDisplayProgress)
   log.info('rtableConnect()...');
 
   self.m_remote_is_connected = true;
+
+  // p_demoDropboxSync(self);
+
+  var tables =
+  [
+    // List of all of the feeds URLs
+    {name: 'rss_subscriptions', formatVersion: 1},
+
+    // All entries that were marked as read
+    {name: 'rss_entries_read', formatVersion: 1}
+  ];
+
+  self.m_rt = new feeds_ns.RTables(tables, function (event)
+      {
+        handleRTEvent(self, event);
+      });
+
+  return;
 
   // Delete all pending (m_is_unsubscribed = true), now that Dropbox is
   // logged in (these are entries that are in state IS_LOCAL_ONLY or
@@ -1782,7 +2131,7 @@ function markEntryAsRead(entryHash, isRead)
           else
           {
             dbEntry.m_is_read = isRead;
-            self.p_rtableSyncEntry(dbEntry);
+            self.p_rtableSyncEntryRead(dbEntry);
             return 0;  // Record in the DB
           }
         }
