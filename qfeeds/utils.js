@@ -424,7 +424,7 @@ function stringify()
 {
   let self = this;
 
-  return self.m_curState + ' (' + self.m_prevState + ')';
+  return self.m_curState + ' (prev=' + self.m_prevState + ')';
 }
 StateMachine.prototype.stringify = stringify;
 
