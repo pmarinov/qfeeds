@@ -415,11 +415,7 @@ function advance(toState)
   {
       // log.info('state:  ' + self.m_curState);
       var step = self.m_states[self.m_curState];
-      var state1 = self.m_curState;
-
       step();
-
-      assert(state1 != self.m_curState, 'Not advanced after executing "' + state1 + '"');
   }, 0);  // Delay 0, just yield
 }
 StateMachine.prototype.advance = advance;
