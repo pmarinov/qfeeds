@@ -407,6 +407,11 @@ function loadStateMachine(objRTables, remoteTableName)
                     state.advance('IDLE');
                   });
         }
+        else
+        {
+          // Nothing to load in this step of the state machine, move to the next
+          state.advance('LOAD_DATA_FULL_STATE');
+        }
       });
 
   state.add('LOAD_DATA_FULL_STATE', function ()
@@ -516,6 +521,12 @@ function loadStateMachine(objRTables, remoteTableName)
                   // Retry later
                   state.advance('IDLE');
                 });
+        }
+        else
+        {
+          // Nothing to load in this state, move to the next
+          // TODO: IDLE or APPLY_REMOE_STATE?
+          state.advance('IDLE');
         }
       });
 
