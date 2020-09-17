@@ -114,3 +114,24 @@ Edition
 
 * To be able to navigate the *source files* while in the Debugger set
   the option "Enable browser and add-on debugging toolboxes" to ON
+
+== Debug functions ==
+
+From the browser's console can be invoked a list of debug functions
+
+=== Force fresh reload of remote feeds ===
+
+* Delete local IndexedDB of subscribed feeds
+
+* Reset cached version ID of the remote table
+
+....
+>> feeds_ns.app.m_feedsDir.m_feedsDB.feedUnsubscribeAll()
+[Debug] Delete all subscriptions from IndexedDB...'
+[Debug] Done, deleted 8 RSS subsciptions
+
+>> feeds_ns.app.m_feedsDir.m_feedsDB.feedResetRTableConnection()
+....
+
+Close and re-open the extension. It should load all remote entries
+into local IndexedDB

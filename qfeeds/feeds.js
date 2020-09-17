@@ -1875,17 +1875,39 @@ function feedRemove(feedUrl)
 Feeds.prototype.feedRemove = feedRemove;
 
 // object Feeds.feedUnsubscribeAll
+// [Debug function]
 // Deletes all feeds from database table 'rss_subscriptions' and list of feeds
-// To call for debug purposes from the console:
+//
+// To call for from the console:
 // feeds_ns.app.m_feedsDir.m_feedsDB.feedUnsubscribeAll
 function feedUnsubscribeAll()
 {
   var self = this;
 
+  log.info('[Debug] Delete all subscriptions from IndexedDB...');
+
+  let num_subs = self.m_rssFeeds.length;
   while (self.m_rssFeeds.length > 0)
     self.feedRemove(self.m_rssFeeds[0].m_url);
+
+  log.info('[Debug] Done, deleted ' + num_subs + ' RSS subsciptions');
 }
 Feeds.prototype.feedUnsubscribeAll = feedUnsubscribeAll;
+
+// object Feeds.feedResetRTableConnection
+// [Debug function]
+// Resets connection to remote table 'rss_subscriptions', upon restart
+// the App will do a full re-load of the remote table
+//
+// To call for from the console:
+// feeds_ns.app.m_feedsDir.m_feedsDB.feedResetRTableConnection
+function feedResetRTableConnection()
+{
+  var self = this;
+
+  self.m_rt.reset('rss_subscriptions');
+}
+Feeds.prototype.feedResetRTableConnection = feedResetRTableConnection;
 
 // object Feeds.feedMarkUnsubscribed
 // Marks a feed as unsubscribed (permits undo)

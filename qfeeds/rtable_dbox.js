@@ -43,6 +43,18 @@ function insert(remoteTableName, tableRow)
 }
 RTables.prototype.insert = insert;
 
+// object RTables.reset()
+// [Debug function]
+// Reset connection to remote table, next load will be a full re-load
+function reset(remoteTableName, tableRow)
+{
+  let self = this;
+  let ctx = self.m_rtables[remoteTableName].m_ctx;
+
+  // TODO
+}
+RTables.prototype.reset = reset;
+
 // object RTables.p_rescheduleWriteBack
 function p_rescheduleWriteBack()
 {
