@@ -1887,8 +1887,9 @@ function feedUnsubscribeAll()
   log.info('[Debug] Delete all subscriptions from IndexedDB...');
 
   let num_subs = self.m_rssFeeds.length;
+  // Remove local feeds, without remote sync
   while (self.m_rssFeeds.length > 0)
-    self.feedRemove(self.m_rssFeeds[0].m_url);
+    self.p_feedRemove(self.m_rssFeeds[0].m_url, false)
 
   log.info('[Debug] Done, deleted ' + num_subs + ' RSS subsciptions');
 }

@@ -51,7 +51,17 @@ function reset(remoteTableName, tableRow)
   let self = this;
   let ctx = self.m_rtables[remoteTableName].m_ctx;
 
-  // TODO
+  g_utilsCB.setPref(ctx.prefRevJournal, 'empty');
+  g_utilsCB.setPref(ctx.prefRevFState, 'empty');
+  g_utilsCB.setPref(ctx.prefRevJournalRemoteJSON, '');
+
+  ctx.freshRevJournal = null;
+  ctx.freshRevFState = null;
+
+  ctx.remoteJournal = [];
+  ctx.newJournal = [];
+
+  log.info('dropbox: [' + remoteTableName + '] local copy has been reset');
 }
 RTables.prototype.reset = reset;
 
@@ -682,8 +692,6 @@ function RTables(rtables, cbEvents, cbDisplayProgress)
       prefRevJournal: 'm_local.dbox.' + entry.name + '.journal.rev',
       // Copy of journal JSON loaded from Dropbox
       prefRevJournalRemoteJSON: 'm_local.dbox.' + entry.name + '.remote.journal.rev.json',
-      // Copy of journal JSON of yet uncommited JSON (not yet sent to Dropbox)
-      prefRevJournalLocalJSON: 'm_local.dbox.' + entry.name + '.local.journal.rev.json',
       // Store revision of file full-state
       prefRevFState: 'm_local.dbox.' + entry.name + '.fstate.rev',
 
