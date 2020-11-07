@@ -1058,6 +1058,55 @@ function p_rtableFWSubs(cbDone)
 }
 Feeds.prototype.p_rtableFWSubs = p_rtableFWSubs;
 
+// object Feeds.p_rtableFSyncSubs
+// (Full Sync) Apply a full remote state locally
+// 1. Add all remote entries that are NOT present locally
+// 2. Delete all local entries that are NOT in the remote table
+function p_rtableFSyncSubs(rtable)
+{
+  let self = this;
+
+  // Make a hash map of the local entries, mark them entries as 0
+  let k = 0;
+  let entry = null;
+  let localEntries = {};
+  for (k = 0; k < self.m_rssFeeds.length; ++k)
+  {
+    let entry = self.m_rssFeeds[k];
+    localEntries[entry.m_url] = 0;
+  }
+
+  let x = 0;
+  let rtEntry = null;
+  let key = null;
+  let objList = [];
+  let updateObj = null;
+  for (x = 0; x < rtable.length; ++x)
+  {
+    rtEntry = rtable[x];
+    // Imitate generation of an updated obj
+    updateObj =
+      {
+        isDeleted: false,  // Operation is insert/update, not delete
+        data: utils_ns.copyFields(rtEntry, [])  // record data
+      };
+    objList.push(updateObj);
+
+    key = rtEntry.m_url;
+    localEntries[key] = 1;
+  }
+
+  // Update/insert all remote entries
+  // TODO: convert p_rtableRemoteFeedsListener() to the new format of m_url, m_tags
+  self.p_rtableRemoteFeedsListener(objList);
+
+  // Generate event _deleted_ for all that were in local but
+  // not in the remote table
+
+  // TODO: implement
+}
+Feeds.prototype.p_rtableFSyncSubs = p_rtableFSyncSubs;
+
 // object Feeds.p_rtableEntriesSetSync
 // Walk over all RSS entries (regardless of which subscription) in the
 // local DB, for entries marked as IS_SYNC_IN_PROGRESS set new state
@@ -1200,6 +1249,7 @@ function handleRTEvent(self, event)
     if (event.tableName == 'rss_subscriptions')
     {
       log.info('feeds: Full sync of table `rss_subscriptions\'');
+      self.p_rtableFSyncSubs(event.data);
     }
     else if (event.tableName == 'rss_entries_read')
     {
@@ -1240,6 +1290,8 @@ function rtableConnect(cbDisplayProgress)
       });
 
   return;
+
+  // TODO: Remove this eventually when the NEW Dropbox is completed
 
   // Delete all pending (m_is_unsubscribed = true), now that Dropbox is
   // logged in (these are entries that are in state IS_LOCAL_ONLY or
