@@ -470,7 +470,7 @@ function loadStateMachine(objRTables, remoteTableName)
           let revFState = g_utilsCB.getPref(ctx.prefRevFState);
           if (revFState === undefined || revFState == 'empty')
           {
-            // Nothing held locally
+            // 1. Nothing held locally
             log.info('dropbox: [' + remoteTableName + '] No locally full-state (first time to load)');
             shouldLoad = true;
           }
@@ -479,17 +479,17 @@ function loadStateMachine(objRTables, remoteTableName)
             // We have both remote version AND local version
             if (revFState == ctx.freshRevFState)
             {
-              log.info('dropbox: [' + remoteTableName + '] No new full-state data');
+              log.info('dropbox: [' + remoteTableName + '] No new full-state data, advance to IDLE');
 
-              // Nothin to load (remote rev is the same as last time), advance
-              state.advance('APPLY_REMOTE_STATE');
+              // 2. Nothin to load (remote rev is the same as last time), advance
+              state.advance('IDLE');
 
               // This step of the state machine is completed
               return;
             }
             else
             {
-              // Local version and remote versions are different
+              // 3. Local version and remote versions are different
               shouldLoad = true;
               log.info('dropbox: [' + remoteTableName + '] New remote full-state detected');
             }
@@ -572,6 +572,7 @@ function loadStateMachine(objRTables, remoteTableName)
             data: ctx.tempFullState
           });
 
+          // Full state has been consumed => free the memory
           ctx.tempFullState = [];
         }
 
