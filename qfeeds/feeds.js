@@ -588,9 +588,9 @@ function getStats()
 }
 Feeds.prototype.getStats = getStats;
 
-// object [old] Feeds.p_rtableRemoteFeedsListener
+// object [old] Feeds.p_rtableRemoteFeedsListenerOld
 // Handle updates from the remote tables for 'rss_subscriptions'
-function p_rtableRemoteFeedsListener(records)
+function p_rtableRemoteFeedsListenerOld(records)
 {
   var self = this;
   var k = 0;
@@ -640,6 +640,82 @@ function p_rtableRemoteFeedsListener(records)
       newFeed.m_hash = r.data.m_rss_feed_hash;
       newFeed.m_url = r.data.m_rss_feed_url;
       newFeed.m_tags = r.data.m_tags;
+      newFeed.m_remote_state = feeds_ns.RssSyncState.IS_SYNCED;
+
+      // Put into local list of RSS subscriptions (self.m_rssFeeds)
+      self.p_feedInsert(newFeed);
+
+      self.p_feedRecord(newFeed, false,
+          function(wasUpdated)
+          {
+            if (wasUpdated == 1)
+            {
+              // New feed -> fetch RSS data
+              self.p_fetchRss(newFeed.m_url, null,
+                  function()  // CB: write operation is completed
+                  {
+                    // If any extra activation/display is needed
+                    self.m_feedsCB.onRemoteFeedUpdated(newFeed.m_url, newFeed.m_tags);
+                  });
+            }
+            else
+              log.info('p_rtableRemoteFeedsListener: nothing to do for ' + newFeed.m_url);
+          });
+    })()
+  }
+}
+Feeds.prototype.p_rtableRemoteFeedsListenerOld = p_rtableRemoteFeedsListenerOld;
+
+// object Feeds.p_rtableRemoteFeedsListener
+// Handle updates from the remote tables for 'rss_subscriptions'
+function p_rtableRemoteFeedsListener(records)
+{
+  let self = this;
+  let k = 0;
+  let r = null;
+  for (k = 0; k < records.length; ++k)
+  {
+    (function()  // scope
+    {
+      // Unfold one record -- each simply an array of 2 entries
+      r = records[k];
+      let feedUrl = r.data[0];
+      let feedTags = r.data[1];
+
+      let sha1 = CryptoJS.SHA1(feedUrl);
+      let feedHash = sha1.toString();
+      let x = self.p_feedFindByHash(feedHash);
+
+      // Skip operation if it is remote delete
+      // Local delete will take place when scheduled
+      if (r.isDeleted)  // remotely deleted?
+      {
+        if (x == -1)
+        {
+          log.warn('p_rtableRemoteFeedsListener: unknown feed ' + feedHash);
+          return;
+        }
+        log.info('rtable_event: deleted remotely -- ' + self.m_rssFeeds[x].m_url);
+        self.p_feedRemove(self.m_rssFeeds[x].m_url, false);
+        self.m_feedsCB.onRemoteFeedDeleted(feedHash);
+        return;  // leave the anonymous scope
+      }
+
+      // A record was added or updated
+      let newFeed = null;
+      if (x == -1)   // Update or addition of a new feed from a remote operation
+      {
+        newFeed = feeds_ns.emptyRssHeader();
+      }
+      else
+      {
+        // We already have such feed locally: this is an update operation
+        newFeed = feeds_ns.copyRssHeader(self.m_rssFeeds[x]);
+      }
+      // Now apply the data that come from the remote operation
+      newFeed.m_hash = feedHash;
+      newFeed.m_url = feedUrl;
+      newFeed.m_tags = feedTags;
       newFeed.m_remote_state = feeds_ns.RssSyncState.IS_SYNCED;
 
       // Put into local list of RSS subscriptions (self.m_rssFeeds)
@@ -719,6 +795,8 @@ Feeds.prototype.p_rtableSyncEntry = p_rtableSyncEntry;
 // Sync one RSS feed (RSSHeader) entry with the remote table
 function p_rtableSyncFeedEntry(feed)
 {
+  utils_ns.assert(false, "Invoking an OLD method");
+
   // We can't use _instanceof_ for objects that are read from the indexedDB
   // just check for some fields to confirm this is RssHeader object
   utils_ns.hasFields(feed, ['m_rss_type', 'm_rss_version'], 'p_rtableSyncFeedEntry');
@@ -1088,11 +1166,11 @@ function p_rtableFSyncSubs(rtable)
     updateObj =
       {
         isDeleted: false,  // Operation is insert/update, not delete
-        data: utils_ns.copyFields(rtEntry, [])  // record data
+        data: rtEntry.slice(0)  // Clone the array
       };
     objList.push(updateObj);
 
-    key = rtEntry.m_url;
+    key = rtEntry[0];  // URL of the feed
     localEntries[key] = 1;
   }
 
@@ -1740,7 +1818,8 @@ function p_feedRecord(feed, syncRTable, cbResult)
         if (data === undefined)
         {
           needsUpdate = true;  // entry is not in the DB
-          needsRTableSync = true;  // Also update RTable 'rss_subscriptions'
+          if (syncRTable)
+            needsRTableSync = true;  // Also update RTable 'rss_subscriptions'
         }
         else
         {
