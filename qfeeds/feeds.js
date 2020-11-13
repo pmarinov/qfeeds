@@ -721,6 +721,7 @@ function p_rtableRemoteFeedsListener(records)
       // Put into local list of RSS subscriptions (self.m_rssFeeds)
       self.p_feedInsert(newFeed);
 
+      // Put in the IndexedDB
       self.p_feedRecord(newFeed, false,
           function(wasUpdated)
           {
@@ -1862,9 +1863,9 @@ function p_feedRecord(feed, syncRTable, cbResult)
 }
 Feeds.prototype.p_feedRecord = p_feedRecord;
 
-// object Feeds.feedAddByUrl
+// object Feeds.p_feedAddByUrl
 // add a new feed (by URL) to list of feeds
-function feedAddByUrl(feedUrl, tags, cbDone)
+function p_feedAddByUrl(feedUrl, tags, cbDone, updateRemote)
 {
   var self = this;
   var newFeed = new feeds_ns.RssHeader(feedUrl /*url*/, feedUrl /*title*/,
@@ -1875,8 +1876,9 @@ function feedAddByUrl(feedUrl, tags, cbDone)
   // Put into local list of RSS subscriptions (self.m_rssFeeds)
   self.p_feedInsert(newFeed);
 
-  // Add to IndexedDB table rss_subscriptions and to remote table 'rss_subscriptions'
-  self.p_feedRecord(newFeed, true, null);
+  // Add to IndexedDB table rss_subscriptions
+  // Add to remote table 'rss_subscriptions' (if updateRemote)
+  self.p_feedRecord(newFeed, updateRemote, null);
 
   // First fetch of the RSS data for this URL, update the subscribed listeners
   self.p_fetchRss(feedUrl, null,
@@ -1886,7 +1888,41 @@ function feedAddByUrl(feedUrl, tags, cbDone)
           cbDone();
       });
 }
+Feeds.prototype.p_feedAddByUrl = p_feedAddByUrl;
+
+// object Feeds.feedAddByUrl
+// add a new feed (by URL) to list of feeds
+function feedAddByUrl(feedUrl, tags, cbDone)
+{
+  let self = this;
+
+  self.p_feedAddByUrl(feedUrl, tags, cbDone, true);
+}
 Feeds.prototype.feedAddByUrl = feedAddByUrl;
+
+// object Feeds.feedAddByUrl1
+// [Debug function]
+// Add a new example feed (by URL) to list of feeds
+function feedAddByUrl1()
+{
+  let self = this;
+
+  self.p_feedAddByUrl('http://www.npr.org/rss/rss.php?id=1034', '', null, false);
+  log.info('[Debug] Added http://www.npr.org/rss/rss.php?id=1034');
+}
+Feeds.prototype.feedAddByUrl1 = feedAddByUrl1;
+
+// object Feeds.feedAddByUrl2
+// [Debug function]
+// Add a new example feed (by URL) to list of feeds
+function feedAddByUrl2()
+{
+  let self = this;
+
+  self.p_feedAddByUrl('https://lareviewofbooks.org/feed/?ver=2', '', null, false);
+  log.info('[Debug] Added https://lareviewofbooks.org/feed/?ver=2');
+}
+Feeds.prototype.feedAddByUrl2 = feedAddByUrl2;
 
 // object Feeds.p_feedRemoveDB
 // Deletes a feed from database table 'rss_subscriptions'

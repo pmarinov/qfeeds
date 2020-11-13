@@ -135,3 +135,13 @@ From the browser's console can be invoked a list of debug functions
 
 Close and re-open the extension. It should load all remote entries
 into local IndexedDB
+
+=== Add example entries ===
+
+....
+>> feeds_ns.app.m_feedsDir.m_feedsDB.feedAddByUrl1()
+[Debug] Added https://...
+
+>> feeds_ns.app.m_feedsDir.m_feedsDB.feedAddByUrl2()
+[Debug] Added https://...
+....
