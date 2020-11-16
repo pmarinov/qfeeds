@@ -1141,6 +1141,8 @@ Feeds.prototype.p_rtableFWSubs = p_rtableFWSubs;
 // (Full Sync) Apply a full remote state locally
 // 1. Add all remote entries that are NOT present locally
 // 2. Delete all local entries that are NOT in the remote table
+//
+// rtable -- the remote table, all entries
 function p_rtableFSyncSubs(rtable)
 {
   let self = this;
@@ -1151,10 +1153,11 @@ function p_rtableFSyncSubs(rtable)
   let localEntries = {};
   for (k = 0; k < self.m_rssFeeds.length; ++k)
   {
-    let entry = self.m_rssFeeds[k];
+    entry = self.m_rssFeeds[k];
     localEntries[entry.m_url] = 0;
   }
 
+  // Generate event _updated_ for all remote entries
   let x = 0;
   let rtEntry = null;
   let key = null;
@@ -1176,13 +1179,39 @@ function p_rtableFSyncSubs(rtable)
   }
 
   // Update/insert all remote entries
-  // TODO: convert p_rtableRemoteFeedsListener() to the new format of m_url, m_tags
   self.p_rtableRemoteFeedsListener(objList);
 
   // Generate event _deleted_ for all that were in local but
   // not in the remote table
+  let keys = Object.keys(localEntries);
+  let index = 0;
+  objList = [];
+  for (x = 0; x < keys.length; ++x)
+  {
+    key = keys[x];  // key an URL of subscribed feed
+    if (localEntries[key] == 1)  // RSS subscription is in local AND in remote
+      continue;
 
-  // TODO: implement
+    // Verify if the local entry has been sent to remote table
+    index = self.p_feedFindByUrl(key);
+    utils_ns.assert(index >= 0,
+        "p_rtableFSyncSubs: Unexpected result from p_feedFindByUrl()");
+    entry = self.m_rssFeeds[index];
+    if (entry.m_remote_state != feeds_ns.RssSyncState.IS_SYNCED)
+      continue;  // Skip deleting
+
+    // Imitate generation of an updated obj
+    // local[key] is in local, but no longer in the remote, it needs to be deleted
+    updateObj =
+      {
+        isDeleted: true,  // Operation is insert/update, not delete
+        data: null
+      };
+    objList.push(updateObj);
+  }
+
+  // Delete locally all entries that were selected
+  self.p_rtableRemoteFeedsListener(objList);
 }
 Feeds.prototype.p_rtableFSyncSubs = p_rtableFSyncSubs;
 

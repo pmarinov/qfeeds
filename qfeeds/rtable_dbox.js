@@ -355,7 +355,8 @@ function loadStateMachine(objRTables, remoteTableName)
               log.info('dropbox: [' + remoteTableName + '] Restore from locally stored JSON');
 
               let journalJSON = g_utilsCB.getPref(ctx.prefRevJournalRemoteJSON);
-              utils_ns.assert(journalJSON !== undefined, "dropbox: Corrupted storage of " + ctx.prefRevJournalRemoteJSON);
+              // TODO: Is this assert needed?
+              // utils_ns.assert(journalJSON !== undefined, "dropbox: Corrupted storage of " + ctx.prefRevJournalRemoteJSON);
               if (journalJSON === undefined)
               {
                 state.advance('IDLE');
