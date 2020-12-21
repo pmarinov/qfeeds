@@ -1369,6 +1369,12 @@ function handleRTEvent(self, event)
           "handleRTEvent: event for an invalid table '" + event.tableName + "'");
     }
   }
+  else if (event.event == 'EMPTY_EVENT')
+  {
+    // For debug purposes: immediately call eventDone()
+    log.info(`feeds: EMPTY_EVENT for \`${event.tableName}\'`);
+    self.m_rt.eventDone(event.tableName);
+  }
 }
 
 // object Feeds.rtableConnect

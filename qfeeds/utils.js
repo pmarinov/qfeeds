@@ -382,14 +382,13 @@ function numberWith2Decimals(v)
   return parseFloat(Math.round(v * 100) / 100).toFixed(2)
 }
 
-function StateMachine(state)
+function StateMachine()
 {
   let self = this;
 
   self.m_states = {};
   self.m_curState = null;
   self.m_prevState = null;
-  self.m_ctx = {};  // Dictionary to store context information
   return this;
 }
 
@@ -428,6 +427,81 @@ function stringify()
 }
 StateMachine.prototype.stringify = stringify;
 
+
+function EventQ(handlerCb)
+{
+  let self = this;
+
+  self.m_events = [];
+  self.m_cur = null;  // No event in progress
+  self.m_handlerCb = handlerCb;
+  return this;
+}
+
+function p_eventSchedule()
+{
+  let self = this;
+
+  assert(self.m_cur != null, 'p_eventSchedule: no event to schedule');
+
+  setTimeout(self.m_handlerCb, 0, self.m_cur);
+}
+EventQ.prototype.p_eventSchedule = p_eventSchedule;
+
+function runEvent(event)
+{
+  let self = this;
+
+  // If an event is in progress, add event to the queue
+  if (self.m_in_progress)
+  {
+    self.m_events.push(event);
+    return;
+  }
+
+  self.m_cur = event;
+  self.p_eventSchedule();
+}
+EventQ.prototype.runEvent = runEvent;
+
+function eventDone()
+{
+  let self = this;
+
+  assert(self.m_cur != null, 'eventDone: no event in progress');
+
+  if (!self.p_getNext())
+    return;
+
+  self.p_eventSchedule();
+}
+EventQ.prototype.eventDone = eventDone;
+
+function addEvent(event)
+{
+  let self = this;
+
+  self.m_events.push(event);
+}
+EventQ.prototype.addEvent = addEvent;
+
+function p_getNext()
+{
+  let self = this;
+
+  if (self.m_events.length == 0)
+  {
+    self.m_cur = null;
+    return false;
+  }
+
+  self.m_cur = self.m_events[0];  // Grap from the head of the array
+  self.m_events.splice(0, 1);  // Remove from position 0
+
+  return true;
+}
+EventQ.prototype.p_getNext = p_getNext;
+
 utils_ns.assert = assert;
 utils_ns.roughSizeOfObject = roughSizeOfObject;
 utils_ns.hasFields = hasFields;
@@ -446,5 +520,6 @@ utils_ns.marshal = marshal;
 utils_ns.numberWithCommas = numberWithCommas;
 utils_ns.numberWith2Decimals = numberWith2Decimals;
 utils_ns.StateMachine = StateMachine;
+utils_ns.EventQ = EventQ;
 
 })();

@@ -65,6 +65,19 @@ function reset(remoteTableName, tableRow)
 }
 RTables.prototype.reset = reset;
 
+// object RTables.eventDone()
+// The current event has been processed, trigger the next event (if
+// any is pending) for the table
+function eventDone(remoteTableName)
+{
+  let self = this;
+  let ctx = self.m_rtables[remoteTableName].m_ctx;
+
+  log.info(`dropbox: [${remoteTableName}] event DONE, event: ${ctx.events.m_cur.event}`);
+  ctx.events.eventDone();
+}
+RTables.prototype.eventDone = eventDone;
+
 // object RTables.p_rescheduleWriteBack
 function p_rescheduleWriteBack()
 {
@@ -78,6 +91,16 @@ function p_rescheduleWriteBack()
   self.m_writeBack = setTimeout(writeBackHandler, 5 * 1000, self);
 }
 RTables.prototype.p_rescheduleWriteBack = p_rescheduleWriteBack;
+
+// object RTables.p_eventHandler
+function p_eventHandler(self, tableName, event)
+{
+  let rtable = self.m_rtables[tableName];
+  let ctx = rtable.m_ctx;
+
+  ctx.cbEvents(event);
+}
+RTables.prototype.p_eventHandler = p_eventHandler;
 
 // object [global] writeBackHandler()
 // Set to be invoked periodically by a timer,
@@ -206,6 +229,13 @@ function loadStateMachine(objRTables, remoteTableName)
 
   state.add('IDLE', function ()
       {
+        let ctx = objRTables.m_rtables[remoteTableName].m_ctx;
+        ctx.events.runEvent({
+            event: 'EMPTY_EVENT',
+            tableName: ctx.tableName,
+            data: 'Yo'
+        });
+
         log.info('dropbox: [' + remoteTableName + '] state ' + state.stringify());
       });
 
@@ -712,12 +742,21 @@ function RTables(rtables, cbEvents, cbDisplayProgress)
       // (Temporary, only until applied after load)
       tempFullState: [],
       tempJournal: [],
-      tempJournalJSON: null
+      tempJournalJSON: null,
+
+      // Queue of events for the table
+      events: null
     };
 
     // Instantiate read and write state machines,
     // one per remote table
     rentry.m_readStateM = loadStateMachine(self, entry.name);
+
+    // EventQ, one per remote table
+    rentry.m_ctx.events =  new utils_ns.EventQ(function (event)
+        {
+          self.p_eventHandler(self, entry.name, event);
+        });
   }
 
   // Setup the handler of periodic write operations
