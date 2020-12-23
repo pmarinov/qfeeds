@@ -229,11 +229,12 @@ function loadStateMachine(objRTables, remoteTableName)
 
   state.add('IDLE', function ()
       {
+        // For debug purposes schedule a no-op event
         let ctx = objRTables.m_rtables[remoteTableName].m_ctx;
         ctx.events.runEvent({
             event: 'EMPTY_EVENT',
             tableName: ctx.tableName,
-            data: 'Yo'
+            data: 'Yo1'
         });
 
         log.info('dropbox: [' + remoteTableName + '] state ' + state.stringify());

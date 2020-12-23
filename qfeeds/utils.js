@@ -453,7 +453,7 @@ function runEvent(event)
   let self = this;
 
   // If an event is in progress, add event to the queue
-  if (self.m_in_progress)
+  if (self.m_cur != null)
   {
     self.m_events.push(event);
     return;
