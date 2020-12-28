@@ -634,10 +634,24 @@ function writeFullState(tableName, entries, cbDone)
 
   let ctx = self.m_rtables[tableName].m_ctx;
 
+  // Why not use JSON.stringify() of the array?
+  // For debug purposes it is better to have our own output with ONE entry per line
+  // (open the .json files from Dropbox to examine)
+  let strEntries = '"entries": [';
+  let i = 0;
+  for (i = 0; i < entries.length; ++i)
+  {
+    if (i > 0)
+      strEntries += ', '
+    strEntries += '\n';
+    strEntries += "  " + JSON.stringify(entries[i])
+  }
+  strEntries += ']'
+
   // String representation of the entire file on Dropbox
   let strAll = '{\n' +
       '"formatVersion": ' + ctx.formatVersion + ',\n' +
-      '"entries": [\n' + entries.join(',\n') + '\n]\n' +
+      '"entries": ' + strEntries + '\n' +
     '}\n';
 
   let writeMode = null;
@@ -651,6 +665,7 @@ function writeFullState(tableName, entries, cbDone)
     // Write over an existing revision (revFState)
     writeMode =  {
       '.tag': 'update',
+      // Update only if the version hasn't changed from this in the mean time
       'update': revFState,
     };
     strPrevVer = String(revFState);
@@ -674,8 +689,16 @@ function writeFullState(tableName, entries, cbDone)
             // Keep track of the new revision of the file on Dropbox
             g_utilsCB.setPref(ctx.prefRevFState, response.rev);
             // console.log(response);
+
             // Callback SUCCESS
             cbDone(0);
+
+            // Mark as read
+            ctx.events.runEvent({
+                event: 'MARK_AS_SYNCED',
+                tableName: ctx.tableName,
+                data: entries
+            });
           })
       .catch(function(error)
           {

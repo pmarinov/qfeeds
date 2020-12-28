@@ -1094,6 +1094,13 @@ function p_rtableFWSubs(cbDone)
           // in local variable all[]
           self.m_rt.writeFullState('rss_subscriptions', all, function(exitCode)
               {
+                if (cbDone != null)
+                  cbDone(exitCode);
+
+                return;
+
+                // TODO: Remove IS_SYNCHED
+
                 // Handle exit code from m_rt.writeFullState()
                 //
                 // All entries that were sent to remote table were
@@ -1118,18 +1125,7 @@ function p_rtableFWSubs(cbDone)
         // One row in the remote table
         let newRemoteEntry = [feed.m_url, feed.m_tags];
         // Collect it
-        all.push(JSON.stringify(newRemoteEntry));
-
-        // Mark for a later completion: 
-        // Upon successfull write to remote table all entries will be
-        // marked as IS_SYNCED
-        if (feed.m_remote_state != feeds_ns.RssSyncState.IS_SYNC_IN_PROGRESS)
-        {
-          // Record all read entries in the remote table
-          log.info('p_rtableFWSubs: mark as SYNC_IN_PROGRESS for [' + feed.m_url + ']');
-          feed.m_remote_state = feeds_ns.RssSyncState.IS_SYNC_IN_PROGRESS;
-          return 1;  // Update entry in IndexedDB
-        }
+        all.push(newRemoteEntry);
 
         // No changes to the entry, move to the next
         return 2;
@@ -1269,6 +1265,13 @@ function p_rtableFWEntriesRead(cbDone)
         {
           self.m_rt.writeFullState('rss_entries_read', all, function(exitCode)
               {
+                if (cbDone != null)
+                  cbDone(exitCode);
+
+                return;
+
+                // TODO remove
+
                 // Handle exit code from m_rt.writeFullState()
                 //
                 // All entries that were sent to remote table were
@@ -1293,18 +1296,7 @@ function p_rtableFWEntriesRead(cbDone)
         // One row in the remote table
         let newRemoteEntry = new RemoteEntryRead(rssEntry)
         // Collect it
-        all.push(JSON.stringify(newRemoteEntry));
-
-        // Mark for a later completion: 
-        // Upon successfull write to remote table all entries will be
-        // marked as IS_SYNCED
-        if (rssEntry.m_remote_state != feeds_ns.RssSyncState.IS_SYNC_IN_PROGRESS)
-        {
-          // Record all read entries in the remote table
-          log.info('p_rtableFWEntriesRead: mark as SYNC_IN_PROGRESS for [' + rssEntry.m_hash + ']');
-          rssEntry.m_remote_state = feeds_ns.RssSyncState.IS_SYNC_IN_PROGRESS;
-          return 1;  // Update entry in the IndexedDB
-        }
+        all.push(newRemoteEntry);
 
         // No changes to the entry, move to the next
         return 2;
@@ -1375,6 +1367,11 @@ function handleRTEvent(self, event)
     log.info(`feeds: EMPTY_EVENT for \`${event.tableName}\'`);
     self.m_rt.eventDone(event.tableName);
   }
+  else
+  {
+    log.info(`feeds: handleRTEvent(): unhandled ${event.event} for \`${event.tableName}\'`);
+  }
+
 }
 
 // object Feeds.rtableConnect
