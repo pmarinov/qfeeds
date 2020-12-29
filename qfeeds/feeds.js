@@ -1211,42 +1211,63 @@ function p_rtableFSyncSubs(rtable)
 }
 Feeds.prototype.p_rtableFSyncSubs = p_rtableFSyncSubs;
 
-// object Feeds.p_rtableEntriesSetSync
-// Walk over all RSS entries (regardless of which subscription) in the
-// local DB, for entries marked as IS_SYNC_IN_PROGRESS set new state
-// (newSyncState will be IS_SYNCED or IS_LOCAL_ONLY)
-function p_rtableEntriesSetSync(newSyncState, cbDone)
+// object Feeds.p_markEntriesAsSynched
+// Set remote status of all entries as IS_SYNCED
+// Input:
+// listRemoteEntries -- an array in the format sent for remote table operations,
+//     see RemoteEntryRead() for the formation of the entry
+// cbDone -- Invoke at the end to notify operation in the DB as completed
+function p_markEntriesAsSynched(listRemoteEntries, cbDone)
 {
   let self = this;
 
-  self.updateEntriesAll(
-      function(rssEntry)
-      {
-        if (rssEntry == null)  // No more entries
+  let entryIndex = 0;
+  let numCompleted = 0;
+  let requestCompleted = false;
+  for (entryIndex = 0; entryIndex < listRemoteEntries.length; ++entryIndex)
+  {
+    let entry = listRemoteEntries[entryIndex];
+    let entryHash = entry[0];  // First entry in the array is the hash (the key)
+    let cnt = entryIndex;
+
+    self.feedUpdateEntry(entryHash,
+        function(state, dbEntry)
         {
-          if (cbDone != null)
+          if (state == 0)
+          {
+            utils_ns.assert(dbEntry.m_hash == entryHash, 'markEntriesAsSynched: bad data');
+
+            // Already in the state it needs to be?
+            if (dbEntry.m_remote_state == feeds_ns.RssSyncState.IS_SYNCED)
+            {
+              log.info(`markEntriesAsSynched: entry (${cnt}): [${entryHash}], ALREADY marked, skipping it`);
+              return 1;  // Don't record in the DB
+            }
+            else
+            {
+              dbEntry.m_remote_state = feeds_ns.RssSyncState.IS_SYNCED;
+              return 0;  // Record in the DB
+            }
+          }
+          else if (state == 1)
+          {
+            log.error(`db: update entry (${cnt}): [${entryHash}], error not found`);
+            return 1;  // Don't record in the DB
+          }
+
+          --numCompleted;
+
+          // Everything already marked?
+          if (requestCompleted && numCompleted == 0)
+          {
+            log.info(`markEntriesAsSynched: marked ${listRemoteEntries.length} as IS_SYNCED`);
             cbDone();
-          return 0;
-        }
-
-        if (rssEntry.m_remote_state == feeds_ns.RssSyncState.IS_SYNC_IN_PROGRESS)
-        {
-          // Record all read entries in the remote table
-          let strState = '!BAD!';
-          if (newSyncState == feeds_ns.RssSyncState.IS_SYNCED)
-            strState = 'IS_SYNCED';
-          if (newSyncState == feeds_ns.RssSyncState.IS_LOCAL_ONLY)
-            strState = 'IS_LOCAL_ONLY';
-          log.info('p_rtableSubsSetSync: mark as ' + strState + ' for (' + rssEntry.m_title + ')');
-          rssEntry.m_remote_state = newSyncState;
-          return 1;  // Update entry in the IndexedDB
-        }
-
-        // No changes to the entry, move to the next
-        return 2;
-      });
+          }
+        });
+  }
+  requestCompleted = true;
 }
-Feeds.prototype.p_rtableEntriesSetSync = p_rtableEntriesSetSync;
+Feeds.prototype.p_markEntriesAsSynched = p_markEntriesAsSynched;
 
 // object Feeds.p_rtableFWEntriesRead
 // (Full Write) Walk over all RSS entries in the local DB and send all that were marked as read
@@ -1267,28 +1288,6 @@ function p_rtableFWEntriesRead(cbDone)
               {
                 if (cbDone != null)
                   cbDone(exitCode);
-
-                return;
-
-                // TODO remove
-
-                // Handle exit code from m_rt.writeFullState()
-                //
-                // All entries that were sent to remote table were
-                // marked with IS_SYNC_IN_PROGRESS, now they need to be
-                // marked as SYNCED (remote write OK) or LOCAL_ONLY (remote write has failed)
-                let newSyncState = -1;
-                
-                if (exitCode == 0)  // Remote write OK?
-                  newSyncState = feeds_ns.RssSyncState.IS_SYNCED;
-                else
-                  newSyncState = feeds_ns.RssSyncState.IS_LOCAL_ONLY;
-
-                self.p_rtableEntriesSetSync(newSyncState, function ()
-                  {
-                    if (cbDone != null)
-                      cbDone(exitCode);
-                  });
               });
           return 0;
         }
@@ -1354,6 +1353,29 @@ function handleRTEvent(self, event)
     else if (event.tableName == 'rss_entries_read')
     {
       log.info('feeds: Full sync of table `rss_entries_read\'');
+    }
+    else
+    {
+      utils_ns.assert(false,
+          "handleRTEvent: event for an invalid table '" + event.tableName + "'");
+    }
+  }
+  else if (event.event == 'MARK_AS_SYNCED')
+  {
+    // Make local table reflect fully the remote table
+    // This event is generated by a change in the remote table
+    if (event.tableName == 'rss_subscriptions')
+    {
+      log.error('feeds: Mark as synced for table `rss_subscriptions\', NOT IMPLEMENTED YET');
+    }
+    else if (event.tableName == 'rss_entries_read')
+    {
+      log.info('feeds: Mark as synced for table `rss_entries_read\'');
+      self.p_markEntriesAsSynched(event.data, function ()
+          {
+            // Tell the event queue to proceeed with the next event
+            self.m_rt.eventDone(event.tableName);
+          });
     }
     else
     {
