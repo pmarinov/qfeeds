@@ -1230,6 +1230,7 @@ function p_markEntriesAsSynched(listRemoteEntries, cbDone)
     let entryHash = entry[0];  // First entry in the array is the hash (the key)
     let cnt = entryIndex;
 
+    ++numCompleted;  // The number of expected completion callbacks
     self.feedUpdateEntry(entryHash,
         function(state, dbEntry)
         {
@@ -1240,7 +1241,7 @@ function p_markEntriesAsSynched(listRemoteEntries, cbDone)
             // Already in the state it needs to be?
             if (dbEntry.m_remote_state == feeds_ns.RssSyncState.IS_SYNCED)
             {
-              log.info(`markEntriesAsSynched: entry (${cnt}): [${entryHash}], ALREADY marked, skipping it`);
+              log.info(`p_markEntriesAsSynched: entry (${cnt}): [${entryHash}], ALREADY marked, skipping it`);
               return 1;  // Don't record in the DB
             }
             else
@@ -1260,12 +1261,20 @@ function p_markEntriesAsSynched(listRemoteEntries, cbDone)
           // Everything already marked?
           if (requestCompleted && numCompleted == 0)
           {
-            log.info(`markEntriesAsSynched: marked ${listRemoteEntries.length} as IS_SYNCED`);
+            log.info(`p_markEntriesAsSynched: marked ${listRemoteEntries.length} as IS_SYNCED`);
             cbDone();
           }
         });
   }
   requestCompleted = true;
+
+  // Check if the for() loop above ended up scheduling anything
+  if (numCompleted == 0)
+  {
+    // No changes in the IndexedDB
+    log.info(`p_markEntriesAsSynched:  Nothing needed to be marked as IS_SYNCED`);
+    cbDone();
+  }
 }
 Feeds.prototype.p_markEntriesAsSynched = p_markEntriesAsSynched;
 
