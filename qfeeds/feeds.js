@@ -269,8 +269,8 @@ function RemoteEntryRead(rssEntry)
   // Strip the time (after '_')
   // Date is sufficient for keeping the age of an entry
   // Date is used only for the purpose of making an entry expire and be deleted
-  let limit = entry_date.indexOf('_')
-  entry_date = entry_date.slice(0, limit)
+  let limit = entry_date.indexOf('_');
+  entry_date = entry_date.slice(0, limit);
   return [rss_entry_hash, rss_feed_hash, is_read, entry_date]
 }
 // Preserve old version for some time
@@ -303,18 +303,29 @@ function RemoteEntryRead(rssEntry)
 
 // object [old] RemoteFeedUrl [constructor]
 // From an RssHeader constructs a RemoteFeedUrl record
+// function RemoteFeedUrl(feed)
+// {
+//   this.m_rss_feed_hash = null;  // this is a key in the remote table
+//   this.m_rss_feed_url = null;
+//   this.m_tags = null;
+//   if (feed == null)  // An empty object was requested?
+//     return this;
+
+//   this.m_rss_feed_hash = feed.m_hash;
+//   this.m_rss_feed_url = feed.m_url;
+//   this.m_tags = feed.m_tags;
+//   return this;
+// }
+
+// object RemoteFeedUrl [constructor]
+// From an RssHeader constructs a RemoteFeedUrl record
 function RemoteFeedUrl(feed)
 {
-  this.m_rss_feed_hash = null;  // this is a key in the remote table
-  this.m_rss_feed_url = null;
-  this.m_tags = null;
   if (feed == null)  // An empty object was requested?
-    return this;
+    return [null, null, null]
 
-  this.m_rss_feed_hash = feed.m_hash;
-  this.m_rss_feed_url = feed.m_url;
-  this.m_tags = feed.m_tags;
-  return this;
+  // url, tags, user-set options for the feed
+  return [feed.m_url, feed.m_tags, ""];
 }
 
 // object Feeds.p_incExpireCount
@@ -1036,7 +1047,8 @@ function p_rtableSyncEntryRead(rssEntry)
 }
 Feeds.prototype.p_rtableSyncEntryRead = p_rtableSyncEntryRead;
 
-// object Feeds.p_rtableSubsSetSync
+// object [old] Feeds.p_rtableSubsSetSync
+// TODO: remove
 // Walk over all RSS subscription records in the local DB,
 // for all entries marked as IS_SYNC_IN_PROGRESS set new state
 // (newSyncState will be IS_SYNCED or IS_LOCAL_ONLY)
@@ -1072,6 +1084,72 @@ function p_rtableSubsSetSync(newSyncState, cbDone)
       });
 }
 Feeds.prototype.p_rtableSubsSetSync = p_rtableSubsSetSync;
+
+// object Feeds.p_markSubsAsSynched
+// Set remote status of all RSS subscriptions as IS_SYNCED
+// Input:
+// listRemoteSubs -- an array in the format sent for remote table operations,
+//     see RemoteFeedUrl() for the formation of the entry
+// cbDone -- Invoke at the end to notify operation in the DB as completed
+function p_markSubsAsSynched(listRemoteSubs, cbDone)
+{
+  let self = this;
+
+  let feedIndex = 0;
+  let numCompleted = 0;
+  let requestCompleted = false;
+  let numEntries = listRemoteSubs.length;
+  for (feedIndex = 0; feedIndex < listRemoteSubs.length; ++feedIndex)
+  {
+    let entry = listRemoteSubs[feedIndex];
+    let cnt = feedIndex;  // A copy in the current scope
+
+    // Search for feed f
+    let f = feeds_ns.emptyRssHeader();
+    f.m_url = entry[0];  // Element 0 is the URL (remote table entry format)
+
+    // find if a feed with this URL is already in m_rssFeeds[]
+    let index = self.m_rssFeeds.binarySearch(f, compareRssHeadersByUrl);
+    if (index < 0)
+    {
+      log.warn('p_markSubsAsSynched: error, ' + f.m_url + ' is unknown');
+      continue;
+    };
+    let target = self.m_rssFeeds[index];
+
+    if (target.m_remote_state == feeds_ns.RssSyncState.IS_SYNCED)
+    {
+      log.info(`p_markSubsAsSynched: entry [${cnt}] (${target.m_url}): ALREADY marked, skipping it`);
+      continue;
+    }
+
+    target.m_remote_state = feeds_ns.RssSyncState.IS_SYNCED;  // Ends up in m_rssFeeds[] too
+
+    ++numCompleted;  // The number of expected completion callbacks
+    self.p_feedRecord(target, false, function ()
+        {
+          --numCompleted;
+
+          // Everything already marked?
+          if (requestCompleted && numCompleted == 0)
+          {
+            log.info(`p_markSubsAsSynched: marked ${numEntries} as IS_SYNCED`);
+            cbDone();
+          }
+        });
+
+  }
+  requestCompleted = true;
+
+  // Check if the for() loop above ended up scheduling anything
+  if (numCompleted == 0)
+  {
+    // No changes in the IndexedDB
+    log.info(`p_markSubsAsSynched: Nothing needed to be marked as IS_SYNCED`);
+    cbDone();
+  }
+}
+Feeds.prototype.p_markSubsAsSynched = p_markSubsAsSynched;
 
 // object Feeds.p_rtableFWSubs
 // (Full Write) Walk over all RSS subscription records in the local DB and send all of then
@@ -1123,7 +1201,7 @@ function p_rtableFWSubs(cbDone)
         }
 
         // One row in the remote table
-        let newRemoteEntry = [feed.m_url, feed.m_tags];
+        let newRemoteEntry = new RemoteFeedUrl(feed);
         // Collect it
         all.push(newRemoteEntry);
 
@@ -1224,11 +1302,12 @@ function p_markEntriesAsSynched(listRemoteEntries, cbDone)
   let entryIndex = 0;
   let numCompleted = 0;
   let requestCompleted = false;
+  let numEntries = listRemoteEntries.length;
   for (entryIndex = 0; entryIndex < listRemoteEntries.length; ++entryIndex)
   {
     let entry = listRemoteEntries[entryIndex];
     let entryHash = entry[0];  // First entry in the array is the hash (the key)
-    let cnt = entryIndex;
+    let cnt = entryIndex;  // A copy in the current scope
 
     ++numCompleted;  // The number of expected completion callbacks
     self.feedUpdateEntry(entryHash,
@@ -1261,7 +1340,7 @@ function p_markEntriesAsSynched(listRemoteEntries, cbDone)
           // Everything already marked?
           if (requestCompleted && numCompleted == 0)
           {
-            log.info(`p_markEntriesAsSynched: marked ${listRemoteEntries.length} as IS_SYNCED`);
+            log.info(`p_markEntriesAsSynched: marked ${numEntries} as IS_SYNCED`);
             cbDone();
           }
         });
@@ -1302,7 +1381,7 @@ function p_rtableFWEntriesRead(cbDone)
         }
 
         // One row in the remote table
-        let newRemoteEntry = new RemoteEntryRead(rssEntry)
+        let newRemoteEntry = new RemoteEntryRead(rssEntry);
         // Collect it
         all.push(newRemoteEntry);
 
@@ -1375,7 +1454,11 @@ function handleRTEvent(self, event)
     // This event is generated by a change in the remote table
     if (event.tableName == 'rss_subscriptions')
     {
-      log.error('feeds: Mark as synced for table `rss_subscriptions\', NOT IMPLEMENTED YET');
+      self.p_markSubsAsSynched(event.data, function ()
+          {
+            // Tell the event queue to proceeed with the next event
+            self.m_rt.eventDone(event.tableName);
+          });
     }
     else if (event.tableName == 'rss_entries_read')
     {

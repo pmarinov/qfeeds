@@ -185,12 +185,13 @@ function writeBackHandler(self)
               for (let j = 0; j < ctx.newJournal.length; ++j)
                 ctx.remoteJournal.push(ctx.newJournal[j]);
 
-              // Call event handler to reflect which entries are safe
-              ctx.cbEvents({
-                event: 'MARK_AS_SYNCHED',
-                tableName: ctx.tableName,
-                entries: ctx.newJournal.copy()
+              // Mark as saved (synced to remote)
+              ctx.events.runEvent({
+                  event: 'MARK_AS_SYNCED',
+                  tableName: ctx.tableName,
+                  data: ctx.newJournal.copy()
               });
+
               // Empty newJournal (everything is in remoteJournal now)
               ctx.newJournal = [];
             })
