@@ -1217,7 +1217,7 @@ Feeds.prototype.p_rtableFWSubs = p_rtableFWSubs;
 // 2. Delete all local entries that are NOT in the remote table
 //
 // rtable -- the remote table, all entries
-function p_rtableFSyncSubs(rtable)
+function p_rtableFSyncSubs(rtable, cbDone)
 {
   let self = this;
 
@@ -1286,6 +1286,9 @@ function p_rtableFSyncSubs(rtable)
 
   // Delete locally all entries that were selected
   self.p_rtableRemoteFeedsListener(objList);
+
+  if (cbDone)
+    cbDone();
 }
 Feeds.prototype.p_rtableFSyncSubs = p_rtableFSyncSubs;
 
@@ -1406,6 +1409,9 @@ function handleRTEvent(self, event)
       log.info('feeds: Full write of table `rss_subscriptions\'');
       self.p_rtableFWSubs(function (code)
           {
+            // Tell the event queue to proceeed with the next event
+            self.m_rt.eventDone(event.tableName);
+
             if (code == 0)
             {
               // Status write OK
@@ -1417,6 +1423,9 @@ function handleRTEvent(self, event)
       log.info('feeds: Full write of table `rss_entries_read\'');
       self.p_rtableFWEntriesRead(function (code)
           {
+            // Tell the event queue to proceeed with the next event
+            self.m_rt.eventDone(event.tableName);
+
             if (code == 0)
             {
               // Status write OK
@@ -1436,7 +1445,11 @@ function handleRTEvent(self, event)
     if (event.tableName == 'rss_subscriptions')
     {
       log.info('feeds: Full sync of table `rss_subscriptions\'');
-      self.p_rtableFSyncSubs(event.data);
+      self.p_rtableFSyncSubs(event.data, function ()
+          {
+            // Tell the event queue to proceeed with the next event
+            self.m_rt.eventDone(event.tableName);
+          });
     }
     else if (event.tableName == 'rss_entries_read')
     {
@@ -1485,7 +1498,6 @@ function handleRTEvent(self, event)
   {
     log.info(`feeds: handleRTEvent(): unhandled ${event.event} for \`${event.tableName}\'`);
   }
-
 }
 
 // object Feeds.rtableConnect
@@ -1651,7 +1663,7 @@ function dbOpen(cbDone)
         log.info("db: ('rrss', 'open') first time, create tables of Feeds DB...");
         var db = event.target.result;
 
-        // Records of type RssHeader 
+        // Records of type RssHeader
         var s = db.createObjectStore('rss_subscriptions', { keyPath: 'm_url' });
         log.info("db: ('rrss', 'open') table 'rss_subscriptions' start create operation");
 

@@ -74,6 +74,12 @@ function eventDone(remoteTableName)
   let ctx = self.m_rtables[remoteTableName].m_ctx;
 
   log.info(`dropbox: [${remoteTableName}] event DONE, event: ${ctx.events.m_cur.event}`);
+
+  // Completion callback
+  if (ctx.events.m_cur.cbCompletion != null)
+    ctx.events.m_cur.cbCompletion();
+
+  // Advance to the next event in the queue, if any
   ctx.events.eventDone();
 }
 RTables.prototype.eventDone = eventDone;
@@ -189,7 +195,8 @@ function writeBackHandler(self)
               ctx.events.runEvent({
                   event: 'MARK_AS_SYNCED',
                   tableName: ctx.tableName,
-                  data: ctx.newJournal.copy()
+                  data: ctx.newJournal.copy(),
+                  cbCompletion: null
               });
 
               // Empty newJournal (everything is in remoteJournal now)
@@ -235,7 +242,8 @@ function loadStateMachine(objRTables, remoteTableName)
         ctx.events.runEvent({
             event: 'EMPTY_EVENT',
             tableName: ctx.tableName,
-            data: 'Yo1'
+            data: 'Yo1',
+            cbCompletion: null
         });
 
         log.info('dropbox: [' + remoteTableName + '] state ' + state.stringify());
@@ -491,16 +499,18 @@ function loadStateMachine(objRTables, remoteTableName)
           ctx.remoteJournal = [];
 
           // Invoke callback to initiate writing of full state to Dropbox
-          ctx.cbEvents({
+          ctx.events.runEvent({
             event: 'WRITE_FULL_STATE',
-            tableName: ctx.tableName
+            tableName: ctx.tableName,
+            data: null,
+            cbCompletion: null
           });
         }
         else
         {
-          // There is remote journal file, check if we need to load it
-
-          let revFState = g_utilsCB.getPref(ctx.prefRevFState);
+          //
+          // There is remote full-state file, check if we need to load it
+          let revFState = g_utilsCB.getPref(ctx.prefRevFState);  // Against current record of remote ver.
           if (revFState === undefined || revFState == 'empty')
           {
             // 1. Nothing held locally
@@ -541,9 +551,6 @@ function loadStateMachine(objRTables, remoteTableName)
                 {
                   log.info('dropbox: filesDownload, fstate, rev: ' + response.rev);
                   // console.info(response);
-
-                  // Store this new remote revision
-                  g_utilsCB.setPref(ctx.prefRevFState, response.rev);
 
                   // In the off-chance that remote rev has changed during
                   // the steps in this state machine
@@ -595,14 +602,23 @@ function loadStateMachine(objRTables, remoteTableName)
         //
         // If remote data was loaded it will be reflected in tempFullState and tempJournal,
         // apply it to local data state
-
         if (ctx.tempFullState.length > 0)
         {
-          // Invoke callback to initiate writing of full state to Dropbox
-          ctx.cbEvents({
+          // Event: Initiate writing of full state from Dropbox into local table
+          ctx.events.runEvent({
             event: 'SYNC_FULL_STATE',
             tableName: ctx.tableName,
-            data: ctx.tempFullState
+            data: ctx.tempFullState,
+            cbCompletion: function ()
+                {
+                  // At this point the revision ID of the remote table
+                  // is only stored in memory: ctxctx.freshRevFState
+                  //
+                  // Store this new remote revision into local storage
+                  // (survives restarts)
+                  g_utilsCB.setPref(ctx.prefRevFState, ctx.freshRevFState);
+                  log.info(`dropbox: [${remoteTableName}] applied full state from rev: ${ctx.freshRevFState}`);
+                }
           });
 
           // Full state has been consumed => free the memory
@@ -698,7 +714,8 @@ function writeFullState(tableName, entries, cbDone)
             ctx.events.runEvent({
                 event: 'MARK_AS_SYNCED',
                 tableName: ctx.tableName,
-                data: entries
+                data: entries,
+                cbCompletion: null
             });
           })
       .catch(function(error)
