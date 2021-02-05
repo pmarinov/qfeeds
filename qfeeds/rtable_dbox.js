@@ -654,7 +654,7 @@ function writeFullState(tableName, entries, cbDone)
   // Why not use JSON.stringify() of the array?
   // For debug purposes it is better to have our own output with ONE entry per line
   // (open the .json files from Dropbox to examine)
-  let strEntries = '"entries": [';
+  let strEntries = '[';
   let i = 0;
   for (i = 0; i < entries.length; ++i)
   {
