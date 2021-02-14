@@ -680,83 +680,6 @@ function p_rtableRemoteFeedsListenerOld(records)
 }
 Feeds.prototype.p_rtableRemoteFeedsListenerOld = p_rtableRemoteFeedsListenerOld;
 
-// object Feeds.p_rtableRemoteFeedsListener
-// Handle updates from the remote tables for 'rss_subscriptions'
-function p_rtableRemoteFeedsListener(records)
-{
-  let self = this;
-  let k = 0;
-  let r = null;
-  for (k = 0; k < records.length; ++k)
-  {
-    (function()  // scope
-    {
-      // Unfold one record -- each simply an array of 2 entries
-      r = records[k];
-      let feedUrl = r.data[0];
-      let feedTags = r.data[1];
-
-      let sha1 = CryptoJS.SHA1(feedUrl);
-      let feedHash = sha1.toString();
-      let x = self.p_feedFindByHash(feedHash);
-
-      // Skip operation if it is remote delete
-      // Local delete will take place when scheduled
-      if (r.isDeleted)  // remotely deleted?
-      {
-        if (x == -1)
-        {
-          log.warn('p_rtableRemoteFeedsListener: unknown feed ' + feedHash);
-          return;
-        }
-        log.info('rtable_event: deleted remotely -- ' + self.m_rssFeeds[x].m_url);
-        self.p_feedRemove(self.m_rssFeeds[x].m_url, false);
-        self.m_feedsCB.onRemoteFeedDeleted(feedHash);
-        return;  // leave the anonymous scope
-      }
-
-      // A record was added or updated
-      let newFeed = null;
-      if (x == -1)   // Update or addition of a new feed from a remote operation
-      {
-        newFeed = feeds_ns.emptyRssHeader();
-      }
-      else
-      {
-        // We already have such feed locally: this is an update operation
-        newFeed = feeds_ns.copyRssHeader(self.m_rssFeeds[x]);
-      }
-      // Now apply the data that come from the remote operation
-      newFeed.m_hash = feedHash;
-      newFeed.m_url = feedUrl;
-      newFeed.m_tags = feedTags;
-      newFeed.m_remote_state = feeds_ns.RssSyncState.IS_SYNCED;
-
-      // Put into local list of RSS subscriptions (self.m_rssFeeds)
-      self.p_feedInsert(newFeed);
-
-      // Put in the IndexedDB
-      self.p_feedRecord(newFeed, false,
-          function(wasUpdated)
-          {
-            if (wasUpdated == 1)
-            {
-              // New feed -> fetch RSS data
-              self.p_fetchRss(newFeed.m_url, null,
-                  function()  // CB: write operation is completed
-                  {
-                    // If any extra activation/display is needed
-                    self.m_feedsCB.onRemoteFeedUpdated(newFeed.m_url, newFeed.m_tags);
-                  });
-            }
-            else
-              log.info('p_rtableRemoteFeedsListener: nothing to do for ' + newFeed.m_url);
-          });
-    })()
-  }
-}
-Feeds.prototype.p_rtableRemoteFeedsListener = p_rtableRemoteFeedsListener;
-
 // object [old] Feeds.p_rtableListener
 // Handle updates from the remote tables
 function p_rtableListener(table_id, records)
@@ -1154,87 +1077,6 @@ function p_markSubsAsSynched(listRemoteSubs, cbDone)
 }
 Feeds.prototype.p_markSubsAsSynched = p_markSubsAsSynched;
 
-// object Feeds.p_rtableFSyncSubs
-// (Full Sync) Apply a full remote state locally
-// 1. Add all remote entries that are NOT present locally
-// 2. Delete all local entries that are NOT in the remote table
-//
-// rtable -- the remote table, all entries
-function p_rtableFSyncSubs(rtable, cbDone)
-{
-  let self = this;
-
-  // Make a hash map of the local entries, mark them entries as 0
-  let k = 0;
-  let entry = null;
-  let localEntries = {};
-  for (k = 0; k < self.m_rssFeeds.length; ++k)
-  {
-    entry = self.m_rssFeeds[k];
-    localEntries[entry.m_url] = 0;
-  }
-
-  // Generate event _updated_ for all remote entries
-  let x = 0;
-  let rtEntry = null;
-  let key = null;
-  let objList = [];
-  let updateObj = null;
-  for (x = 0; x < rtable.length; ++x)
-  {
-    rtEntry = rtable[x];
-    // Imitate generation of an updated obj
-    updateObj =
-      {
-        isDeleted: false,  // Operation is insert/update, not delete
-        data: rtEntry.slice(0)  // Clone the array
-      };
-    objList.push(updateObj);
-
-    key = rtEntry[0];  // URL of the feed
-    localEntries[key] = 1;
-  }
-
-  // Update/insert all remote entries
-  self.p_rtableRemoteFeedsListener(objList);
-
-  // Generate event _deleted_ for all that were in local but
-  // not in the remote table
-  let keys = Object.keys(localEntries);
-  let index = 0;
-  objList = [];
-  for (x = 0; x < keys.length; ++x)
-  {
-    key = keys[x];  // key an URL of subscribed feed
-    if (localEntries[key] == 1)  // RSS subscription is in local AND in remote
-      continue;
-
-    // Verify if the local entry has been sent to remote table
-    index = self.p_feedFindByUrl(key);
-    utils_ns.assert(index >= 0,
-        "p_rtableFSyncSubs: Unexpected result from p_feedFindByUrl()");
-    entry = self.m_rssFeeds[index];
-    if (entry.m_remote_state != feeds_ns.RssSyncState.IS_SYNCED)
-      continue;  // Skip deleting
-
-    // Imitate generation of an updated obj
-    // local[key] is in local, but no longer in the remote, it needs to be deleted
-    updateObj =
-      {
-        isDeleted: true,  // Operation is insert/update, not delete
-        data: null
-      };
-    objList.push(updateObj);
-  }
-
-  // Delete locally all entries that were selected
-  self.p_rtableRemoteFeedsListener(objList);
-
-  if (cbDone)
-    cbDone();
-}
-Feeds.prototype.p_rtableFSyncSubs = p_rtableFSyncSubs;
-
 // object Feeds.p_markEntriesAsSynched
 // Set remote status of all entries as IS_SYNCED
 // Input:
@@ -1388,7 +1230,7 @@ function handleRTEvent(self, event)
     if (event.tableName == 'rss_subscriptions')
     {
       log.info('feeds: Full sync of table `rss_subscriptions\'');
-      self.p_rtableFSyncSubs(event.data, function ()
+      self.m_rtSubs.fullTableSync(self.m_rt, event.data, function ()
           {
             // Tell the event queue to proceeed with the next event
             self.m_rt.eventDone(event.tableName);
