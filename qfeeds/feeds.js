@@ -66,6 +66,9 @@ function Feeds()
   // (object RTables)
   self.m_rt = null;
 
+  // Handle events for a remote table of RSS subscriptions
+  self.m_rtSubs = null;
+
   // Setup the poll loop
   self.m_timeoutID = setTimeout(p_poll, 1, self);
 
@@ -1151,66 +1154,6 @@ function p_markSubsAsSynched(listRemoteSubs, cbDone)
 }
 Feeds.prototype.p_markSubsAsSynched = p_markSubsAsSynched;
 
-// object Feeds.p_rtableFWSubs
-// (Full Write) Walk over all RSS subscription records in the local DB and send all of then
-// to remote table
-function p_rtableFWSubs(cbDone)
-{
-  let self = this;
-  let all = [];
-
-  self.p_feedsUpdateAll(
-      function(feed)
-      {
-        // Parameter: `feed' one subsription descriptor -- one by one
-        // this function is called for all entries in the table
-        // indexed db 'rss_subscription
-
-        if (feed == null)  // No more entries
-        {
-          // Write to remote table all the entries that were collected
-          // in local variable all[]
-          self.m_rt.writeFullState('rss_subscriptions', all, function(exitCode)
-              {
-                if (cbDone != null)
-                  cbDone(exitCode);
-
-                return;
-
-                // TODO: Remove IS_SYNCHED
-
-                // Handle exit code from m_rt.writeFullState()
-                //
-                // All entries that were sent to remote table were
-                // marked with IS_SYNC_IN_PROGRESS, now they need to be
-                // marked as SYNCED or LOCAL_ONLY
-                let newSyncState = -1;
-                
-                if (exitCode == 0)  // Remote write OK?
-                  newSyncState = feeds_ns.RssSyncState.IS_SYNCED;
-                else
-                  newSyncState = feeds_ns.RssSyncState.IS_LOCAL_ONLY;
-
-                self.p_rtableSubsSetSync(newSyncState, function ()
-                  {
-                    if (cbDone != null)
-                      cbDone(exitCode);
-                  });
-              });
-          return 0;
-        }
-
-        // One row in the remote table
-        let newRemoteEntry = new RemoteFeedUrl(feed);
-        // Collect it
-        all.push(newRemoteEntry);
-
-        // No changes to the entry, move to the next
-        return 2;
-      });
-}
-Feeds.prototype.p_rtableFWSubs = p_rtableFWSubs;
-
 // object Feeds.p_rtableFSyncSubs
 // (Full Sync) Apply a full remote state locally
 // 1. Add all remote entries that are NOT present locally
@@ -1407,7 +1350,7 @@ function handleRTEvent(self, event)
     if (event.tableName == 'rss_subscriptions')
     {
       log.info('feeds: Full write of table `rss_subscriptions\'');
-      self.p_rtableFWSubs(function (code)
+      self.m_rtSubs.fullTableWrite(self.m_rt, function (code)
           {
             // Tell the event queue to proceeed with the next event
             self.m_rt.eventDone(event.tableName);
@@ -1520,6 +1463,8 @@ function rtableConnect(cbDisplayProgress)
     // All entries that were marked as read
     {name: 'rss_entries_read', formatVersion: 1}
   ];
+
+  self.m_rtSubs = new feeds_rt_subs_ns.rtHandlerSubs(self, 'rss_subscriptions');
 
   self.m_rt = new feeds_ns.RTables(tables, function (event)
       {
