@@ -246,6 +246,74 @@ function fullTableSync(rt, table, cbDone)
 }
 rtHandlerSubs.prototype.fullTableSync = fullTableSync;
 
+// object rtHandlerSubs.markAsSynced
+// Set remote status of all RSS subscriptions as IS_SYNCED
+
+// Params:
+// rt -- Remote Tables Object (Dropbox connector)
+// listRemoteSubs -- an array in the format sent for remote table operations,
+//     see RemoteFeedUrl() for the formation of the entry
+// cbDone -- Invoke at the end to notify operation in the DB as completed
+function markAsSynced(rt, listRemoteSubs, cbDone)
+{
+  let self = this;
+
+  let feedIndex = 0;
+  let numCompleted = 0;
+  let requestCompleted = false;
+  let numEntries = listRemoteSubs.length;
+  for (feedIndex = 0; feedIndex < listRemoteSubs.length; ++feedIndex)
+  {
+    let entry = listRemoteSubs[feedIndex];
+    let cnt = feedIndex;  // A copy in the current scope
+
+    // Search for feed f
+    let f = feeds_ns.emptyRssHeader();
+    f.m_url = entry[0];  // Element 0 is the URL (remote table entry format)
+
+    // find if a feed with this URL is already in m_rssFeeds[]
+    let index = self.m_feeds.m_rssFeeds.binarySearch(f, feeds_ns.compareRssHeadersByUrl);
+    if (index < 0)
+    {
+      log.warn('rtHandlerSubs.markAsSynced: error, ' + f.m_url + ' is unknown');
+      continue;
+    };
+    let target = self.m_feeds.m_rssFeeds[index];
+
+    if (target.m_remote_state == feeds_ns.RssSyncState.IS_SYNCED)
+    {
+      log.info(`rtHandlerSubs.markAsSynced: entry [${cnt}] (${target.m_url}): ALREADY marked, skipping it`);
+      continue;
+    }
+
+    target.m_remote_state = feeds_ns.RssSyncState.IS_SYNCED;  // Ends up in m_rssFeeds[] too
+
+    ++numCompleted;  // The number of expected completion callbacks
+    self.m_feeds.p_feedRecord(target, false, function ()
+        {
+          --numCompleted;
+
+          // Everything already marked?
+          if (requestCompleted && numCompleted == 0)
+          {
+            log.info(`rtHandlerSubs.markAsSynced: marked ${numEntries} as IS_SYNCED`);
+            cbDone();
+          }
+        });
+
+  }
+  requestCompleted = true;
+
+  // Check if the for() loop above ended up scheduling anything
+  if (numCompleted == 0)
+  {
+    // No changes in the IndexedDB
+    log.info(`rtHandlerSubs.markAsSynced: Nothing needed to be marked as IS_SYNCED`);
+    cbDone();
+  }
+}
+rtHandlerSubs.prototype.markAsSynced = markAsSynced;
+
 // export to feeds_rt_subs_ns namespace
 feeds_rt_subs_ns.rtHandlerSubs = rtHandlerSubs;
 })();
