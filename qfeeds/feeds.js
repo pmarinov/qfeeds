@@ -67,7 +67,12 @@ function Feeds()
   self.m_rt = null;
 
   // Handle events for a remote table of RSS subscriptions
+  // (file: rss_subscriptions.fstate.json in Dropbox/Apps/QFeeds)
   self.m_rtSubs = null;
+
+  // Handle events for a remote tale of status read of RSS feed entries
+  // (file: rss_entries_read.fstate.json in Dropbox/Apps/QFeeds)
+  self.m_rtEntries = null;
 
   // Setup the poll loop
   self.m_timeoutID = setTimeout(p_poll, 1, self);
@@ -1241,6 +1246,7 @@ function rtableConnect(cbDisplayProgress)
   ];
 
   self.m_rtSubs = new feeds_rt_subs_ns.rtHandlerSubs(self, 'rss_subscriptions');
+  self.m_rtEntries = new feeds_rt_entries_ns.rtHandlerEntries(self, 'rss_entries_read');
 
   self.m_rt = new feeds_ns.RTables(tables, function (event)
       {
