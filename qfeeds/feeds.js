@@ -1084,40 +1084,6 @@ function p_markEntriesAsSynched(listRemoteEntries, cbDone)
 }
 Feeds.prototype.p_markEntriesAsSynched = p_markEntriesAsSynched;
 
-// object Feeds.p_rtableFWEntriesRead
-// (Full Write) Walk over all RSS entries in the local DB and send all that were marked as read
-// to remote table
-// NOTE: By not sending is_read = false we temporarely save a bit of
-// space on the remote DB
-function p_rtableFWEntriesRead(cbDone)
-{
-  let self = this;
-  let all = [];
-
-  self.updateEntriesAll(
-      function(rssEntry)
-      {
-        if (rssEntry == null)  // No more entries
-        {
-          self.m_rt.writeFullState('rss_entries_read', all, function(exitCode)
-              {
-                if (cbDone != null)
-                  cbDone(exitCode);
-              });
-          return 0;
-        }
-
-        // One row in the remote table
-        let newRemoteEntry = new RemoteEntryRead(rssEntry);
-        // Collect it
-        all.push(newRemoteEntry);
-
-        // No changes to the entry, move to the next
-        return 2;
-      });
-}
-Feeds.prototype.p_rtableFWEntriesRead = p_rtableFWEntriesRead;
-
 // object Feeds.handleRTevent()
 // Handle events from remote tables
 function handleRTEvent(self, event)
@@ -1145,7 +1111,7 @@ function handleRTEvent(self, event)
     else if (event.tableName == 'rss_entries_read')
     {
       log.info('feeds: Full write of table `rss_entries_read\'');
-      self.p_rtableFWEntriesRead(function (code)
+      self.m_rtEntries.fullTableWrite(self.m_rt, function (code)
           {
             // Tell the event queue to proceeed with the next event
             self.m_rt.eventDone(event.tableName);
