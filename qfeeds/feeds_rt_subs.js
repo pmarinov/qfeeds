@@ -247,14 +247,14 @@ function fullTableSync(rt, table, cbDone)
 rtHandlerSubs.prototype.fullTableSync = fullTableSync;
 
 // object rtHandlerSubs.markAsSynced
-// Set remote status of all RSS subscriptions as IS_SYNCED
+// Set remote status of all RSS subscriptions as IS_SYNCED in the
+// local Indexed DB
 
 // Params:
-// rt -- Remote Tables Object (Dropbox connector)
 // listRemoteSubs -- an array in the format sent for remote table operations,
 //     see RemoteFeedUrl() for the formation of the entry
 // cbDone -- Invoke at the end to notify operation in the DB as completed
-function markAsSynced(rt, listRemoteSubs, cbDone)
+function markAsSynced(listRemoteSubs, cbDone)
 {
   let self = this;
 
@@ -300,7 +300,6 @@ function markAsSynced(rt, listRemoteSubs, cbDone)
             cbDone();
           }
         });
-
   }
   requestCompleted = true;
 

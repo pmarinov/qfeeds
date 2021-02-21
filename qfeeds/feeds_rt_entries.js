@@ -94,6 +94,76 @@ function fullTableWrite(rt, cbDone)
 }
 rtHandlerEntries.prototype.fullTableWrite = fullTableWrite;
 
+// object rtHandlerEntries.markAsSynced
+// Set remote status of all entries as IS_SYNCED into the local
+// Indexed DB
+//
+// Input:
+// listRemoteEntries -- an array in the format sent for remote table operations,
+//     see RemoteEntryRead() for the formation of the entry
+// cbDone -- Invoke at the end to notify operation in the DB as completed
+function markAsSynced(listRemoteEntries, cbDone)
+{
+  let self = this;
+
+  let entryIndex = 0;
+  let numCompleted = 0;
+  let requestCompleted = false;
+  let numEntries = listRemoteEntries.length;
+  for (entryIndex = 0; entryIndex < listRemoteEntries.length; ++entryIndex)
+  {
+    let entry = listRemoteEntries[entryIndex];
+    let entryHash = entry[0];  // First entry in the array is the hash (the key)
+    let cnt = entryIndex;  // A copy in the current scope
+
+    ++numCompleted;  // The number of expected completion callbacks
+    self.m_feeds.feedUpdateEntry(entryHash,
+        function(state, dbEntry)
+        {
+          if (state == 0)
+          {
+            utils_ns.assert(dbEntry.m_hash == entryHash, 'markEntriesAsSynched: bad data');
+
+            // Already in the state it needs to be?
+            if (dbEntry.m_remote_state == feeds_ns.RssSyncState.IS_SYNCED)
+            {
+              log.info(`rtHandlerEntries.markAsSynced: entry (${cnt}): [${entryHash}], ALREADY marked, skipping it`);
+              return 1;  // Don't record in the DB
+            }
+            else
+            {
+              dbEntry.m_remote_state = feeds_ns.RssSyncState.IS_SYNCED;
+              return 0;  // Record in the DB
+            }
+          }
+          else if (state == 1)
+          {
+            log.error(`db: update entry (${cnt}): [${entryHash}], error not found`);
+            return 1;  // Don't record in the DB
+          }
+
+          --numCompleted;
+
+          // Everything already marked?
+          if (requestCompleted && numCompleted == 0)
+          {
+            log.info(`markAsSynced: marked ${numEntries} as IS_SYNCED`);
+            cbDone();
+          }
+        });
+  }
+  requestCompleted = true;
+
+  // Check if the for() loop above ended up scheduling anything
+  if (numCompleted == 0)
+  {
+    // No changes in the IndexedDB
+    log.info(`rtHandlerEntries.markAsSynced:  Nothing needed to be marked as IS_SYNCED`);
+    cbDone();
+  }
+}
+rtHandlerEntries.prototype.markAsSynced = markAsSynced;
+
 // export to feeds_rt_entries_ns namespace
 feeds_rt_entries_ns.rtHandlerEntries = rtHandlerEntries;
 })();
