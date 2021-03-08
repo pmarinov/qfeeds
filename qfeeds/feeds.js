@@ -1067,7 +1067,7 @@ function handleRTEvent(self, event)
     if (event.tableName == 'rss_subscriptions')
     {
       log.info('feeds: Full sync of table `rss_subscriptions\'');
-      self.m_rtSubs.fullTableSync(self.m_rt, event.data, function ()
+      self.m_rtSubs.fullTableSync(event.cbSyncLocalTable, function ()
           {
             // Tell the event queue to proceeed with the next event
             self.m_rt.eventDone(event.tableName);
@@ -1076,6 +1076,28 @@ function handleRTEvent(self, event)
     else if (event.tableName == 'rss_entries_read')
     {
       log.info('feeds: Full sync of table `rss_entries_read\'');
+    }
+    else
+    {
+      utils_ns.assert(false,
+          "handleRTEvent: event for an invalid table '" + event.tableName + "'");
+    }
+  }
+  else if (event.event == 'ENTRY_UPDATE')
+  {
+    // Remote entries were updated (new values or deleted)
+    if (event.tableName == 'rss_subscriptions')
+    {
+      log.info('feeds: Full sync of table `rss_subscriptions\'');
+      self.m_rtSubs.handleEntryEvent(event.data, function ()
+          {
+            // Tell the event queue to proceeed with the next event
+            self.m_rt.eventDone(event.tableName);
+          });
+    }
+    else if (event.tableName == 'rss_entries_read')
+    {
+      log.info('feeds: Entry event of table `rss_entries_read\'');
     }
     else
     {
@@ -1743,7 +1765,7 @@ function p_feedRemoveDB(feedUrl, needsRTableSync)
         }
         else
         {
-            log.info('p_feedRemoveDB: entry was never in remote table: ' + feedUrl);
+            log.info('p_feedRemoveDB: sync to remote not reqested for: ' + feedUrl);
         }
 
         // Record exists, delete it

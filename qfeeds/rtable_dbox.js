@@ -84,6 +84,92 @@ function eventDone(remoteTableName)
 }
 RTables.prototype.eventDone = eventDone;
 
+// object RTables.syncLocalTable
+// Invoked as a call back to complete the synchronization of the local table,
+// it is fed the local table keys and it applies rtFull (the full remote table) against the local one by
+// generating events for each entry that needs to change (set or delete events)
+//
+// Params:
+// localTableKeys -- dictionary with all local keys and each value has
+//                   fields for synched and reserved set to 0
+function p_syncLocalTable(remoteTableName, localTableKeys, rtFull, cbDone)
+{
+  let self = this;
+  let ctx = self.m_rtables[remoteTableName].m_ctx;
+
+  // Generate event _updated_ for all remote entries
+  let x = 0;
+  let rtEntry = null;
+  let key = null;
+  let objList = [];
+  let updateObj = null;
+  for (x = 0; x < rtFull.length; ++x)
+  {
+    rtEntry = rtFull[x];
+    // Object for an event Updated
+    updateObj =
+      {
+        isDeleted: false,  // Operation is insert/update, not delete
+        data: rtEntry.slice(0)  // Clone the array
+      };
+    objList.push(updateObj);
+
+    key = rtEntry[0];  // URL of the feed
+    localTableKeys[key].reserved = 1;
+  }
+
+  // Generate event _deleted_ for all that were in local but
+  // not in the remote table
+  let keys = Object.keys(localTableKeys);
+  let index = 0;
+  objList = [];
+  for (x = 0; x < keys.length; ++x)
+  {
+    key = keys[x];  // key an URL of subscribed feed
+
+    if (localTableKeys[key].reserved == 1)  // RSS subscription is in local AND in remote
+      continue;                  // No need to delete
+
+    // Verify if the local entry has been sent to remote table
+    if (!localTableKeys[key].is_synced)  // Not synced to remote table?
+      continue;                        // It is only local, skip deleting
+
+    // Object for an event Deleted
+    // local[key] is in local, but no longer in the remote, IT NEEDS to be deleted
+    let simple_row = [];
+    simple_row.push(key);  // The row will have the key only
+    updateObj =
+      {
+        isDeleted: true,  // Operation is insert/update, not delete
+        data: simple_row.slice(0)  // Clone the array
+      };
+    objList.push(updateObj);
+  }
+
+  // Enqueue the list of entry updates as an event
+  ctx.events.runEvent({
+    event: 'ENTRY_UPDATE',
+    tableName: remoteTableName,
+    data: objList,
+    cbCompletion: function ()
+        {
+          // At this point the revision ID of the remote table
+          // is only stored in memory: ctxctx.freshRevFState
+          //
+          // Store this new remote revision into local storage
+          // (survives restarts)
+          g_utilsCB.setPref(ctx.prefRevFState, ctx.freshRevFState);
+          log.info(`dropbox: [${remoteTableName}] completed ENTRY_UPDATE for rev: ${ctx.freshRevFState}`);
+        }
+  });
+
+  if (cbDone)
+    cbDone();
+
+  log.info(`dropbox: [${remoteTableName}] applied full state from rev: ${ctx.freshRevFState}`);
+}
+RTables.prototype.p_syncLocalTable = p_syncLocalTable;
+
 // object RTables.p_rescheduleWriteBack
 function p_rescheduleWriteBack()
 {
@@ -604,6 +690,24 @@ function loadStateMachine(objRTables, remoteTableName)
         // apply it to local data state
         if (ctx.tempFullState.length > 0)
         {
+          let rtFull = ctx.tempFullState;
+
+          // Experimental:
+          ctx.events.runEvent({
+            event: 'SYNC_FULL_STATE',
+            tableName: ctx.tableName,
+            data: null,
+            cbSyncLocalTable: function(remoteTableName, localTableKeys, cbDone)
+                {
+                  // This function is invoked to complete the
+                  // operation of full sync of local tableonce we
+                  // already have the keys of the local entries
+                  objRTables.p_syncLocalTable(
+                      remoteTableName, localTableKeys, rtFull, cbDone);
+                }
+          });
+
+          if (false) {
           // Event: Initiate writing of full state from Dropbox into local table
           ctx.events.runEvent({
             event: 'SYNC_FULL_STATE',
@@ -620,6 +724,7 @@ function loadStateMachine(objRTables, remoteTableName)
                   log.info(`dropbox: [${remoteTableName}] applied full state from rev: ${ctx.freshRevFState}`);
                 }
           });
+          }
 
           // Full state has been consumed => free the memory
           ctx.tempFullState = [];
