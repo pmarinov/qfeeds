@@ -1076,6 +1076,11 @@ function handleRTEvent(self, event)
     else if (event.tableName == 'rss_entries_read')
     {
       log.info('feeds: Full sync of table `rss_entries_read\'');
+      self.m_rtEntries.fullTableSync(event.cbSyncLocalTable, function ()
+          {
+            // Tell the event queue to proceeed with the next event
+            self.m_rt.eventDone(event.tableName);
+          });
     }
     else
     {
@@ -1097,7 +1102,11 @@ function handleRTEvent(self, event)
     }
     else if (event.tableName == 'rss_entries_read')
     {
-      log.info('feeds: Entry event of table `rss_entries_read\'');
+      self.m_rtEntries.handleEntryEvent(event.data, function ()
+          {
+            // Tell the event queue to proceeed with the next event
+            self.m_rt.eventDone(event.tableName);
+          });
     }
     else
     {

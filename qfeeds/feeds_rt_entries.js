@@ -94,6 +94,133 @@ function fullTableWrite(rt, cbDone)
 }
 rtHandlerEntries.prototype.fullTableWrite = fullTableWrite;
 
+// object rtHandlerSubs.handleEntryEvent
+// Handle updates from the remote tables for 'rss_subscriptions'
+// (Entries added/set or deleted)
+function handleEntryEvent(records, cbDone)
+{
+  let self = this;
+
+  let numCompleted = 0;
+  let requestCompleted = false;
+  let k = 0;
+  let r = null;
+  for (k = 0; k < records.length; ++k)
+  {
+      let r = records[k];
+
+      // Skip operation if it is remote delete
+      // Local delete will take place when scheduled (entry is aged)
+      if (r.isDeleted)  // remotely deleted?
+        continue;
+
+      let rss_entry_hash = r.data[0];
+      let rss_feed_hash = r.data[1];
+      let is_read = r.data[2];
+      let strDate = r.data[3];
+
+      // Reflect the new state on the screen (if the feed is currently displayed)
+      self.m_feeds.m_feedsCB.onRemoteMarkAsRead(rss_entry_hash,
+          rss_feed_hash, is_read);
+
+      if (false)
+      {
+        // Deletion should be done when entries are expired in the local DB
+        // TOOD: REMOVE from here
+
+        // Check if the entry is too old and needs to be remove from the remote table (expired)
+        var dateEntry = utils_ns.parseStrictDateStr(strDate);
+        if (feeds_ns.isTooOldDate(dateEntry))
+        {
+          log.trace('Expire entry ' + strDate);
+          rt.deleteRec(self.m_rtName, rss_entry_hash);
+          self.p_incExpireCount();
+        }
+      }
+
+      ++numCompleted;  // The number of expected completion callbacks
+
+      // Apply new state in the IndexedDB
+      self.m_feeds.feedUpdateEntry(rss_entry_hash,
+          function(state, dbEntry)
+          {
+            --numCompleted;
+
+            // Everything already recorded?
+            if (requestCompleted && numCompleted == 0)
+            {
+              log.info(`rtHandlerSubs.handleEntryEvent: updated ${numCompleted} entries`);
+              cbDone();
+            }
+
+            if (state == 0)
+            {
+              utils_ns.assert(dbEntry.m_hash == rss_entry_hash, 'markAsRead: bad data');
+
+              if (dbEntry.m_is_read == is_read)  // Nothing changed?
+              {
+                log.trace("db: ('rss_data') update entry (" + rss_entry_hash + '): is_read = ' + is_read);
+                return 1;  // Don't record in the DB
+              }
+              else
+              {
+                dbEntry.m_is_read = is_read;
+                dbEntry.m_remote_state = feeds_ns.RssSyncState.IS_SYNCED;
+                return 0;  // Record in the DB
+              }
+            }
+            else if (state == 1)
+            {
+              log.trace("db: ('rss_data') update entry (" + rss_entry_hash + '): not found: put local placeholder');
+              // Create a pseudo entry -- only hash, date, m_remote_state and is_read are valid
+              dbEntry.m_hash = rss_entry_hash;
+              dbEntry.m_date = dateEntry;  // in Date object format
+              dbEntry.m_remote_state = feeds_ns.RssSyncState.IS_REMOTE_ONLY;
+              dbEntry.m_is_read = is_read;
+              dbEntry.m_title = '';
+              dbEntry.m_description = '';
+              dbEntry.m_link = '';
+              // TODO: when entry is fetched by the RSS loop, take care to respect IS_REMOTE_ONLY
+              // TODO: don't overwrite the m_is_read flag
+              return 0;
+            }
+          });
+  }
+  requestCompleted = true;
+
+  // Check if the for() loop above ended up scheduling anything
+  if (numCompleted == 0)
+  {
+    // No changes in the IndexedDB
+    log.info(`rtHandlerSubs.handleEntryEvent: Nothing done for ENTRY_UPDATED or all was synchronous`);
+    cbDone();
+  }
+}
+rtHandlerEntries.prototype.handleEntryEvent = handleEntryEvent;
+
+// object rtHandlerEntries.fullTableSync
+// (Full Sync) Apply a full remote state locally
+//
+// Params:
+// cbSynclocaltable -- Function of rtable, invoke to complete sync of
+//                     remote table by supplying the local keys
+// cbDone -- Chain in the completion callback
+function fullTableSync(cbSyncLocalTable, cbDone)
+{
+  let self = this;
+
+  // By not supplying the local entries we forgo deleting any local
+  // entries if they are not in the remote table. This is not a
+  // problem in the case of the RSS entries because they all age out
+  // and are deleted locally automatically
+  let localEntries = {};
+
+  // This operation will ONLY bring any new entries that are in the
+  // remote table (there will be no deletion events)
+  cbSyncLocalTable(self.m_rtName, localEntries, cbDone);
+}
+rtHandlerEntries.prototype.fullTableSync = fullTableSync;
+
 // object rtHandlerEntries.markAsSynced
 // Set remote status of all entries as IS_SYNCED into the local
 // Indexed DB

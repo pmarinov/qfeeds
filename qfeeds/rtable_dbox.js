@@ -115,6 +115,13 @@ function p_syncLocalTable(remoteTableName, localTableKeys, rtFull, cbDone)
     objList.push(updateObj);
 
     key = rtEntry[0];  // URL of the feed
+
+    if (localTableKeys[key] === undefined)  // No local keys fed into p_syncLocalTable()?
+    {
+      // Then assume all are not synced
+      localTableKeys[key] = {is_synced: false, reserved: 0};
+    }
+
     localTableKeys[key].reserved = 1;
   }
 
@@ -122,7 +129,6 @@ function p_syncLocalTable(remoteTableName, localTableKeys, rtFull, cbDone)
   // not in the remote table
   let keys = Object.keys(localTableKeys);
   let index = 0;
-  objList = [];
   for (x = 0; x < keys.length; ++x)
   {
     key = keys[x];  // key an URL of subscribed feed
