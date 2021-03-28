@@ -6,6 +6,8 @@
 # Then: make all
 # Help: make
 
+# Requires: GNU make, curl
+
 SHELL = /bin/bash
 
 # This was tested to work with version 4.1 of GNU Make
@@ -79,11 +81,13 @@ JS_LIBS = lib/bootstrap-3.2.0-dist/js/bootstrap.js \
 	 lib/loglevel.js \
 	 lib/sanitizer.js \
 	 lib/prism.js \
-	 lib/Dropbox-sdk.js
+	 lib/Dropbox-sdk.js \
+	 lib/Dropbox-sdk.js.map
 
 # Recursively list all web files
 # TODO: Move oauth_receiver files into a sub folder (if possible)
-find-web-files := -name "*.js" -o -name "*.html" -o -name "*.css" -o \
+find-web-files := -name "*.js" -o -name "*.js.map" -o \
+     -name "*.html" -o -name "*.css" -o \
      -name "*.png" -o -name "*.svg" -o \
 	 -name "*.eot" -o -name "*.ttf" -o -name "*.woff"
 app-files-find := $(shell find ./lib $(find-web-files)) \
