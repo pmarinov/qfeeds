@@ -100,11 +100,14 @@ https://developer.mozilla.org/en-US/docs/Archive/Add-ons/Setting_up_extension_de
 up extension development environment] (mozilla.org), see section
 "Firefox extension proxy file"
 
+* *Activate the extension* from page `about:addons`. Toggle the
+  enable/disable switch-box button for extension QFeeds.
+
 * Once *the setup of devel version is done* Firefox Developer Edition
   can be started conveniently with:
 +
 ....
-$ (cd ~/.local/bin/firefox; ./firefox;)&
+$ (cd ~/.local/bin/firefox; ./firefox&)
 ....
 
 * To *reload the extension* after edits, Ctrl+R
@@ -113,7 +116,11 @@ $ (cd ~/.local/bin/firefox; ./firefox;)&
 Edition
 
 * To be able to navigate the *source files* while in the Debugger set
-  the option "Enable browser and add-on debugging toolboxes" to ON
+  the option "Enable browser and add-on debugging toolboxes" to
+  ON. Restart the browser.
+
+* Alternative way to see the sources in the debugger is via the page
+  `about:debugging#/runtime/this-firefox`, button "Inspect" for QFeeds
 
 == Debug functions ==
 
