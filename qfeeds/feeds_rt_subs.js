@@ -157,7 +157,7 @@ function handleEntryEvent(records, cbDone)
             // Everything already recorded?
             if (requestCompleted && numCompleted == 0)
             {
-              log.info(`rtHandlerSubs.handleEntryEvent: marked ${numEntries} as IS_SYNCED`);
+              log.info(`rtHandlerSubs.handleEntryEvent: marked ${numCompleted} as IS_SYNCED`);
               cbDone();
             }
 

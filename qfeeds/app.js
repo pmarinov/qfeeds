@@ -55,7 +55,7 @@ function App()
         {
           log.info('app: message "oauthConnectToken"')
           // log.info('token: ' + request.content);
-          for (i = 0; i < self.m_hookAuthCompleted.length; ++i)
+          for (let i = 0; i < self.m_hookAuthCompleted.length; ++i)
             self.m_hookAuthCompleted[i](request.content)
         }
       });

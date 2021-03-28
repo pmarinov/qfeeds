@@ -249,6 +249,11 @@ ConnectDBox.prototype.p_setToken = p_setToken;
 
 // object ConnectDBox.p_completeOAuth
 // A callback to handle message from Dropbox's OAuth page
+//
+// To get here:
+// oauth_receiver_dbox.js, chrome.runtime.sendMessage() => app.js,
+// process message "oauthConnectToken" => invoke hook target
+// p_CompleteOAuth()
 function p_completeOAuth(self, token)
 {
   self.m_rawToken = token;
@@ -286,7 +291,9 @@ function dboxLoginLogout()
 
     self.m_client = new window.Dropbox.Dropbox({clientId: APIKEY});
     const fullReceiverPath =
-      'moz-extension://ccf49d46-563b-485a-a796-8c23da8278fd/qfeeds/oauth_receiver_dbox.html';
+      // TODO: why would the extension path change?
+      // 'moz-extension://ccf49d46-563b-485a-a796-8c23da8278fd/qfeeds/oauth_receiver_dbox.html';
+      'moz-extension://f4a98444-8d82-4036-a9a3-98fee281183e/qfeeds/oauth_receiver_dbox.html';
     let authUrl =
       self.m_client.getAuthenticationUrl(fullReceiverPath, 'zzclient', 'token');
 
