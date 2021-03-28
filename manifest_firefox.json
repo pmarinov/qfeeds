@@ -6,7 +6,7 @@
 "short_name": "qfeeds",
 "description": "Reader of RSS feeds",
 
-"applications":
+"browser_specific_settings":
 {
   "gecko":
   {
