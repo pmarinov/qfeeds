@@ -291,6 +291,17 @@ function markAsSynced(listRemoteEntries, cbDone)
 }
 rtHandlerEntries.prototype.markAsSynced = markAsSynced;
 
+// object rtHandlerEntries.insert
+// Schedules a row of data to be inserted in the remote table
+function insert(rssEntry)
+{
+  let self = this;
+
+  let newRemoteEntry = new RemoteEntryRead(rssEntry);
+  self.m_feeds.m_rt.insert('rss_entries_read', newRemoteEntry);
+}
+rtHandlerEntries.prototype.insert = insert;
+
 // export to feeds_rt_entries_ns namespace
 feeds_rt_entries_ns.rtHandlerEntries = rtHandlerEntries;
 })();

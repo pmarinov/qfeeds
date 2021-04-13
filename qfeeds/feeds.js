@@ -972,8 +972,7 @@ function p_rtableSyncEntryRead(rssEntry)
   }
   else
   {
-    let newRemoteEntry = new RemoteEntryRead(rssEntry);
-    self.m_rt.insert('rss_entries_read', newRemoteEntry);
+    self.m_rtEntries.insert(rssEntry)
   }
 }
 Feeds.prototype.p_rtableSyncEntryRead = p_rtableSyncEntryRead;

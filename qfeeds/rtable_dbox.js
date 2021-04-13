@@ -846,9 +846,9 @@ function RTables(rtables, cbEvents, cbDisplayProgress)
 
   self.m_rtables = {};
 
-  self.TAG_ACTION_INSERT = 1;  // Add new entry
-  self.TAG_ACTION_SET = 2;  // Set value for an entry (if it alredy exists locally)
-  self.TAG_ACTION_DELETE = 3;  // Delete
+  self.TAG_ACTION_INSERT = 'A';  // Add new entry
+  self.TAG_ACTION_SET = 'S';     // Set value for an entry (if it alredy exists locally)
+  self.TAG_ACTION_DELETE = 'D';  // Delete
 
   for (let i = 0; i < rtables.length; ++i)
   {
