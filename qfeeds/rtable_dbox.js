@@ -51,10 +51,9 @@ function reset(remoteTableName, tableRow)
   let self = this;
   let ctx = self.m_rtables[remoteTableName].m_ctx;
 
-  g_utilsCB.setPref(ctx.prefRevJournal, 'empty');
   g_utilsCB.setPref(ctx.prefRevFState, 'empty');
-  g_utilsCB.setPref(ctx.prefRevJournalRemoteJSON, '');
 
+  ctx.revJournal = 'empty';
   ctx.freshRevJournal = null;
   ctx.freshRevFState = null;
 
@@ -224,6 +223,10 @@ function writeBackHandler(self)
     if (ctx.newJournal.length == 0)
       continue;
 
+    // We need the remote journal in order to append (overwrite it)
+    if (!ctx.journalAcquired)
+      continue; // Acquisition of remote journal in progress
+
     // String presentation of all journal entries
     // (Append "new" after "remote")
     let entries = [];
@@ -240,9 +243,9 @@ function writeBackHandler(self)
 
     let writeMode = null;
     let strPrevVer = 'none';
-    let revJournal = g_utilsCB.getPref(ctx.prefRevJournal);
+    let revJournal = ctx.revJournal;
 
-    if (revJournal === undefined || revJournal == 'empty')
+    if (revJournal == 'empty')
     {
       // Journal file doesn't exist remotely
       writeMode = 'overwrite';
@@ -277,17 +280,22 @@ function writeBackHandler(self)
                 'prev: ' + strPrevVer + ', new: ' + response.rev);
 
               // Keep track of the new revision of the file on Dropbox
-              g_utilsCB.setPref(ctx.prefRevJournal, response.rev);
+              ctx.revJournal = response.rev;
 
               // Move newJournal[] at the end of remoteJournal[]
               for (let j = 0; j < ctx.newJournal.length; ++j)
                 ctx.remoteJournal.push(ctx.newJournal[j]);
 
               // Mark as saved (synced to remote)
+              // 1. Make a new table in the format of MARK_AS_SYNCED
+              let listSynced = []
+              for (let j = 0; j < ctx.newJournal.length; ++j)
+                listSynced.push(ctx.newJournal[j].m_row);
+              // 2. Queue the event
               ctx.events.runEvent({
                   event: 'MARK_AS_SYNCED',
                   tableName: ctx.tableName,
-                  data: ctx.newJournal.copy(),
+                  data: listSynced,
                   cbCompletion: null
               });
 
@@ -300,7 +308,7 @@ function writeBackHandler(self)
               {
                 // Data file doesn't exist on Dropbox
                 log.info('dropbox: revision conflict detected for "' + ctx.fnameJournal  + '"');
-                g_utilsCB.setPref(ctx.prefRevJournal, 'empty');
+                ctx.revJournal = 'empty';
               }
               else
               {
@@ -349,13 +357,11 @@ function loadStateMachine(objRTables, remoteTableName)
         let ctx = objRTables.m_rtables[remoteTableName].m_ctx;
 
         // Reset fresh revisions
-        ctx.freshRevJournal = null;
+        ctx.freshRevJournal = 'empty';
         ctx.freshRevFState = null;
 
         // Download remote full state (if any fresh detected)
         ctx.tempFullState = [];
-        ctx.tempJournal = [];  // Assume nothing new (for APPLY_REMOTE_STATE)
-        ctx.tempJournalJSON = null;
 
         // Start the state machine sequence
         state.advance('GET_REV_JOURNAL');
@@ -393,8 +399,7 @@ function loadStateMachine(objRTables, remoteTableName)
                   {
                     // Data file doesn't exist on Dropbox
                     log.info('dropbox: NOT FOUND detected for "' + baseName  + '"');
-                    g_utilsCB.setPref(ctx.prefRevJournal, 'empty');
-                    ctx.freshRevJournal = null;
+                    ctx.freshRevJournal = 'empty';
                   }
                   else
                   {
@@ -459,7 +464,7 @@ function loadStateMachine(objRTables, remoteTableName)
         let ctx = objRTables.m_rtables[remoteTableName].m_ctx;
         let shouldLoad = false;
 
-        if (ctx.freshRevJournal == null)
+        if (ctx.freshRevJournal == 'empty')
         {
           // No remote journal file
           log.info('dropbox: [' + remoteTableName + '] No remote journal');
@@ -469,10 +474,10 @@ function loadStateMachine(objRTables, remoteTableName)
         }
         else
         {
+          //
           // There is remote journal file, check if we need to load it
-
-          let revJournal = g_utilsCB.getPref(ctx.prefRevJournal);
-          if (revJournal === undefined || revJournal == 'empty')
+          let revJournal = ctx.revJournal;
+          if (revJournal == 'empty')
           {
             // Nothing held locally
             log.info('dropbox: [' + remoteTableName + '] No locally loaded remote journal (first time to load)');
@@ -484,18 +489,7 @@ function loadStateMachine(objRTables, remoteTableName)
             if (revJournal == ctx.freshRevJournal)
             {
               // Restore journal from locally stored string
-              log.info('dropbox: [' + remoteTableName + '] Restore from locally stored JSON');
-
-              let journalJSON = g_utilsCB.getPref(ctx.prefRevJournalRemoteJSON);
-              // TODO: Is this assert needed?
-              // utils_ns.assert(journalJSON !== undefined, "dropbox: Corrupted storage of " + ctx.prefRevJournalRemoteJSON);
-              if (journalJSON === undefined)
-              {
-                state.advance('IDLE');
-                return;
-              }
-
-              ctx.remoteJournal = JSON.parse(journalJSON);
+              log.info('dropbox: [' + remoteTableName + '] Use locally stored JSON');
 
               // Nothin to load (remote rev is the same as last time)
               state.advance('LOAD_DATA_FULL_STATE');
@@ -526,13 +520,6 @@ function loadStateMachine(objRTables, remoteTableName)
                     log.info('dropbox: filesDownload, journal, rev: ' + response.rev);
                     // console.info(response);
 
-                    // Store this new remote revision
-                    g_utilsCB.setPref(ctx.prefRevJournal, response.rev);
-
-                    // In the off-chance that remote rev has changed during
-                    // the steps in this state machine
-                    ctx.freshRevJournal = response.rev;
-
                     // Parse JSON and keep a copy in local ctx
                     let blob = response.fileBlob;
                     let reader = new FileReader();
@@ -542,8 +529,9 @@ function loadStateMachine(objRTables, remoteTableName)
                           // TODO: Check that essential fields are present
                           // TODO: Check that size makes sense
                           let data = JSON.parse(reader.result);
-                          ctx.tempJournal = data['entries'];
-                          ctx.tempJournalJSON = reader.result;
+                          // Store locally new version + journal contents
+                          ctx.freshRevJournal = response.rev;
+                          ctx.remoteJournal = data['entries'];
                           state.advance('LOAD_DATA_FULL_STATE');
                         });
                     // Activate listener "loadend"
@@ -578,13 +566,16 @@ function loadStateMachine(objRTables, remoteTableName)
         let ctx = objRTables.m_rtables[remoteTableName].m_ctx;
         let shouldLoad = false;
 
+        // Nothing loaded (yet)
+        ctx.tempFullState = [];
+
         if (ctx.freshRevFState == null)
         {
           // No remote full-state file
           log.info('dropbox: [' + remoteTableName + '] No remote full state file, write one');
 
-          // Nothin to load (remote file is not found)
-          state.advance('IDLE');
+          // Nothing to load, pass thrgouth no-op APPLY_REMOTE_STATE
+          state.advance('APPLY_REMOTE_STATE');
 
           // Clear local copy of remote journal
           // (prepare for full state write)
@@ -616,8 +607,8 @@ function loadStateMachine(objRTables, remoteTableName)
             {
               log.info('dropbox: [' + remoteTableName + '] No new full-state data, advance to IDLE');
 
-              // 2. Nothin to load (remote rev is the same as last time), advance
-              state.advance('IDLE');
+              // 2. Nothing to load, pass thrgouth no-op APPLY_REMOTE_STATE
+              state.advance('APPLY_REMOTE_STATE');
 
               // This step of the state machine is completed
               return;
@@ -678,9 +669,8 @@ function loadStateMachine(objRTables, remoteTableName)
         }
         else
         {
-          // Nothing to load in this state, move to the next
-          // TODO: IDLE or APPLY_REMOE_STATE?
-          state.advance('IDLE');
+          // Nothing to load, pass thrgouth no-op APPLY_REMOTE_STATE
+          state.advance('APPLY_REMOTE_STATE');
         }
       });
 
@@ -692,7 +682,7 @@ function loadStateMachine(objRTables, remoteTableName)
         let ctx = objRTables.m_rtables[remoteTableName].m_ctx;
 
         //
-        // If remote data was loaded it will be reflected in tempFullState and tempJournal,
+        // If remote data was loaded it will be reflected in tempFullState,
         // apply it to local data state
         if (ctx.tempFullState.length > 0)
         {
@@ -713,38 +703,19 @@ function loadStateMachine(objRTables, remoteTableName)
                 }
           });
 
-          if (false) {
-          // Event: Initiate writing of full state from Dropbox into local table
-          ctx.events.runEvent({
-            event: 'SYNC_FULL_STATE',
-            tableName: ctx.tableName,
-            data: ctx.tempFullState,
-            cbCompletion: function ()
-                {
-                  // At this point the revision ID of the remote table
-                  // is only stored in memory: ctxctx.freshRevFState
-                  //
-                  // Store this new remote revision into local storage
-                  // (survives restarts)
-                  g_utilsCB.setPref(ctx.prefRevFState, ctx.freshRevFState);
-                  log.info(`dropbox: [${remoteTableName}] applied full state from rev: ${ctx.freshRevFState}`);
-                }
-          });
-          }
-
           // Full state has been consumed => free the memory
           ctx.tempFullState = [];
         }
 
-        if (ctx.tempJournal.length > 0)
+        //
+        // Check if a journal was loaded and apply all the entries from it
+        // (all entries from ctx.remoteJournal[]
+        if (ctx.freshRevJournal != ctx.revJournal)
         {
-          // TODO: Apply
+          ctx.revJournal = ctx.freshRevJournal;
+          ctx.journalAcquired = true;
 
-          ctx.remoteJournal = ctx.tempJournal;
-
-          // JSON is preserved to be used between sessions
-          g_utilsCB.setPref(ctx.prefRevJournalRemoteJSON, ctx.tempJournalJSON);
-          ctx.tempJournal = [];
+          // TODO: Implement here iteration + application of journal entries
         }
         state.advance('IDLE');
       });
@@ -873,16 +844,15 @@ function RTables(rtables, cbEvents, cbDisplayProgress)
       // Name of the preference fields for local storage
       // [used with setPref()/getPref()]
       //
-      // Store revision of file journal
-      prefRevJournal: 'm_local.dbox.' + entry.name + '.journal.rev',
-      // Copy of journal JSON loaded from Dropbox
-      prefRevJournalRemoteJSON: 'm_local.dbox.' + entry.name + '.remote.journal.rev.json',
       // Store revision of file full-state
       prefRevFState: 'm_local.dbox.' + entry.name + '.fstate.rev',
 
+      journalAcquired: false,  // The first time
+      revJournal: 'empty',  // Not in local storage, only in memory
+
       // Freshly extracted versions (revisions)
-      freshRevJournal: null,
-      freshRevFState: null,
+      freshRevJournal: 'empty',
+      freshRevFState: 'empty',
 
       // Event handler
       cbEvents: cbEvents,
@@ -894,8 +864,6 @@ function RTables(rtables, cbEvents, cbDisplayProgress)
       // Full state
       // (Temporary, only until applied after load)
       tempFullState: [],
-      tempJournal: [],
-      tempJournalJSON: null,
 
       // Queue of events for the table
       events: null
