@@ -72,7 +72,7 @@ function eventDone(remoteTableName)
   let self = this;
   let ctx = self.m_rtables[remoteTableName].m_ctx;
 
-  log.info(`dropbox: [${remoteTableName}] event DONE, event: ${ctx.events.m_cur.event}`);
+  log.info(`dropbox: [${remoteTableName}] RTables.eventDone(), event: ${ctx.events.m_cur.event}`);
 
   // Completion callback
   if (ctx.events.m_cur.cbCompletion != null)
@@ -174,6 +174,66 @@ function p_syncLocalTable(remoteTableName, localTableKeys, rtFull, cbDone)
   log.info(`dropbox: [${remoteTableName}] applied full state from rev: ${ctx.freshRevFState}`);
 }
 RTables.prototype.p_syncLocalTable = p_syncLocalTable;
+
+// object RTables.p_applyJournal
+// Apply entries to local tabe via event ENTRY_UPDATE
+//
+// Params:
+//   journal -- remote table journal
+function p_applyJournal(remoteTableName, journal)
+{
+  let self = this;
+
+  let rtable = self.m_rtables[remoteTableName];
+  let ctx = rtable.m_ctx;
+
+  let x = 0;
+  let objList = [];
+  for (x = 0; x < journal.length; ++x)
+  {
+    let jEntry = journal[x];
+
+    // Object for an event
+    let updateObj =
+      {
+        isDeleted: false,  // Operation is insert/update, or delete
+        data: []  // Clone the array
+      };
+
+    // Is operation delete?
+    if (jEntry.m_action == self.TAG_ACTION_DELETE)
+    {
+      updateObj.isDeleted = true;
+    }
+
+    // Clone the array for a row of data
+    updateObj.data = jEntry.m_row.slice(0)
+
+    objList.push(updateObj);
+  }
+
+  // Enqueue the list of entry updates as an event
+  ctx.events.runEvent({
+    event: 'ENTRY_UPDATE',
+    tableName: remoteTableName,
+    data: objList,
+    cbCompletion: function ()
+        {
+          // TODO: WHAT?
+          if (false)
+          {
+          // At this point the revision ID of the remote table
+          // is only stored in memory: ctxctx.freshRevFState
+          //
+          // Store this new remote revision into local storage
+          // (survives restarts)
+          g_utilsCB.setPref(ctx.prefRevFState, ctx.freshRevFState);
+          }
+          log.info(`dropbox: [${remoteTableName}] completion cb for ENTRY_UPDATE for rev: ${ctx.freshRevFState}`);
+        }
+  })
+}
+RTables.prototype.p_applyJournal = p_applyJournal;
 
 // object RTables.p_rescheduleWriteBack
 function p_rescheduleWriteBack()
@@ -712,10 +772,10 @@ function loadStateMachine(objRTables, remoteTableName)
         // (all entries from ctx.remoteJournal[]
         if (ctx.freshRevJournal != ctx.revJournal)
         {
+          objRTables.p_applyJournal(remoteTableName, ctx.remoteJournal);
+
           ctx.revJournal = ctx.freshRevJournal;
           ctx.journalAcquired = true;
-
-          // TODO: Implement here iteration + application of journal entries
         }
         state.advance('IDLE');
       });
