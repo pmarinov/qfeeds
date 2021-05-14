@@ -51,6 +51,7 @@ function reset(remoteTableName, tableRow)
   let self = this;
   let ctx = self.m_rtables[remoteTableName].m_ctx;
 
+  g_utilsCB.setPref(ctx.prefRevJournal, 'empty');
   g_utilsCB.setPref(ctx.prefRevFState, 'empty');
 
   ctx.revJournal = 'empty';
@@ -180,7 +181,7 @@ RTables.prototype.p_syncLocalTable = p_syncLocalTable;
 //
 // Params:
 //   journal -- remote table journal
-function p_applyJournal(remoteTableName, journal)
+function p_applyJournal(remoteTableName, journal, cbDone)
 {
   let self = this;
 
@@ -219,17 +220,8 @@ function p_applyJournal(remoteTableName, journal)
     data: objList,
     cbCompletion: function ()
         {
-          // TODO: WHAT?
-          if (false)
-          {
-          // At this point the revision ID of the remote table
-          // is only stored in memory: ctxctx.freshRevFState
-          //
-          // Store this new remote revision into local storage
-          // (survives restarts)
-          g_utilsCB.setPref(ctx.prefRevFState, ctx.freshRevFState);
-          }
           log.info(`dropbox: [${remoteTableName}] completion cb for ENTRY_UPDATE for rev: ${ctx.freshRevFState}`);
+          cbDone();
         }
   })
 }
@@ -772,7 +764,24 @@ function loadStateMachine(objRTables, remoteTableName)
         // (all entries from ctx.remoteJournal[]
         if (ctx.freshRevJournal != ctx.revJournal)
         {
-          objRTables.p_applyJournal(remoteTableName, ctx.remoteJournal);
+          // Version of journal that was already applied to local indexedDB
+          //
+          // (We load remote journal at every startup, but apply only
+          // if prefRevJournal indicates a change)
+          let revAppliedJournal = g_utilsCB.getPref(ctx.prefRevJournal);
+          log.info('dropbox: [' + remoteTableName + '] revAppliedJournal: ' + revAppliedJournal);
+
+          if (ctx.freshRevJournal != revAppliedJournal)
+          {
+            log.info('dropbox: [' + remoteTableName + '] revAppliedJournal != freshRevJournal => apply new journal');
+
+            let revToApply = ctx.freshRevJournal;
+            objRTables.p_applyJournal(remoteTableName, ctx.remoteJournal, function ()
+                {
+                    // Journal applied, make a record that local indexed DB reflects that remote version
+                    g_utilsCB.setPref(ctx.prefRevJournal, revToApply);
+                });
+          }
 
           ctx.revJournal = ctx.freshRevJournal;
           ctx.journalAcquired = true;
@@ -904,6 +913,8 @@ function RTables(rtables, cbEvents, cbDisplayProgress)
       // Name of the preference fields for local storage
       // [used with setPref()/getPref()]
       //
+      // Store revision of file journal
+      prefRevJournal: 'm_local.dbox.' + entry.name + '.journal.rev',
       // Store revision of file full-state
       prefRevFState: 'm_local.dbox.' + entry.name + '.fstate.rev',
 
