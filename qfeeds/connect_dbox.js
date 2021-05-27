@@ -290,12 +290,24 @@ function dboxLoginLogout()
     log.info("dropbox: LoginLogout => login start");
 
     self.m_client = new window.Dropbox.Dropbox({clientId: APIKEY});
-    const fullReceiverPath =
+    const fullReceiverPathFirefox =
       // TODO: why would the extension path change?
       // 'moz-extension://ccf49d46-563b-485a-a796-8c23da8278fd/qfeeds/oauth_receiver_dbox.html';
       'moz-extension://f4a98444-8d82-4036-a9a3-98fee281183e/qfeeds/oauth_receiver_dbox.html';
-    let authUrl =
-      self.m_client.getAuthenticationUrl(fullReceiverPath, 'zzclient', 'token');
+    const fullReceiverPathChrome =
+      'chrome-extension://kdjijdhlleambcpendblfhdmpmfdbcbd/qfeeds/oauth_receiver_dbox.html';
+
+    let authUrl = null;
+    if (window.navigator.vendor == "Google Inc.")
+    {
+      log.info('OAuth on Google Chrome browser');
+      authUrl = self.m_client.getAuthenticationUrl(fullReceiverPathChrome, 'zzclient', 'token');
+    }
+    else
+    {
+      log.info('OAuth on Firefox browser');
+      authUrl = self.m_client.getAuthenticationUrl(fullReceiverPathFirefox, 'zzclient', 'token');
+    }
 
     chrome.tabs.create({ url: authUrl}, function (newTab)
         {
