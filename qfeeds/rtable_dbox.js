@@ -879,10 +879,97 @@ function writeFullState(tableName, entries, cbDone)
 }
 RTables.prototype.writeFullState = writeFullState;
 
+// Object RTables.p_fileExists()
+// Checks if a file exists on Dropbox
+//
+// Result is delivered via the callbac cbResult()
+function p_fileExists(fileName, cbResult)
+{
+  let self = this;
+
+  // Check if folder already exists
+  g_dbox.filesGetMetadata(
+      {
+        path: '/' + fileName,
+        include_media_info: false,
+        include_deleted: false,
+        include_has_explicit_shared_members: false
+      })
+      .then(function(response)
+          {
+            log.info('dropbox: p_fileExists for ' + fileName);
+            cbResult(true);
+            // console.log(response);
+          })
+      .catch(function(response)
+          {
+            if (response.status == 409 && response.error.error_summary.startsWith('path/not_found'))
+            {
+              // Data file doesn't exist on Dropbox
+              log.info('dropbox: p_fileExists, NOT FOUND detected for "' + fileName  + '"');
+            }
+            else
+            {
+              let msg = `dropbox: p_fileExists, ${fileName}, error: ${response.status}, summary: ${response.error}`;
+              log.error(response);
+
+              utils_ns.domError(msg);
+            }
+            cbResult(false);
+          });
+}
+RTables.prototype.p_fileExists = p_fileExists;
+
+// Object RTables.p_createFolder()
+// Creates a folder if it doesn't exist already
+function p_createFolder(folder, cbDone)
+{
+  let self = this;
+
+  self.p_fileExists(folder, function (folderExists)
+      {
+        if (folderExists)
+        {
+          // Nothing to do
+          log.info(`dropbox: p_createFolder, ${folder} exists, nothing to do`)
+          cbDone(true);
+        }
+        else
+        {
+          g_dbox.filesCreateFolderV2(
+              {
+                path: '/' + folder,
+                autorename: false
+              })
+              .then(function(response)
+                  {
+                    // console.log(response);
+                    log.info('dropbox: RTables.filesCreateFolderV2(' +
+                      response.metadata.path_display + '), OK');
+                    cbDone(true);
+                  })
+              .catch(function(response)
+                  {
+                    let msg = `dropbox: createfolderV2, ${folder}, error: ${response.status}, summary: ${response.error}`;
+                    log.error(response);
+
+                    utils_ns.domError(msg);
+
+                    // Callback FAILURE
+                    cbDone(false);
+                  });
+        }
+      });
+}
+RTables.prototype.p_createFolder = p_createFolder;
+
 // object RTables.RTable [constructor]
 function RTables(rtables, cbEvents, cbDisplayProgress)
 {
   let self = this;
+
+  // Create folder Profiles
+  self.p_createFolder('Profiles/Default', function (folderOK) {});
 
   self.m_rtables = {};
 
