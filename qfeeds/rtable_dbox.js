@@ -789,7 +789,7 @@ function loadStateMachine(objRTables, remoteTableName)
         state.advance('IDLE');
       });
 
-  // Set the state machine at initial state 'FULL_LOAD'
+  // Set the state machine at initial state 'START_FULL_LOAD'
   state.advance('START_FULL_LOAD');
   return state;
 }
@@ -801,9 +801,8 @@ function writeFullState(tableName, entries, cbDone)
   let self = this;
 
   let ctx = self.m_rtables[tableName].m_ctx;
-
-  // Why not use JSON.stringify() of the array?
-  // For debug purposes it is better to have our own output with ONE entry per line
+  // Q: Why not use JSON.stringify() of the array?
+  // A: For debug purposes it is better to have our own output with ONE entry per line
   // (open the .json files from Dropbox to examine)
   let strEntries = '[';
   let i = 0;
@@ -968,79 +967,87 @@ function RTables(rtables, cbEvents, cbDisplayProgress)
 {
   let self = this;
 
-  // Create folder Profiles
-  self.p_createFolder('Profiles/Default', function (folderOK) {});
-
-  self.m_rtables = {};
-
-  self.TAG_ACTION_INSERT = 'A';  // Add new entry
-  self.TAG_ACTION_SET = 'S';     // Set value for an entry (if it alredy exists locally)
-  self.TAG_ACTION_DELETE = 'D';  // Delete
-
-  for (let i = 0; i < rtables.length; ++i)
-  {
-    let entry = rtables[i];
-
-    self.m_rtables[entry.name] = {};
-    let rentry = self.m_rtables[entry.name];
-
-    // Context is shared between read and write state machines
-    rentry.m_ctx =
-    {
-      tableName: entry.name,
-
-      //
-      // Names of files to keep in Dropbox
-      fnameJournal: entry.name + '.journal.json',
-      fnameFState: entry.name + '.fstate.json',
-
-      formatVersion: entry.formatVersion,
-
-      //
-      // Name of the preference fields for local storage
-      // [used with setPref()/getPref()]
-      //
-      // Store revision of file journal
-      prefRevJournal: 'm_local.dbox.' + entry.name + '.journal.rev',
-      // Store revision of file full-state
-      prefRevFState: 'm_local.dbox.' + entry.name + '.fstate.rev',
-
-      journalAcquired: false,  // The first time
-      revJournal: 'empty',  // Not in local storage, only in memory
-
-      // Freshly extracted versions (revisions)
-      freshRevJournal: 'empty',
-      freshRevFState: 'empty',
-
-      // Event handler
-      cbEvents: cbEvents,
-
-      // Journals
-      remoteJournal: [],
-      newJournal: [],
-
-      // Full state
-      // (Temporary, only until applied after load)
-      tempFullState: [],
-
-      // Queue of events for the table
-      events: null
-    };
-
-    // Instantiate read and write state machines,
-    // one per remote table
-    rentry.m_readStateM = loadStateMachine(self, entry.name);
-
-    // EventQ, one per remote table
-    rentry.m_ctx.events =  new utils_ns.EventQ(function (event)
+  // Create folder Profiles if needed
+  self.p_createFolder('Profiles/Default', function (folderOK)
+      {
+        if (folderOK)
         {
-          self.p_eventHandler(self, entry.name, event);
-        });
-  }
+            self.m_rtables = {};
 
-  // Setup the handler of periodic write operations
-  self.m_writeBack = setTimeout(writeBackHandler, 5 * 1000, self);
-  self.m_writeBackInProgress = false;
+            self.TAG_ACTION_INSERT = 'A';  // Add new entry
+            self.TAG_ACTION_SET = 'S';     // Set value for an entry (if it alredy exists locally)
+            self.TAG_ACTION_DELETE = 'D';  // Delete
+
+            for (let i = 0; i < rtables.length; ++i)
+            {
+              let entry = rtables[i];
+
+              self.m_rtables[entry.name] = {};
+              let rentry = self.m_rtables[entry.name];
+
+              // Context is shared between read and write state machines
+              rentry.m_ctx =
+              {
+                tableName: entry.name,
+
+                //
+                // Names of files to keep in Dropbox
+                fnameJournal: entry.name + '.journal.json',
+                fnameFState: entry.name + '.fstate.json',
+
+                formatVersion: entry.formatVersion,
+
+                //
+                // Name of the preference fields for local storage
+                // [used with setPref()/getPref()]
+                //
+                // Store revision of file journal
+                prefRevJournal: 'm_local.dbox.' + entry.name + '.journal.rev',
+                // Store revision of file full-state
+                prefRevFState: 'm_local.dbox.' + entry.name + '.fstate.rev',
+
+                journalAcquired: false,  // The first time
+                revJournal: 'empty',  // Not in local storage, only in memory
+
+                // Freshly extracted versions (revisions)
+                freshRevJournal: 'empty',
+                freshRevFState: 'empty',
+
+                // Event handler
+                cbEvents: cbEvents,
+
+                // Journals
+                remoteJournal: [],
+                newJournal: [],
+
+                // Full state
+                // (Temporary, only until applied after load)
+                tempFullState: [],
+
+                // Queue of events for the table
+                events: null
+              };
+
+              // Instantiate read and write state machines,
+              // one per remote table
+              rentry.m_readStateM = loadStateMachine(self, entry.name);
+
+              // EventQ, one per remote table
+              rentry.m_ctx.events =  new utils_ns.EventQ(function (event)
+                  {
+                    self.p_eventHandler(self, entry.name, event);
+                  });
+            }
+
+            // Setup the handler of periodic write operations
+            self.m_writeBack = setTimeout(writeBackHandler, 5 * 1000, self);
+            self.m_writeBackInProgress = false;
+        }
+        else
+        {
+          // TODO: Show a dialog box for error
+        }
+      });
 
   return self;
 }
