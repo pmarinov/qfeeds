@@ -784,8 +784,12 @@ function loadStateMachine(objRTables, remoteTableName)
           }
 
           ctx.revJournal = ctx.freshRevJournal;
-          ctx.journalAcquired = true;
         }
+
+        // Flag that new journal entries can be written to disk
+        ctx.journalAcquired = true;
+
+        // Advance
         state.advance('IDLE');
       });
 
