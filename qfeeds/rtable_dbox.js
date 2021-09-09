@@ -318,7 +318,7 @@ function writeBackHandler(self)
     g_dbox.filesUpload(
         {
           contents: strAll,
-          path: '/' + ctx.fnameJournal,
+          path: ctx.profilePath + '/' + ctx.fnameJournal,
           mode: writeMode,
           strict_conflict: true,
           autorename: false,
@@ -428,7 +428,7 @@ function loadStateMachine(objRTables, remoteTableName)
 
         // Root is the App folder on Dropbox
         let baseName = ctx.fnameJournal;
-        let tableFName = '/' + baseName;
+        let tableFName = ctx.profilePath + '/' + baseName;
         g_dbox.filesGetMetadata(
             {
               path: tableFName,
@@ -471,7 +471,7 @@ function loadStateMachine(objRTables, remoteTableName)
 
         // Root is the App folder on Dropbox
         let baseName = ctx.fnameFState;
-        let tableFName = '/' + baseName;
+        let tableFName = ctx.profilePath + '/' + baseName;
         g_dbox.filesGetMetadata(
             {
               path: tableFName,
@@ -565,7 +565,7 @@ function loadStateMachine(objRTables, remoteTableName)
 
           g_dbox.filesDownload(
               {
-                path: '/' + ctx.fnameJournal,
+                path: ctx.profilePath + '/' + ctx.fnameJournal,
               })
               .then(function(response)
                   {
@@ -680,7 +680,7 @@ function loadStateMachine(objRTables, remoteTableName)
 
           g_dbox.filesDownload(
             {
-              path: '/' + ctx.fnameFState,
+              path: ctx.profilePath + '/' + ctx.fnameFState,
             })
             .then(function(response)
                 {
@@ -841,7 +841,7 @@ function writeFullState(tableName, entries, cbDone)
   g_dbox.filesUpload(
       {
         contents: strAll,
-        path: '/' + ctx.fnameFState,
+        path: ctx.profilePath + '/' + ctx.fnameFState,
         mode: writeMode,
         strict_conflict: true,
         autorename: false,
@@ -963,12 +963,12 @@ function p_createFolder(folder, cbDone)
 RTables.prototype.p_createFolder = p_createFolder;
 
 // object RTables.RTable [constructor]
-function RTables(rtables, cbEvents, cbDisplayProgress)
+function RTables(profile, rtables, cbEvents, cbDisplayProgress)
 {
   let self = this;
 
   // Create folder Profiles if needed
-  self.p_createFolder('Profiles/Default', function (folderOK)
+  self.p_createFolder('Profiles/' + profile, function (folderOK)
       {
         if (folderOK)
         {
@@ -992,6 +992,7 @@ function RTables(rtables, cbEvents, cbDisplayProgress)
 
                 //
                 // Names of files to keep in Dropbox
+                profilePath: '/Profiles/' + profile,
                 fnameJournal: entry.name + '.journal.json',
                 fnameFState: entry.name + '.fstate.json',
 

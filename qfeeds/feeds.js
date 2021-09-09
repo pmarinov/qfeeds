@@ -1176,7 +1176,8 @@ function rtableConnect(cbDisplayProgress)
   self.m_rtSubs = new feeds_rt_subs_ns.rtHandlerSubs(self, 'rss_subscriptions');
   self.m_rtEntries = new feeds_rt_entries_ns.rtHandlerEntries(self, 'rss_entries_read');
 
-  self.m_rt = new feeds_ns.RTables(tables, function (event)
+  // For now use profile 'Default'
+  self.m_rt = new feeds_ns.RTables('Default', tables, function (event)
       {
         handleRTEvent(self, event);
       });
