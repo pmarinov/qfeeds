@@ -46,7 +46,11 @@ function RemoteEntryRead(rssEntry)
   rss_entry_hash = rssEntry.m_hash;
 
   let h = rssEntry.m_rssurl_date.indexOf('_');
-  utils_ns.assert(h >= 0, "RemoteEntryRead: invalid rssurl_date hash");
+  if (h < 0)
+  {
+      log.info('error m_rssurl_date: ' + rssEntry.m_rssurl_date);
+      utils_ns.assert(h >= 0, "RemoteEntryRead: invalid rssurl_date hash");
+  }
   rss_feed_hash = rssEntry.m_rssurl_date.slice(0, h);
 
   is_read = rssEntry.m_is_read;
@@ -123,13 +127,14 @@ function handleEntryEvent(records, cbDone)
       self.m_feeds.m_feedsCB.onRemoteMarkAsRead(rss_entry_hash,
           rss_feed_hash, is_read);
 
+      let dateEntry = utils_ns.parseStrictDateStr(strDate);
+
       if (false)
       {
         // Deletion should be done when entries are expired in the local DB
         // TOOD: REMOVE from here
 
         // Check if the entry is too old and needs to be remove from the remote table (expired)
-        var dateEntry = utils_ns.parseStrictDateStr(strDate);
         if (feeds_ns.isTooOldDate(dateEntry))
         {
           log.trace('Expire entry ' + strDate);

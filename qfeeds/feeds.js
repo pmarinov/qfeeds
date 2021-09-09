@@ -92,7 +92,7 @@ function Feeds()
 }
 
 // object Feeds.setCbHandlers
-// Sets the set of callbacks for laod events from IndexedDB
+// Sets the set of callbacks for load events from IndexedDB
 // (This connects to the display methods in FeedsDir)
 function setCbHandlers(feedsCB)
 {
