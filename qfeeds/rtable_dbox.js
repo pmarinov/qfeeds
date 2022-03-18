@@ -657,7 +657,7 @@ function loadStateMachine(objRTables, remoteTableName)
             // We have both remote version AND local version
             if (revFState == ctx.freshRevFState)
             {
-              log.info('dropbox: [' + remoteTableName + '] No new full-state data, advance to IDLE');
+              log.info('dropbox: [' + remoteTableName + '] No new full-state data');
 
               // 2. Nothing to load, pass thrgouth no-op APPLY_REMOTE_STATE
               state.advance('APPLY_REMOTE_STATE');
@@ -786,10 +786,16 @@ function loadStateMachine(objRTables, remoteTableName)
           ctx.revJournal = ctx.freshRevJournal;
         }
 
+        //
+        // HERE: Place operations to be run prior the end of the state machine
+
         // Flag that new journal entries can be written to disk
         ctx.journalAcquired = true;
 
-        // Advance
+        // To IDLE
+        //
+        // (This should be the only place in the state machine to
+        // advance to IDLE, always the same path!)
         state.advance('IDLE');
       });
 

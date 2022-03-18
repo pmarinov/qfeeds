@@ -51,12 +51,16 @@ function App()
             return;
           self.m_feedsDir.p_feedView(request.feedData[0].href);
         }
-        if (request.msg == 'oauthConnectToken')
+        else if (request.msg == 'oauthURL')
         {
-          log.info('app: message "oauthConnectToken"')
-          // log.info('token: ' + request.content);
+          log.info('app: message "oauthURL"')
+          // log.info('url: ' + request.content);
           for (let i = 0; i < self.m_hookAuthCompleted.length; ++i)
             self.m_hookAuthCompleted[i](request.content)
+        }
+        else
+        {
+          log.info(`app: unknown message {request.msg}`)
         }
       });
 

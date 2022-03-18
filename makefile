@@ -71,9 +71,9 @@ lib/Dropbox-sdk.js:
 	mkdir -p lib
 	@echo "[ Downloading Dropbox-sdk.js ]"
 	cd lib && curl  --silent --remote-name --location \
-	    "https://unpkg.com/dropbox@4.0.3/dist/Dropbox-sdk.js"
+	    "https://unpkg.com/dropbox@10.12.0/dist/Dropbox-sdk.js"
 	cd lib && curl  --silent --remote-name --location \
-	    "https://unpkg.com/dropbox@4.0.3/dist/Dropbox-sdk.js.map"
+	    "https://unpkg.com/dropbox@10.12.0/dist/Dropbox-sdk.js.map"
 
 JS_LIBS = lib/bootstrap-3.2.0-dist/js/bootstrap.js \
      lib/jquery-2.0.2.js \
