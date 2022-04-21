@@ -18,6 +18,8 @@ if (typeof feeds_ns === 'undefined')
 {
 "use strict";
 
+const APIKEY = '25sck7n54cqhfq8';
+
 // object ConnectDBox.ConnectDBox [constructor]
 // Connect to Dropbox
 // - Connects to Dropbox if user is already authenticated
@@ -49,6 +51,34 @@ function ConnectDBox(cb, startWithLoggedIn)
   else
     // Assume it is an extension of Firefox
     self.m_fullReceiverPath = 'moz-extension://f4a98444-8d82-4036-a9a3-98fee281183e/qfeeds/oauth_receiver_dbox.html';
+
+  // Dropbox OAuth object
+  // SDK sources: https://github.com/dropbox/dropbox-sdk-js/blob/main/src/auth.js
+  self.m_dbxAuth = new window.Dropbox.Dropbox({clientId: APIKEY}).auth;
+
+  self.m_authUrl = null;
+  // Authentication URL (the new page/tab for user to go to for login into Dropbox)
+  if (window.navigator.vendor == "Google Inc.")
+  {
+    log.info('OAuth on Google Chrome browser');
+    authUrl = self.m_client.getAuthenticationUrl(self.m_fullReceiverPath, 'zzclient', 'token');
+  }
+  else
+  {
+    log.info('OAuth on Firefox browser');
+    self.m_dbxAuth.getAuthenticationUrl(
+            self.m_fullReceiverPath, // [redirectUri]
+            undefined,    // [state] To help prevent cross site scripting attacks.
+            'code',       // [authType] Auth type, defaults to 'token' or 'code'
+            'online',     // [tokenAccessType] null, 'legacy', 'online', 'offline'
+            undefined,    // [scope] Scopes to request for the grant
+            undefined,    // [includeGrantedScopes] 'user', 'team'
+            true          // [usePKCE]
+            )
+        .then(authUrl => {
+          self.m_authUrl = authUrl
+    })
+  }
 
   self.m_authToken = null;
   self.m_accountID = null;
@@ -212,6 +242,9 @@ function p_verifyLoginState()
 }
 ConnectDBox.prototype.p_verifyLoginState = p_verifyLoginState;
 
+// object ConnectDBox.p_parseQueryString
+//
+// Based on a function in Dropbox SDK examples
 function p_parseQueryString(str)
 {
   const ret = Object.create(null);
@@ -254,8 +287,6 @@ function p_parseQueryString(str)
 }
 ConnectDBox.prototype.p_parseQueryString = p_parseQueryString
 
-const APIKEY = '25sck7n54cqhfq8';
-
 // object ConnectDBox.p_obtainToken
 //
 // From a login code call Dropbox to obtain a token, the token can be
@@ -264,26 +295,46 @@ function p_obtainToken()
 {
   let self = this;
 
+  if (true)
+  {
+     self.m_authToken = 'sl.BEW0OHmOEy4FZh8kpquqr2dglBilrF7TZEqjv7c7fe8cGH8ghcY_U4vDY0DFYPUIuGje-qbnbuwdnVKJje-qZkXxnTE9VGFfcF4iFynHr8ibEpmU84VNcSI-rQgCmlvVl_7xcZs';
+     self.m_dbxAuth.setAccessToken(self.m_authToken);
+     self.m_client = new window.Dropbox.Dropbox({auth: self.m_dbxAuth});
+     // Obtain account info as a way to verify connection is good
+     self.p_verifyLoginState();
+  }
+  else
+  {
+  log.info('dropbox: p_obtainToken()');
   self.m_dbxAuth.getAccessTokenFromCode(self.m_fullReceiverPath, self.m_loginCode)
       .then(function(response) {
           console.log(response);
           self.m_authToken = response.result.access_token;
           self.m_dbxAuth.setAccessToken(response.result.access_token);
           self.m_client = new window.Dropbox.Dropbox({auth: self.m_dbxAuth});
+
+          // TODO: Remove this file access
           self.m_client.filesListFolder({path: ''})
                   .then(function(response) {
+                    log.info('dropbox: p_obtainToken(), files ok:');
                     console.log(response.result.entries);
                   })
                   .catch(function(error) {
+                    log.info('dropbox: p_obtainToken(), files error:');
                     console.error(error);
                   });
+
+          // Obtain account info as a way to verify connection is good
           self.p_verifyLoginState();
         })
       .catch(function(error) {
+          log.info('dropbox: p_obtainToken(), error:');
           console.error(error);
+          log.info('dropbox: p_obtainToken(), now p_TransitionToLoginPage():');
+          self.p_TransitionToLoginPage(self.m_authUrl);
         });
+  }
   return;
-
 }
 ConnectDBox.prototype.p_obtainToken = p_obtainToken;
 
@@ -347,34 +398,7 @@ function dboxLoginLogout()
   {
     log.info("dropbox: LoginLogout => login start");
 
-    // 1. Dropbox object
-    // SDK sources: https://github.com/dropbox/dropbox-sdk-js/blob/main/src/auth.js
-    self.m_dbxAuth = new window.Dropbox.Dropbox({clientId: APIKEY}).auth;
-
-    // 2. Authentication URL (the new page/tab for user to go to for login into Dropbox)
-    let authUrl = null;
-    if (window.navigator.vendor == "Google Inc.")
-    {
-      log.info('OAuth on Google Chrome browser');
-      authUrl = self.m_client.getAuthenticationUrl(self.m_fullReceiverPath, 'zzclient', 'token');
-    }
-    else
-    {
-      log.info('OAuth on Firefox browser');
-      self.m_dbxAuth.getAuthenticationUrl(
-              self.m_fullReceiverPath, // [redirectUri]
-              undefined,    // [state] To help prevent cross site scripting attacks.
-              'code',       // [authType] Auth type, defaults to 'token' or 'code'
-              'online',     // [tokenAccessType] null, 'legacy', 'online', 'offline'
-              undefined,    // [scope] Scopes to request for the grant
-              undefined,    // [includeGrantedScopes] 'user', 'team'
-              true          // [usePKCE]
-              )
-          .then(authUrl => {
-            self.p_TransitionToLoginPage(authUrl)
-      })
-    }
-
+    self.p_TransitionToLoginPage(self.m_authUrl);
   };
 }
 ConnectDBox.prototype.dboxLoginLogout = dboxLoginLogout;
