@@ -2,7 +2,7 @@
 "manifest_version": 2,
 
 "name": "QFeeds",
-"version": "0.12.0",
+"version": "0.13.0",
 "short_name": "qfeeds",
 "description": "Reader of RSS feeds",
 
@@ -30,20 +30,13 @@
 
 "permissions":
 [
-  "identity",
-  "identity.email",
-  "storage",
   "downloads",
   "tabs",
-  "https://ssl.gstatic.com/",
-  "https://www.googleapis.com/",
-  "https://www.google.com/",
-  "https://accounts.google.com/",
   "http://*/",
   "https://*/"
 ],
 
-"content_security_policy": "script-src 'self' https://apis.google.com https://drive.google.com; object-src 'self'",
+"content_security_policy": "script-src 'self'; object-src 'self'",
 
 "content_scripts": [ {
       "js": [ "chrome/sniff_common.js", "chrome/doc_start.js" ],
