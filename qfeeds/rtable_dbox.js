@@ -573,7 +573,7 @@ function loadStateMachine(objRTables, remoteTableName)
                     // console.info(response);
 
                     // Parse JSON and keep a copy in local ctx
-                    let blob = response.fileBlob;
+                    let blob = response.result.fileBlob;
                     let reader = new FileReader();
                     reader.addEventListener("loadend", function()
                         {
@@ -594,9 +594,18 @@ function loadStateMachine(objRTables, remoteTableName)
                     log.error('dropbox: filesDownload');
                     log.error(response);
 
-                    // Global error handler for all database errors
+                    // The error could have 2 sources
+                    //
+                    // 1: Dropbox error, then we have fields response.error.error_summary
+                    // 2: FileReader.readAsText(), then we have response.message
+                    let err_msg = '!response.message!'
+                    if (response.error !== undefined && response.error.error_summary !== undefined)
+                      err_msg = response.error.error_summary
+                    else
+                      err_msg = response.message;
+
                     utils_ns.domError("dropbox: filesDownload('" + ctx.fnameJournal + "'), " +
-                        "error: " + response.error.error_summary);
+                        "error: " + err_msg);
 
                     // Retry later
                     state.advance('IDLE');
@@ -692,7 +701,7 @@ function loadStateMachine(objRTables, remoteTableName)
                   ctx.freshRevFState = response.rev;
 
                   // Parse JSON and keep a copy in local ctx
-                  let blob = response.fileBlob;
+                  let blob = response.result.fileBlob;
                   let reader = new FileReader();
                   reader.addEventListener("loadend", function()
                       {
@@ -711,9 +720,18 @@ function loadStateMachine(objRTables, remoteTableName)
                   log.error('dropbox: filesDownload');
                   console.log(error);
 
-                  // Global error handler for all database errors
-                  utils_ns.domError("dropbox: filesDownload('" + ctx.fnameFState + "'), " +
-                      "error: " + response.error.error_summary);
+                  // The error could have 2 sources
+                  //
+                  // 1: Dropbox error, then we have fields response.error.error_summary
+                  // 2: FileReader.readAsText(), then we have response.message
+                  let err_msg = '!response.message!'
+                  if (response.error !== undefined && response.error.error_summary !== undefined)
+                    err_msg = response.error.error_summary
+                  else
+                    err_msg = response.message;
+
+                  utils_ns.domError("dropbox: filesDownload('" + ctx.fnameJournal + "'), " +
+                      "error: " + err_msg);
 
                   // Retry later
                   state.advance('IDLE');
