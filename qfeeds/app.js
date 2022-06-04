@@ -238,11 +238,15 @@ function p_setDefaultPref()
   // Keys that start with m_local stay only on the local machine
   if (prefs["m_local.app.logged_in"] === undefined)
     self.m_feedsDB.prefSet("m_local.app.logged_in", false);
+
+  // Dropbox profile folder named 'Default'
+  if (prefs["m_local.dbox.profile"] === undefined)
+    self.m_feedsDB.prefSet("m_local.dbox.profile", 'Default');
 }
 App.prototype.p_setDefaultPref = p_setDefaultPref;
 
 // object App.p_getHandlersRemoteStatus()
-// A bridge between GDrive status and other elements (UI or Database)
+// A bridge between Dropbox status and other elements (UI or Database)
 function p_getHandlersRemoteStatus()
 {
   var self = this;

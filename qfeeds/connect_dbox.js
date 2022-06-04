@@ -62,6 +62,7 @@ function ConnectDBox(cb, startWithLoggedIn)
   {
     log.info('OAuth on Google Chrome browser');
     authUrl = self.m_client.getAuthenticationUrl(self.m_fullReceiverPath, 'zzclient', 'token');
+    utils_ns.domError('Dropbox not yet tested!');
   }
   else
   {
@@ -70,7 +71,7 @@ function ConnectDBox(cb, startWithLoggedIn)
             self.m_fullReceiverPath, // [redirectUri]
             undefined,    // [state] To help prevent cross site scripting attacks.
             'code',       // [authType] Auth type, defaults to 'token' or 'code'
-            'online',     // [tokenAccessType] null, 'legacy', 'online', 'offline'
+            'offline',     // [tokenAccessType] null, 'legacy', 'online', 'offline'
             undefined,    // [scope] Scopes to request for the grant
             undefined,    // [includeGrantedScopes] 'user', 'team'
             true          // [usePKCE]

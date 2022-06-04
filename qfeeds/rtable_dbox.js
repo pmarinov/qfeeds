@@ -914,7 +914,7 @@ function p_fileExists(fileName, cbResult)
 {
   let self = this;
 
-  // Check if folder already exists
+  // Check if file exists
   g_dbox.filesGetMetadata(
       {
         path: '/' + fileName,
@@ -1075,6 +1075,8 @@ function RTables(profile, rtables, cbEvents, cbDisplayProgress)
         else
         {
           // TODO: Show a dialog box for error
+          log.error('Failed to create Profile folder');
+          utils_ns.domError('Failed to create Profile folder');
         }
       });
 
