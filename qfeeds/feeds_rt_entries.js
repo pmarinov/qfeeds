@@ -74,7 +74,7 @@ function fullTableWrite(rt, cbDone)
   let self = this;
   let all = [];
 
-  self.m_feeds.updateEntriesAll(
+  self.m_feeds.feedReadEntriesAll(
       function(rssEntry)
       {
         if (rssEntry == null)  // No more entries
@@ -84,6 +84,7 @@ function fullTableWrite(rt, cbDone)
                 if (cbDone != null)
                   cbDone(exitCode);
               });
+          // No next entry
           return 0;
         }
 
@@ -92,8 +93,8 @@ function fullTableWrite(rt, cbDone)
         // Collect it
         all.push(newRemoteEntry);
 
-        // No changes to the entry, move to the next
-        return 2;
+        // Continue with next
+        return 1;
       });
 }
 rtHandlerEntries.prototype.fullTableWrite = fullTableWrite;
@@ -160,6 +161,8 @@ function handleEntryEvent(records, cbDone)
 
             if (state == 0)
             {
+              // Entry with this hash exists in the local indexed DB
+              // Reflect the new state
               utils_ns.assert(dbEntry.m_hash == rss_entry_hash, 'markAsRead: bad data');
 
               if (dbEntry.m_is_read == is_read)  // Nothing changed?
@@ -176,6 +179,9 @@ function handleEntryEvent(records, cbDone)
             }
             else if (state == 1)
             {
+              // Entry with this hash doesn't exist in the local indexed DB
+              // Create a pseudo entry to reflect the remote data in it
+              // (Entries expire and are deleted after some time!)
               log.trace("db: ('rss_data') update entry (" + rss_entry_hash + '): not found: put local placeholder');
               // Create a pseudo entry -- only hash, date, m_remote_state and is_read are valid
               dbEntry.m_hash = rss_entry_hash;
@@ -185,6 +191,7 @@ function handleEntryEvent(records, cbDone)
               dbEntry.m_title = '';
               dbEntry.m_description = '';
               dbEntry.m_link = '';
+              dbEntry.m_rssurl_date = rss_entry_hash + "_" + utils_ns.dateToStrStrict(dateEntry);
               // TODO: when entry is fetched by the RSS loop, take care to respect IS_REMOTE_ONLY
               // TODO: don't overwrite the m_is_read flag
               return 0;
