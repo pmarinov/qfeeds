@@ -22,6 +22,7 @@ if (typeof feeds_ns === 'undefined')
 let g_connectionObj = null;
 let g_dbox = null;
 let g_utilsCB  = null;
+const g_journalMaxSize = 1024 * 4;
 
 function JournalEntry(tableRow, action)
 {
@@ -33,6 +34,9 @@ function JournalEntry(tableRow, action)
 
 // object RTables.insert()
 // Insert an entry into a remote table
+//
+// Entries are pushed into a vector and picked up
+// writeBackHandler()
 function insert(remoteTableName, tableRow)
 {
   let self = this;
@@ -53,8 +57,11 @@ function reset(remoteTableName, tableRow)
 
   g_utilsCB.setPref(ctx.prefRevJournal, 'empty');
   g_utilsCB.setPref(ctx.prefRevFState, 'empty');
+  log.info(`dropbox: [${remoteTableName}] reset: ${ctx.prefRevJournal}`);
+  log.info(`dropbox: [${remoteTableName}] reset: ${ctx.prefRevFState}`);
 
   ctx.revJournal = 'empty';
+  ctx.idJournal = 'empty';
   ctx.freshRevJournal = null;
   ctx.freshRevFState = null;
 
@@ -160,7 +167,7 @@ function p_syncLocalTable(remoteTableName, localTableKeys, rtFull, cbDone)
     cbCompletion: function ()
         {
           // At this point the revision ID of the remote table
-          // is only stored in memory: ctxctx.freshRevFState
+          // is only stored in memory: ctx.freshRevFState
           //
           // Store this new remote revision into local storage
           // (survives restarts)
@@ -256,8 +263,11 @@ RTables.prototype.p_eventHandler = p_eventHandler;
 // checks if local journals are dirty and sends them to Dropbox
 function writeBackHandler(self)
 {
+  // Only one operation active at a time,
+  // reschedule if still in the previous one
   if (self.m_writeBackInProgress)
   {
+    // This is unexpected
     self.p_rescheduleWriteBack();
     return;
   }
@@ -277,7 +287,7 @@ function writeBackHandler(self)
 
     // We need the remote journal in order to append (overwrite it)
     if (!ctx.journalAcquired)
-      continue; // Acquisition of remote journal in progress
+      continue; // Acquisition of remote journal still pending
 
     // String presentation of all journal entries
     // (Append "new" after "remote")
@@ -292,87 +302,148 @@ function writeBackHandler(self)
         '"formatVersion": ' + ctx.formatVersion + ',\n' +
         '"entries": [\n' + entries.join(',\n') + '\n]\n' +
       '}\n';
+    let lenStrAll = strAll.length;
 
-    let writeMode = null;
-    let strPrevVer = 'none';
-    let revJournal = ctx.revJournal;
+    // Record up to which entry in the journal is being sent to remote
+    // journal file
+    let markRecordPoint = ctx.newJournal.length;
 
-    if (revJournal == 'empty')
+    if (lenStrAll > g_journalMaxSize)
     {
-      // Journal file doesn't exist remotely
-      writeMode = 'overwrite';
-      log.info('dropbox: writeBackHandler() -- new journal');
+      log.info(`dropbox: writeBackHandler(${tableName}) journal size limit reached: ` +
+               `${lenStrAll} > ${g_journalMaxSize}`);
+      log.info(`dropbox: writeBackHandler(${tableName}), ${markRecordPoint} journal entries`);
+
+      // 1. Enqueue event SYNC_FULL_STATE
+      // (This will produce its own MARK_AS_SYNCED)
+      ctx.events.runEvent({
+          event: 'WRITE_FULL_STATE',
+          tableName: ctx.tableName,
+          data: null,
+          cbCompletion: function() {
+              // 2. Delete the entries up to markRecordPoint from ctx.newJournal[]
+              log.info(`dropbox: writeBackHandler(${tableName}), Delete ${markRecordPoint} journal entries`);
+              ctx.newJournal.splice(0, markRecordPoint);
+
+              // 3. Delete the journal file
+              log.info(`dropbox: writeBackHandler(${tableName}), delete journal file: ${ctx.fnameJournal}`);
+              log.info(`dropbox: writeBackHandler(${tableName}), filesDelete(${ctx.idJournal})`);
+              g_dbox.filesDeleteV2(
+                  {
+                    path: ctx.profilePath + '/' + ctx.fnameJournal,
+                  })
+                  .then(function(response)
+                      {
+                        log.info(`dropbox: writeBackHandler(${tableName}), filesDelete(${ctx.fnameJournal}), deleted OK`);
+                      })
+                  .catch(function(response)
+                      {
+                        log.error(response);
+
+                        // The error could have 2 sources
+                        //
+                        // 1: Dropbox error, then we have fields response.error.error_summary
+                        // 2: No-Dropbox error, then we have response.message
+                        let err_msg = '!response.message!'
+                        if (response.error !== undefined && response.error.error_summary !== undefined)
+                          err_msg = response.error.error_summary
+                        else
+                          err_msg = response.message;
+
+                        utils_ns.domError("dropbox: filesDelete('" + ctx.fnameJournal + "'), " +
+                            "error: " + err_msg);
+                      });
+          }
+      });
     }
     else
     {
-      // Overwrite an existing revision (revJournal)
-      // Make sure the version we have locally matches the remote one
-      log.info('dropbox: writeBackHandler() -- update journal rev: ' + revJournal);
-      writeMode =  {
-        '.tag': 'update',
-        'update': revJournal,
-      };
-      strPrevVer = String(revJournal);
-    }
+      let writeMode = null;
+      let strPrevVer = 'none';
+      let revJournal = ctx.revJournal;
 
-    g_dbox.filesUpload(
-        {
-          contents: strAll,
-          path: ctx.profilePath + '/' + ctx.fnameJournal,
-          mode: writeMode,
-          strict_conflict: true,
-          autorename: false,
-          mute: true
-        })
-        .then(function(response)
-            {
-              // console.log(response);
-              log.info('dropbox: RTables.writeBackHandler(' +
-                tableName + '), total dump length: ' + strAll.length + ', ' +
-                'prev: ' + strPrevVer + ', new: ' + response.rev);
+      if (revJournal == 'empty')
+      {
+        // Journal file doesn't exist remotely
+        writeMode = 'overwrite';
+        log.info('dropbox: writeBackHandler() -- new journal');
+      }
+      else
+      {
+        // Overwrite an existing revision (revJournal)
+        // Make sure the version we have locally matches the remote one
+        log.info('dropbox: writeBackHandler() -- update journal rev: ' + revJournal);
+        writeMode =  {
+          '.tag': 'update',
+          'update': revJournal,
+        };
+        strPrevVer = String(revJournal);
+      }
 
-              // Keep track of the new revision of the file on Dropbox
-              ctx.revJournal = response.rev;
+      g_dbox.filesUpload(
+          {
+            contents: strAll,
+            path: ctx.profilePath + '/' + ctx.fnameJournal,
+            mode: writeMode,
+            strict_conflict: true,
+            autorename: false,
+            mute: true
+          })
+          .then(function(response)
+              {
+                // console.log(response);
+                log.info('dropbox: RTables.writeBackHandler(' +
+                  tableName + '), total dump length: ' + strAll.length + ', ' +
+                  'prev: ' + strPrevVer + ', new: ' + response.result.rev);
 
-              // Move newJournal[] at the end of remoteJournal[]
-              for (let j = 0; j < ctx.newJournal.length; ++j)
-                ctx.remoteJournal.push(ctx.newJournal[j]);
+                // Keep track of the new revision of the file on Dropbox
+                ctx.revJournal = response.result.rev;
 
-              // Mark as saved (synced to remote)
-              // 1. Make a new table in the format of MARK_AS_SYNCED
-              let listSynced = []
-              for (let j = 0; j < ctx.newJournal.length; ++j)
-                listSynced.push(ctx.newJournal[j].m_row);
-              // 2. Queue the event
-              ctx.events.runEvent({
-                  event: 'MARK_AS_SYNCED',
-                  tableName: ctx.tableName,
-                  data: listSynced,
-                  cbCompletion: null
+                // Move newJournal[] at the end of remoteJournal[]
+                for (let j = 0; j < markRecordPoint; ++j)
+                  ctx.remoteJournal.push(ctx.newJournal[j]);
+
+                // Mark as saved (synced to remote)
+                // 1. Make a new table in the format of MARK_AS_SYNCED
+                let listSynced = []
+                for (let j = 0; j < markRecordPoint; ++j)
+                  listSynced.push(ctx.newJournal[j].m_row);
+
+                // 2. Delete the entries up to markRecordPoint from ctx.newJournal[]
+                ctx.newJournal.splice(0, markRecordPoint);
+
+                // 3. Queue the event
+                ctx.events.runEvent({
+                    event: 'MARK_AS_SYNCED',
+                    tableName: ctx.tableName,
+                    data: listSynced,
+                    cbCompletion: null
+                });
+
+                // Empty newJournal (everything is in remoteJournal now)
+                ctx.newJournal = [];
+              })
+          .catch(function(response)
+              {
+                if (response.status == 409 && response.error.error_summary.startsWith('path/conflict/file'))
+                {
+                  // Data file doesn't exist on Dropbox
+                  log.info('dropbox: revision conflict detected for "' + ctx.fnameJournal  + '"');
+                  ctx.revJournal = 'empty';
+                  ctx.idJournal = 'empty'
+                }
+                else
+                {
+                  log.error('dropbox: getMetadata for journal "' + ctx.fnameJournal + '"');
+                  log.error(response);
+                }
+
+                log.error('dropbox: filesUpload');
+                console.log(response);
+                // Callback FAILURE
+                // We will retry in the next iteration
               });
-
-              // Empty newJournal (everything is in remoteJournal now)
-              ctx.newJournal = [];
-            })
-        .catch(function(response)
-            {
-              if (response.status == 409 && response.error.error_summary.startsWith('path/conflict/file'))
-              {
-                // Data file doesn't exist on Dropbox
-                log.info('dropbox: revision conflict detected for "' + ctx.fnameJournal  + '"');
-                ctx.revJournal = 'empty';
-              }
-              else
-              {
-                log.error('dropbox: getMetadata for journal "' + ctx.fnameJournal + '"');
-                log.error(response);
-              }
-
-              log.error('dropbox: filesUpload');
-              console.log(response);
-              // Callback FAILURE
-              // We will retry in the next iteration
-            });
+    }
   }
 
   self.m_writeBackInProgress = false;
@@ -439,10 +510,12 @@ function loadStateMachine(objRTables, remoteTableName)
             .then(function(response)
                 {
                   log.info('dropbox: getMetadata for journal "' + baseName + '", '
-                      + 'rev: ' + response.rev + ', size: ' + response.size);
+                      + 'rev: ' + response.result.rev + ', size: ' + response.result.size + ', '
+                      + 'id: ' + response.result.id);
                   // console.log(response);
 
-                  ctx.freshRevJournal = response.rev;
+                  ctx.freshRevJournal = response.result.rev;
+                  ctx.idJournal = response.result.id;
                   state.advance('GET_REV_FSTATE');
                 })
             .catch(function(response)
@@ -482,10 +555,10 @@ function loadStateMachine(objRTables, remoteTableName)
             .then(function(response)
                 {
                   log.info('dropbox: getMetadata for fstate "' + baseName + '", '
-                      + 'rev: ' + response.rev + ', size: ' + response.size);
+                      + 'rev: ' + response.result.rev + ', size: ' + response.result.size);
                   // console.log(response);
 
-                  ctx.freshRevFState = response.rev;
+                  ctx.freshRevFState = response.result.rev;
                   state.advance('LOAD_DATA_JOURNAL');
                 })
             .catch(function(response)
@@ -531,7 +604,7 @@ function loadStateMachine(objRTables, remoteTableName)
           let revJournal = ctx.revJournal;
           if (revJournal == 'empty')
           {
-            // Nothing held locally
+            // Nothing held locally yet
             log.info('dropbox: [' + remoteTableName + '] No locally loaded remote journal (first time to load)');
             shouldLoad = true;
           }
@@ -540,8 +613,8 @@ function loadStateMachine(objRTables, remoteTableName)
             // We have both remote version AND local version
             if (revJournal == ctx.freshRevJournal)
             {
-              // Restore journal from locally stored string
-              log.info('dropbox: [' + remoteTableName + '] Use locally stored JSON');
+              // Journal should alredy be in ctx.remoteJournal
+              log.info('dropbox: [' + remoteTableName + '] Use the locally stored journal');
 
               // Nothin to load (remote rev is the same as last time)
               state.advance('LOAD_DATA_FULL_STATE');
@@ -569,7 +642,7 @@ function loadStateMachine(objRTables, remoteTableName)
               })
               .then(function(response)
                   {
-                    log.info('dropbox: filesDownload, journal, rev: ' + response.rev);
+                    log.info(`dropbox: [${remoteTableName}] filesDownload, journal, rev: ${response.result.rev}`);
                     // console.info(response);
 
                     // Parse JSON and keep a copy in local ctx
@@ -582,7 +655,7 @@ function loadStateMachine(objRTables, remoteTableName)
                           // TODO: Check that size makes sense
                           let data = JSON.parse(reader.result);
                           // Store locally new version + journal contents
-                          ctx.freshRevJournal = response.rev;
+                          ctx.freshRevJournal = response.result.rev;
                           ctx.remoteJournal = data['entries'];
                           state.advance('LOAD_DATA_FULL_STATE');
                         });
@@ -693,12 +766,12 @@ function loadStateMachine(objRTables, remoteTableName)
             })
             .then(function(response)
                 {
-                  log.info('dropbox: filesDownload, fstate, rev: ' + response.rev);
+                  log.info('dropbox: filesDownload, fstate, rev: ' + response.result.rev);
                   // console.info(response);
 
                   // In the off-chance that remote rev has changed during
                   // the steps in this state machine
-                  ctx.freshRevFState = response.rev;
+                  ctx.freshRevFState = response.result.rev;
 
                   // Parse JSON and keep a copy in local ctx
                   let blob = response.result.fileBlob;
@@ -879,10 +952,10 @@ function writeFullState(tableName, entries, cbDone)
           {
             console.info('RTables.writeFullState[' +
               tableName + '], total dump length: ' + strAll.length + ', ' +
-              'prev: ' + strPrevVer + ', new: ' + response.rev);
+              'prev: ' + strPrevVer + ', new: ' + response.result.rev);
 
             // Keep track of the new revision of the file on Dropbox
-            g_utilsCB.setPref(ctx.prefRevFState, response.rev);
+            g_utilsCB.setPref(ctx.prefRevFState, response.result.rev);
             // console.log(response);
 
             // Callback SUCCESS
@@ -1035,8 +1108,9 @@ function RTables(profile, rtables, cbEvents, cbDisplayProgress)
                 // Store revision of file full-state
                 prefRevFState: 'm_local.dbox.' + entry.name + '.fstate.rev',
 
-                journalAcquired: false,  // The first time
-                revJournal: 'empty',  // Not in local storage, only in memory
+                journalAcquired: false, // The first time
+                revJournal: 'empty',    // Not in yet in remote storage, only in memory
+                idJournal: 'empty',     // No file ID acquired yet
 
                 // Freshly extracted versions (revisions)
                 freshRevJournal: 'empty',

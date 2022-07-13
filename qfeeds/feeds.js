@@ -242,7 +242,8 @@ function prefReadAll(cbDone)
           return;  // no more entries
         }
         var hdr = dbCursor.value;
-        self.m_prefs[hdr.m_pref] = hdr.m_value
+        self.m_prefs[hdr.m_pref] = hdr.m_value;
+        log.info(`m_prefs[${hdr.m_pref}] = ${hdr.m_value}`);
       });
 }
 Feeds.prototype.prefReadAll = prefReadAll;
@@ -1889,6 +1890,7 @@ function feedResetRTableConnection()
   var self = this;
 
   self.m_rt.reset('rss_subscriptions');
+  self.m_rt.reset('rss_entries_read');
 }
 Feeds.prototype.feedResetRTableConnection = feedResetRTableConnection;
 

@@ -50,7 +50,7 @@ function ConnectDBox(cb, startWithLoggedIn)
     self.m_fullReceiverPath = 'chrome-extension://kdjijdhlleambcpendblfhdmpmfdbcbd/qfeeds/oauth_receiver_dbox.html';
   else
     // Assume it is an extension of Firefox
-    self.m_fullReceiverPath = 'moz-extension://f4a98444-8d82-4036-a9a3-98fee281183e/qfeeds/oauth_receiver_dbox.html';
+    self.m_fullReceiverPath = 'moz-extension://7c66eee6-25e1-4a23-a3d2-c6b1a6534d46/qfeeds/oauth_receiver_dbox.html';
 
   // Dropbox OAuth object
   // SDK sources: https://github.com/dropbox/dropbox-sdk-js/blob/main/src/auth.js

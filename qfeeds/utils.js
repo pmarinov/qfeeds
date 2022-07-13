@@ -455,6 +455,8 @@ function runEvent(event)
   // If an event is in progress, add event to the queue
   if (self.m_cur != null)
   {
+    console.log(self.m_cur);
+    console.log('EventQ.runEvent(): Another event is in progress, adding to the queue');
     self.m_events.push(event);
     return;
   }
