@@ -46,11 +46,7 @@ function ConnectDBox(cb, startWithLoggedIn)
   self.m_dbxAuth = null;
   self.m_loginCode = null;  // Short-lived, obtain an Auth token with it
       
-  if (window.navigator.vendor == "Google Inc.")
-    self.m_fullReceiverPath = 'chrome-extension://kdjijdhlleambcpendblfhdmpmfdbcbd/qfeeds/oauth_receiver_dbox.html';
-  else
-    // Assume it is an extension of Firefox
-    self.m_fullReceiverPath = 'moz-extension://7c66eee6-25e1-4a23-a3d2-c6b1a6534d46/qfeeds/oauth_receiver_dbox.html';
+  self.m_fullReceiverPath = browser.identity.getRedirectURL();
 
   // Dropbox OAuth object
   // SDK sources: https://github.com/dropbox/dropbox-sdk-js/blob/main/src/auth.js
@@ -58,28 +54,19 @@ function ConnectDBox(cb, startWithLoggedIn)
 
   self.m_authUrl = null;
   // Authentication URL (the new page/tab for user to go to for login into Dropbox)
-  if (window.navigator.vendor == "Google Inc.")
-  {
-    log.info('OAuth on Google Chrome browser');
-    authUrl = self.m_client.getAuthenticationUrl(self.m_fullReceiverPath, 'zzclient', 'token');
-    utils_ns.domError('Dropbox not yet tested!');
-  }
-  else
-  {
-    log.info('OAuth on Firefox browser');
-    self.m_dbxAuth.getAuthenticationUrl(
-            self.m_fullReceiverPath, // [redirectUri]
-            undefined,    // [state] To help prevent cross site scripting attacks.
-            'code',       // [authType] Auth type, defaults to 'token' or 'code'
-            'offline',     // [tokenAccessType] null, 'legacy', 'online', 'offline'
-            undefined,    // [scope] Scopes to request for the grant
-            undefined,    // [includeGrantedScopes] 'user', 'team'
-            true          // [usePKCE]
-            )
-        .then(authUrl => {
-          self.m_authUrl = authUrl
-    })
-  }
+  log.info('OAuth on Firefox browser');
+  self.m_dbxAuth.getAuthenticationUrl(
+          self.m_fullReceiverPath, // [redirectUri]
+          undefined,    // [state] To help prevent cross site scripting attacks.
+          'code',       // [authType] Auth type, defaults to 'token' or 'code'
+          'offline',     // [tokenAccessType] null, 'legacy', 'online', 'offline'
+          undefined,    // [scope] Scopes to request for the grant
+          undefined,    // [includeGrantedScopes] 'user', 'team'
+          true          // [usePKCE]
+          )
+      .then(authUrl => {
+        self.m_authUrl = authUrl
+  })
 
   self.m_authToken = null;
   self.m_accountID = null;
@@ -170,6 +157,8 @@ ConnectDBox.prototype.p_dboxSetLoginButton = p_dboxSetLoginButton;
 function p_setLoggedOut()
 {
   let self = this;
+
+  log.info('p_setLoggedOut()');
 
   self.m_authenticated = false;
   self.m_loginCode = null;
@@ -386,6 +375,7 @@ function p_verifyToken()
   }
   else
   {
+    log.info('dropbox: p_verifyToken(), token is null');
     self.p_obtainToken();
   }
   return;
@@ -428,11 +418,44 @@ function p_TransitionToLoginPage(authUrl)
 {
   let self = this;
 
-  chrome.tabs.create({ url: authUrl}, function (newTab)
-      {
-        self.m_authenticationTab = newTab.id;
-        log.info('dropbox: New tab for authentication of Dropbox: ' + newTab.id);
+  browser.identity.launchWebAuthFlow({
+          url: authUrl,
+          interactive: true  // TODO: set it to true if this if user clicking 'Login'
+      })
+      .then(function(urlDropbox) {
+          // urlDropbox will be something such as:
+          // 4ff35ebcb[...].extensions.allizom.org/?code=40hlwLAb[...]
+          let q = self.p_parseQueryString(urlDropbox);
+          if (q.code === undefined)
+          {
+            let msg = `dropbox: missing code, login failed, url: ${urlDropbox}`;
+            log.error(msg);
+            utils_ns.domError(msg);
+            self.p_setLoggedOut();
+            return;
+          }
+          self.m_loginCode = q.code;
+
+          // Store login code in localStorage
+          // localstorage:dropbox.code=self.m_LoginCode
+          localStorage.setItem(self.m_dboxLoginCodeKey, self.m_loginCode);
+
+          // From a login code call Dropbox to obtain a token
+          log.info(`dropbox: Login OK, verify that token works`)
+          self.p_verifyToken();
+          })
+      .catch(function(error) {
+          let msg = `dropbox: ${error}`; 
+          log.error(msg)
+          utils_ns.domError(msg);
+          self.p_setLoggedOut();
       });
+
+  // chrome.tabs.create({ url: authUrl}, function (newTab)
+  //     {
+  //       self.m_authenticationTab = newTab.id;
+  //       log.info('dropbox: New tab for authentication of Dropbox: ' + newTab.id);
+  //     });
 }
 ConnectDBox.prototype.p_TransitionToLoginPage = p_TransitionToLoginPage;
 

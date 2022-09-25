@@ -28,6 +28,7 @@
 
 "permissions":
 [
+  "identity",
   "downloads",
   "tabs",
   "http://*/",

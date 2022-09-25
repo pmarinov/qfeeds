@@ -122,6 +122,8 @@ Edition
 * Alternative way to see the sources in the debugger is via the page
   `about:debugging#/runtime/this-firefox`, button "Inspect" for QFeeds
 
+* Go to `about:debugging` to inspect the UUID of the extension
+
 == Debug functions ==
 
 From the browser's console can be invoked a list of debug functions
