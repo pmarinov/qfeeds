@@ -45,8 +45,13 @@ function ConnectDBox(cb, startWithLoggedIn)
   self.m_client = null;
   self.m_dbxAuth = null;
   self.m_loginCode = null;  // Short-lived, obtain an Auth token with it
-      
-  self.m_fullReceiverPath = browser.identity.getRedirectURL();
+
+  if (typeof browser !== 'undefined')
+    // Firefox
+    self.m_fullReceiverPath = browser.identity.getRedirectURL();
+  else
+    // Chrome
+    self.m_fullReceiverPath = chrome.identity.getRedirectURL();
 
   // Dropbox OAuth object
   // SDK sources: https://github.com/dropbox/dropbox-sdk-js/blob/main/src/auth.js
@@ -391,11 +396,10 @@ ConnectDBox.prototype.p_verifyToken = p_verifyToken;
 // p_CompleteOAuth()
 function p_completeOAuth(self, oauthURL)
 {
-  utils_ns.assert(self.m_authenticationTab >= 0, 'p_completeOAuth: invalid tab id ' + self.m_authenticationTab);
-
-  log.info('dropbox: p_completeOAuth(), closing tab#: ' + self.m_authenticationTab);
-  chrome.tabs.remove(self.m_authenticationTab);
-  self.m_authenticationTab = -1;
+  // utils_ns.assert(self.m_authenticationTab >= 0, 'p_completeOAuth: invalid tab id ' + self.m_authenticationTab);
+  // log.info('dropbox: p_completeOAuth(), closing tab#: ' + self.m_authenticationTab);
+  // chrome.tabs.remove(self.m_authenticationTab);
+  // self.m_authenticationTab = -1;
 
   let q = self.p_parseQueryString(oauthURL);
   if (q.code === undefined)
@@ -411,6 +415,7 @@ function p_completeOAuth(self, oauthURL)
   localStorage.setItem(self.m_dboxLoginCodeKey, self.m_loginCode);
 
   // From a login code call Dropbox to obtain a token
+  log.info(`dropbox: Login OK, verify that token works`)
   self.p_verifyToken();
 }
 
@@ -418,38 +423,35 @@ function p_TransitionToLoginPage(authUrl)
 {
   let self = this;
 
-  browser.identity.launchWebAuthFlow({
-          url: authUrl,
-          interactive: true  // TODO: set it to true if this if user clicking 'Login'
-      })
-      .then(function(urlDropbox) {
-          // urlDropbox will be something such as:
-          // 4ff35ebcb[...].extensions.allizom.org/?code=40hlwLAb[...]
-          let q = self.p_parseQueryString(urlDropbox);
-          if (q.code === undefined)
-          {
-            let msg = `dropbox: missing code, login failed, url: ${urlDropbox}`;
-            log.error(msg);
+  if (typeof browser !== 'undefined')
+  {
+    // Firefox
+    browser.identity.launchWebAuthFlow({
+            url: authUrl,
+            interactive: true  // TODO: set it to true if this if user clicking 'Login'
+        })
+        .then(function(urlDropbox) {
+            // urlDropbox will be something such as:
+            // 4ff35ebcb[...].extensions.allizom.org/?code=40hlwLAb[...]
+            p_completeOAuth(self, urlDropbox); 
+        })
+        .catch(function(error) {
+            let msg = `dropbox: ${error}`; 
+            log.error(msg)
             utils_ns.domError(msg);
             self.p_setLoggedOut();
-            return;
-          }
-          self.m_loginCode = q.code;
-
-          // Store login code in localStorage
-          // localstorage:dropbox.code=self.m_LoginCode
-          localStorage.setItem(self.m_dboxLoginCodeKey, self.m_loginCode);
-
-          // From a login code call Dropbox to obtain a token
-          log.info(`dropbox: Login OK, verify that token works`)
-          self.p_verifyToken();
-          })
-      .catch(function(error) {
-          let msg = `dropbox: ${error}`; 
-          log.error(msg)
-          utils_ns.domError(msg);
-          self.p_setLoggedOut();
-      });
+        });
+  }
+  else
+  {
+    // Chrome
+    chrome.identity.launchWebAuthFlow({
+            url: authUrl,
+            interactive: true  // TODO: set it to true if this if user clicking 'Login'
+        }, function(urlDropbox) {
+            p_completeOAuth(self, urlDropbox); 
+        });
+  }
 
   // chrome.tabs.create({ url: authUrl}, function (newTab)
   //     {
