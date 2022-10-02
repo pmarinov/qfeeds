@@ -20,12 +20,6 @@
   "128": "chrome/icon_rss.png"
 },
 
-"web_accessible_resources":
-[
-  "qfeeds/oauth_receiver_dbox.html",
-  "qfeeds/oauth_receiver_dbox.js"
-],
-
 "permissions":
 [
   "identity",
