@@ -75,7 +75,7 @@ RTables.prototype.reset = reset;
 // object RTables.eventDone()
 // The current event has been processed, trigger the next event (if
 // any is pending) for the table
-function eventDone(remoteTableName)
+function eventDone(remoteTableName, operation_exit_code)
 {
   let self = this;
   let ctx = self.m_rtables[remoteTableName].m_ctx;
@@ -164,7 +164,7 @@ function p_syncLocalTable(remoteTableName, localTableKeys, rtFull, cbDone)
     event: 'ENTRY_UPDATE',
     tableName: remoteTableName,
     data: objList,
-    cbCompletion: function ()
+    cbCompletion: function (exit_code)
         {
           // At this point the revision ID of the remote table
           // is only stored in memory: ctx.freshRevFState
@@ -225,7 +225,7 @@ function p_applyJournal(remoteTableName, journal, cbDone)
     event: 'ENTRY_UPDATE',
     tableName: remoteTableName,
     data: objList,
-    cbCompletion: function ()
+    cbCompletion: function (exit_code)
         {
           log.info(`dropbox: [${remoteTableName}] completion cb for ENTRY_UPDATE for rev: ${ctx.freshRevFState}`);
           cbDone();
@@ -267,14 +267,23 @@ function writeBackHandler(self)
   // reschedule if still in the previous one
   if (self.m_writeBackInProgress)
   {
-    // This is unexpected
+    ++self.m_progressCnt;
+    if (self.m_progressCnt > 3)
+    {
+      utils_ns.domError('dropbox: writeBackHandler() failed to complete');
+      return;
+    }
+
     self.p_rescheduleWriteBack();
     return;
   }
 
   self.m_writeBackInProgress = true;
+  self.m_progressCnt = 0;
 
+  // Go over all remote tables
   let tableNames = Object.keys(self.m_rtables);
+  let scheduled = false;
   for (let i = 0; i < tableNames.length; ++i)
   {
     let tableName = tableNames[i];
@@ -310,22 +319,40 @@ function writeBackHandler(self)
 
     if (lenStrAll > g_journalMaxSize)
     {
+      // Threshold reached:
+      //
+      // The full data representation is full state file + and journal
+      // file, it is time to move all journal entries into the full state file
+      //
+      // The journal entries are already applied in the local
+      // IndexedDB, we can write via a WRITE_FULL_STATE, and then
+      // delete the journal file
+
       log.info(`dropbox: writeBackHandler(${tableName}) journal size limit reached: ` +
                `${lenStrAll} > ${g_journalMaxSize}`);
       log.info(`dropbox: writeBackHandler(${tableName}), ${markRecordPoint} journal entries`);
 
-      // 1. Enqueue event SYNC_FULL_STATE
+      // == 1 == Enqueue event SYNC_FULL_STATE
       // (This will produce its own MARK_AS_SYNCED)
+      scheduled = true;
       ctx.events.runEvent({
           event: 'WRITE_FULL_STATE',
           tableName: ctx.tableName,
           data: null,
-          cbCompletion: function() {
-              // 2. Delete the entries up to markRecordPoint from ctx.newJournal[]
+          cbCompletion: function(exit_code) {
+              if (code != 0)
+              {
+                // Ended in error
+                // Then this is the end of the callback operation
+                self.m_writeBackInProgress = false;
+                return;
+              }
+
+              // == 2 == Delete the entries up to markRecordPoint from ctx.newJournal[]
               log.info(`dropbox: writeBackHandler(${tableName}), Delete ${markRecordPoint} journal entries`);
               ctx.newJournal.splice(0, markRecordPoint);
 
-              // 3. Delete the journal file
+              // == 3 == Delete the journal file
               log.info(`dropbox: writeBackHandler(${tableName}), delete journal file: ${ctx.fnameJournal}`);
               log.info(`dropbox: writeBackHandler(${tableName}), filesDelete(${ctx.idJournal})`);
               g_dbox.filesDeleteV2(
@@ -334,10 +361,17 @@ function writeBackHandler(self)
                   })
                   .then(function(response)
                       {
+                        // The end of the callback operation
+                        self.m_writeBackInProgress = false;
+
+                        // Log it
                         log.info(`dropbox: writeBackHandler(${tableName}), filesDelete(${ctx.fnameJournal}), deleted OK`);
                       })
                   .catch(function(response)
                       {
+                        // The end of the callback operation
+                        self.m_writeBackInProgress = false;
+
                         log.error(response);
 
                         // The error could have 2 sources
@@ -380,6 +414,7 @@ function writeBackHandler(self)
         strPrevVer = String(revJournal);
       }
 
+      scheduled = true;
       g_dbox.filesUpload(
           {
             contents: strAll,
@@ -422,9 +457,15 @@ function writeBackHandler(self)
 
                 // Empty newJournal (everything is in remoteJournal now)
                 ctx.newJournal = [];
+
+                // The end of the callback operation
+                self.m_writeBackInProgress = false;
               })
           .catch(function(response)
               {
+                // The end of the callback operation
+                self.m_writeBackInProgress = false;
+
                 if (response.status == 409 && response.error.error_summary.startsWith('path/conflict/file'))
                 {
                   // Data file doesn't exist on Dropbox
@@ -444,9 +485,19 @@ function writeBackHandler(self)
                 // We will retry in the next iteration
               });
     }
+
+    // Only one pending call-back operation at a time
+    if (scheduled)
+      break;
+  }  // for (let i = 0; i < tableNames.length; ++i)
+
+  if (!scheduled)
+  {
+    // The loop didn't schedule any operations that will complete
+    // later in a callbacks
+    self.m_writeBackInProgress = false;
   }
 
-  self.m_writeBackInProgress = false;
   self.p_rescheduleWriteBack();
 }
 
@@ -1145,6 +1196,7 @@ function RTables(profile, rtables, cbEvents, cbDisplayProgress)
             // Setup the handler of periodic write operations
             self.m_writeBack = setTimeout(writeBackHandler, 5 * 1000, self);
             self.m_writeBackInProgress = false;
+            self.m_progressCnt = 0;  // Counts the attempts that pending operation didn't complete
         }
         else
         {

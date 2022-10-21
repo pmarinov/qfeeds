@@ -1032,7 +1032,7 @@ function handleRTEvent(self, event)
       self.m_rtSubs.fullTableWrite(self.m_rt, function (code)
           {
             // Tell the event queue to proceeed with the next event
-            self.m_rt.eventDone(event.tableName);
+            self.m_rt.eventDone(event.tableName, code);
 
             if (code == 0)
             {
@@ -1046,7 +1046,7 @@ function handleRTEvent(self, event)
       self.m_rtEntries.fullTableWrite(self.m_rt, function (code)
           {
             // Tell the event queue to proceeed with the next event
-            self.m_rt.eventDone(event.tableName);
+            self.m_rt.eventDone(event.tableName, code);
 
             if (code == 0)
             {
@@ -1070,7 +1070,7 @@ function handleRTEvent(self, event)
       self.m_rtSubs.fullTableSync(event.cbSyncLocalTable, function ()
           {
             // Tell the event queue to proceeed with the next event
-            self.m_rt.eventDone(event.tableName);
+            self.m_rt.eventDone(event.tableName, 0);
           });
     }
     else if (event.tableName == 'rss_entries_read')
@@ -1079,7 +1079,7 @@ function handleRTEvent(self, event)
       self.m_rtEntries.fullTableSync(event.cbSyncLocalTable, function ()
           {
             // Tell the event queue to proceeed with the next event
-            self.m_rt.eventDone(event.tableName);
+            self.m_rt.eventDone(event.tableName, 0);
           });
     }
     else
@@ -1097,7 +1097,7 @@ function handleRTEvent(self, event)
       self.m_rtSubs.handleEntryEvent(event.data, function ()
           {
             // Tell the event queue to proceeed with the next event
-            self.m_rt.eventDone(event.tableName);
+            self.m_rt.eventDone(event.tableName, 0);
           });
     }
     else if (event.tableName == 'rss_entries_read')
@@ -1105,7 +1105,7 @@ function handleRTEvent(self, event)
       self.m_rtEntries.handleEntryEvent(event.data, function ()
           {
             // Tell the event queue to proceeed with the next event
-            self.m_rt.eventDone(event.tableName);
+            self.m_rt.eventDone(event.tableName, 0);
           });
     }
     else
@@ -1123,7 +1123,7 @@ function handleRTEvent(self, event)
       self.m_rtSubs.markAsSynced(event.data, function ()
           {
             // Tell the event queue to proceeed with the next event
-            self.m_rt.eventDone(event.tableName);
+            self.m_rt.eventDone(event.tableName, 0);
           });
     }
     else if (event.tableName == 'rss_entries_read')
@@ -1132,7 +1132,7 @@ function handleRTEvent(self, event)
       self.m_rtEntries.markAsSynced(event.data, function ()
           {
             // Tell the event queue to proceeed with the next event
-            self.m_rt.eventDone(event.tableName);
+            self.m_rt.eventDone(event.tableName, 0);
           });
     }
     else
@@ -1145,7 +1145,7 @@ function handleRTEvent(self, event)
   {
     // For debug purposes: immediately call eventDone()
     log.info(`feeds: EMPTY_EVENT for \`${event.tableName}\'`);
-    self.m_rt.eventDone(event.tableName);
+    self.m_rt.eventDone(event.tableName, 0);
   }
   else
   {
