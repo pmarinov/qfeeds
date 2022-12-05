@@ -239,11 +239,11 @@ function p_rescheduleWriteBack()
 {
   let self = this;
 
-  // Reschedule
+  // Cancel any outstanding scheduled runs
   if (self.m_writeBack != null)
     clearTimeout(self.m_writeBack);
 
-  // Setup the handler of periodic write operations
+  // Setup the time for the next run of the write operations
   self.m_writeBack = setTimeout(writeBackHandler, 5 * 1000, self);
 }
 RTables.prototype.p_rescheduleWriteBack = p_rescheduleWriteBack;
@@ -259,8 +259,9 @@ function p_eventHandler(self, tableName, event)
 RTables.prototype.p_eventHandler = p_eventHandler;
 
 // object [global] writeBackHandler()
-// Set to be invoked periodically by a timer,
-// checks if local journals are dirty and sends them to Dropbox
+//
+// Set to be invoked periodically by a timer, checks if local journals
+// are dirty and sends them to Dropbox
 function writeBackHandler(self)
 {
   // Only one operation active at a time,
@@ -270,10 +271,14 @@ function writeBackHandler(self)
     ++self.m_progressCnt;
     if (self.m_progressCnt > 3)
     {
+      // We waited for too long for previous to complete, sound the
+      // alarm
       utils_ns.domError('dropbox: writeBackHandler() failed to complete');
       return;
     }
 
+    // Skip the scheduled write
+    log.info('dropbox: writeBackHandler(), skipped one write')
     self.p_rescheduleWriteBack();
     return;
   }
@@ -294,9 +299,18 @@ function writeBackHandler(self)
     if (ctx.newJournal.length == 0)
       continue;
 
+    if (rtable.m_readStateM.m_curState != 'IDLE')
+    {
+      log.info(`dropbox: writeBackHandler(${tableName}), readStateM not in IDLE, skipped one write`)
+      continue;
+    }
+
     // We need the remote journal in order to append (overwrite it)
     if (!ctx.journalAcquired)
+    {
+      log.info(`dropbox: writeBackHandler(${tableName}), remote journal not acquire yet, skipped one write`)
       continue; // Acquisition of remote journal still pending
+    }
 
     // String presentation of all journal entries
     // (Append "new" after "remote")
@@ -392,6 +406,10 @@ function writeBackHandler(self)
     }
     else
     {
+      //
+      // The journal table is still under the threshold size, write it
+      // as a journal file
+
       let writeMode = null;
       let strPrevVer = 'none';
       let revJournal = ctx.revJournal;
@@ -499,6 +517,59 @@ function writeBackHandler(self)
   }
 
   self.p_rescheduleWriteBack();
+}
+
+// object [global] p_rescheduleStateMachine
+//
+// Reschedule the state machine for another run for the given
+// remoteTableName
+function p_rescheduleStateMachine(objRTables, remoteTableName)
+{
+  let rtable = objRTables.m_rtables[remoteTableName];
+
+  // Cancel any run that was already scheduled
+  if (rtable.m_timerStateM != null)
+    clearTimeout(rtable.m_timerStateM);
+
+  // Setup the time for the next run of the state machine
+  rtable.m_timerStateM =
+      setTimeout(p_triggerStateMachine, 120 * 1000, objRTables, remoteTableName);
+}
+
+// object [global] p_triggerStateMachine
+//
+// Invoked on timer, runs the state machine for remoteTableName if it
+// is state IDLE
+function p_triggerStateMachine(objRTables, remoteTableName)
+{
+  log.info(`dropbox: p_triggerStateMachine(${remoteTableName})`);
+
+  let rtable = objRTables.m_rtables[remoteTableName];
+
+  // State machine should only be started from IDLE state, verify if
+  // it is in IDLE
+  if (rtable.m_readStateM.m_curState != 'IDLE')
+  {
+    ++rtable.m_delayCnt;
+    if (rtable.m_delayCnt > 3)
+    {
+      // We waited for too long for previous to complete, sound the
+      // alarm
+      utils_ns.domError(`dropbox: p_triggerStateMachine(${remoteTableName}) skipped for too many times`);
+      return;
+    }
+
+    // Skip the scheduled write
+    log.info(`dropbox: p_triggerStateMachine(${remoteTableName}), skipped one state machine run (${rtable.m_delayCnt}/3)`)
+    p_rescheduleStateMachine(objRTables, remoteTableName);
+
+    return;
+  }
+
+  // Set the state machine in motion to poll remote tables
+  rtable.m_readStateM.advance('START_FULL_LOAD');
+
+  p_rescheduleStateMachine(objRTables, remoteTableName);
 }
 
 // object loadStateMachine [factory]
@@ -941,8 +1012,8 @@ function loadStateMachine(objRTables, remoteTableName)
         state.advance('IDLE');
       });
 
-  // Set the state machine at initial state 'START_FULL_LOAD'
-  state.advance('START_FULL_LOAD');
+  // Set the state machine at initial state 'IDLE'
+  state.advance('IDLE');
   return state;
 }
 
@@ -1185,12 +1256,18 @@ function RTables(profile, rtables, cbEvents, cbDisplayProgress)
               // Instantiate read and write state machines,
               // one per remote table
               rentry.m_readStateM = loadStateMachine(self, entry.name);
+              rentry.m_timerStateM = null;
+              rentry.m_delayCnt = 0;
 
               // EventQ, one per remote table
               rentry.m_ctx.events =  new utils_ns.EventQ(function (event)
                   {
                     self.p_eventHandler(self, entry.name, event);
                   });
+
+              // First run in 1 second
+              rentry.m_timerStateM =
+                  setTimeout(p_triggerStateMachine, 1 * 1000, self, entry.name);
             }
 
             // Setup the handler of periodic write operations
