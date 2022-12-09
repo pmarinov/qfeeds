@@ -1167,7 +1167,7 @@ function p_createFolder(folder, cbDone)
                   {
                     // console.log(response);
                     log.info('dropbox: RTables.filesCreateFolderV2(' +
-                      response.metadata.path_display + '), OK');
+                      response.result.metadata.path_display + '), OK');
                     cbDone(true);
                   })
               .catch(function(response)

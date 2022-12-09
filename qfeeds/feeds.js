@@ -1178,7 +1178,8 @@ function rtableConnect(cbDisplayProgress)
   self.m_rtEntries = new feeds_rt_entries_ns.rtHandlerEntries(self, 'rss_entries_read');
 
   // For now use profile 'Default'
-  let profileName = self.prefGet('m_local.dbox.profile');
+  let profileName = localStorage.getItem('Profile');
+  log.info(`rtableConnect(): using profile ${profileName}`);
   self.m_rt = new feeds_ns.RTables(profileName, tables, function (event)
       {
         handleRTEvent(self, event);
@@ -1284,26 +1285,47 @@ function p_feedPendingDeleteDB(needsRTableSync)
 }
 Feeds.prototype.p_feedPendingDeleteDB = p_feedPendingDeleteDB;
 
+// object Feeds.switchProfile
+// Switches to a new profile and reload the app
+function switchProfile(newProfile)
+{
+  localStorage.setItem('Profile', newProfile);
+  location.reload();
+}
+Feeds.prototype.switchProfile = switchProfile;
+
 // object Feeds.dbOpen
 // This completes the initialization of the Feeds object
 function dbOpen(cbDone)
 {
   var self = this;
 
-  log.info("db: ('rrss', 'open') connect to Feeds database...");
-  var req = window.indexedDB.open('rrss', 1);
+  let profile = localStorage.getItem("Profile");
+  if (profile == null)
+  {
+    log.info('dbOpen(): profile was never set, setting it to Default');
+    profile = 'Default';
+    localStorage.setItem('Profile', 'Default');
+  }
+
+  let dbName = 'rrss';  // The legacy name is used by Default profile
+  if (profile != 'Default')
+    dbName = profile;
+
+  log.info(`db: (${dbName}, 'open') connect to Feeds database...`);
+  var req = window.indexedDB.open(dbName, 1);
   req.onerror = function (event)
       {
         // Global error handler for all database errors
-        utils_ns.domError("db: ('rrss', 'open') error: " + req.errorCode);
+        utils_ns.domError(`db: (${dbName}, 'open') error: ${req.errorCode}`);
       };
   req.onblocked = function (event)
       {
-        utils_ns.domError("db: ('rrss', 'open') Feeds database is still in use by another instance");
+        utils_ns.domError(`db: (${dbName}, 'open') Feeds database is still in use by another instance`);
       }
   req.onsuccess = function (event)
       {
-        log.info("db: ('rrss', 'open') Feeds database already exists");
+        log.info(`db: (${dbName}, 'open') Feeds database already exists`);
         var db = req.result;
         log.info(db.objectStoreNames);
 
@@ -1313,38 +1335,38 @@ function dbOpen(cbDone)
         // you've never logged into Dropbox all entries are
         // LOCAL_ONLY)
         self.p_feedPendingDeleteDB(false);
-        log.info("db: ('rrss', 'open') Done1");
+        log.info(`db: (${dbName}, 'open') Done1`);
         cbDone();
       };
   req.onupgradeneeded = function(event)
       {
-        log.info("db: ('rrss', 'open') first time, create tables of Feeds DB...");
+        log.info(`db: (${dbName}, 'open') first time, create tables of Feeds DB...`);
         var db = event.target.result;
 
         // Records of type RssHeader
         var s = db.createObjectStore('rss_subscriptions', { keyPath: 'm_url' });
-        log.info("db: ('rrss', 'open') table 'rss_subscriptions' start create operation");
+        log.info(`db: (${dbName}, 'open') table 'rss_subscriptions' start create operation`);
 
         // Records of type RssEntry
         var d1 = db.createObjectStore('rss_data', { keyPath: 'm_hash' });
-        log.info("db: ('rrss', 'open') table 'rss_data' start create operation");
+        log.info(`db: (${dbName}, 'open') table 'rss_data' start create operation`);
 
         d1.createIndex('rssurl_date', 'm_rssurl_date', { unique: false });
-        log.info("db: ('rrss', 'open') index 'rssurl_date' created");
+        log.info(`db: (${dbName}, 'open') index 'rssurl_date' created`);
 
         // Records of pref=value: store user preferences as k/v pairs
         var d2 = db.createObjectStore('preferences', { keyPath: 'm_pref' });
-        log.info("db: ('rrss', 'open') table 'preferences' start create operation");
+        log.info(`db: (${dbName}, 'open') table 'preferences' start create operation`);
 
         self.m_db = db;
 
         // All create transactions endup with a single "oncomplete" call
         d2.transaction.oncomplete = function(event)
             {
-              log.info("db: ('rrss', 'open') all tables and indexes of Feeds DB created");
+              log.info(`db: (${dbName}, 'open') all tables and indexes of Feeds DB created`);
               self.m_feedsCB.onDbCreated();
 
-              log.info("db: ('rrss', 'open') Done2");
+              log.info(`db: (${dbName}, 'open') Done2`);
               // Now IndexedDB calls req.onsuccess()
             };
       };
