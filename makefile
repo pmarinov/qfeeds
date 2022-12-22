@@ -87,7 +87,7 @@ JS_LIBS = lib/bootstrap-3.2.0-dist/js/bootstrap.js \
 # Recursively list all web files
 # TODO: Move oauth_receiver files into a sub folder (if possible)
 find-web-files := -name "*.js" -o -name "*.js.map" -o \
-     -name "*.html" -o -name "*.css" -o \
+     -name "*.html" -o -name "*.css" -o -name "*.css.map" -o \
      -name "*.png" -o -name "*.svg" -o \
 	 -name "*.eot" -o -name "*.ttf" -o -name "*.woff"
 app-files-find := $(shell find ./lib $(find-web-files)) \
