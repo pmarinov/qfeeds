@@ -92,7 +92,7 @@ find-web-files := -name "*.js" -o -name "*.js.map" -o \
 	 -name "*.eot" -o -name "*.ttf" -o -name "*.woff"
 app-files-find := $(shell find ./lib $(find-web-files)) \
     $(shell find ./chrome $(find-web-files)) \
-    $(shell find ./qfeeds $(find-web-files)) \
+    $(shell find ./qfeeds $(find-web-files))
 
 # Output of `find` begins with './', remove it
 app-files := $(subst ./,,$(app-files-find))
