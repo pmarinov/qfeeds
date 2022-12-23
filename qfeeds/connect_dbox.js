@@ -59,7 +59,7 @@ function ConnectDBox(cb, startWithLoggedIn)
 
   self.m_authUrl = null;
   // Authentication URL (the new page/tab for user to go to for login into Dropbox)
-  log.info('OAuth on Firefox browser');
+  log.info('dropbox: OAuth => getAuthenticationUrl');
   self.m_dbxAuth.getAuthenticationUrl(
           self.m_fullReceiverPath, // [redirectUri]
           undefined,    // [state] To help prevent cross site scripting attacks.
@@ -265,13 +265,8 @@ function p_obtainToken()
       .then(function(response) {
           log.info('dropbox: p_obtainToken(), OK');
           console.log(response);
-          self.m_authToken = response.result.access_token;
-          self.m_dbxAuth.setAccessToken(response.result.access_token);
+          self.m_dbxAuth.setRefreshToken(response.result.refresh_token);
           self.m_client = new window.Dropbox.Dropbox({auth: self.m_dbxAuth});
-
-          // Store token in localStorage
-          // localstorage:dropbox.token=self.m_authToken
-          localStorage.setItem(self.m_dboxLoginToken, self.m_authToken);
 
           // Obtain account info as a way to confirm connection is good
           self.p_displayLoginState();
@@ -325,16 +320,11 @@ function p_verifyToken()
   let self = this;
 
   log.info('dropbox: p_verifyToken()');
-  let token = localStorage.getItem(self.m_dboxLoginToken);
 
   // If we have a token, use it
-  if (token != null)
+  if (self.m_client != null)
   {
     log.info('dropbox: p_verifyToken(), use existing token');
-
-    self.m_authToken = token;
-    self.m_dbxAuth.setAccessToken(token);
-    self.m_client = new window.Dropbox.Dropbox({auth: self.m_dbxAuth});
 
     // Verify token freshness by an API call -- attempt to obtain account info
     self.m_client.usersGetCurrentAccount()
