@@ -53,6 +53,13 @@ function ConnectDBox(cb, startWithLoggedIn)
     // Chrome
     self.m_fullReceiverPath = chrome.identity.getRedirectURL();
 
+  self.m_authToken = null;
+  self.m_accountID = null;
+
+  // Local storage key to store the login code
+  self.m_dboxLoginCodeKey = 'dropbox.code';
+  self.m_dboxLoginToken = 'dropbox.token';
+
   // Dropbox OAuth object
   // SDK sources: https://github.com/dropbox/dropbox-sdk-js/blob/main/src/auth.js
   self.m_dbxAuth = new window.Dropbox.Dropbox({clientId: APIKEY}).auth;
@@ -70,27 +77,20 @@ function ConnectDBox(cb, startWithLoggedIn)
           true          // [usePKCE]
           )
       .then(authUrl => {
-        self.m_authUrl = authUrl
+        self.m_authUrl = authUrl;
+
+        // If we have the token already in localStorage use it
+        if (startWithLoggedIn)
+        {
+          // Activate the token only after the object ConnectDBox is created
+          setTimeout(function ()
+          {
+            self.m_loginCode = localStorage.getItem(self.m_dboxLoginCodeKey);
+            if (self.m_loginCode != null)
+              self.p_TransitionToLoginPage();  // This will popup login only the first time
+          }, 0);  // Delay 0, just yield
+        };
   })
-
-  self.m_authToken = null;
-  self.m_accountID = null;
-
-  // Local storage key to store the login code
-  self.m_dboxLoginCodeKey = 'dropbox.code';
-  self.m_dboxLoginToken = 'dropbox.token';
-
-  // If we have the token already in localStorage use it
-  if (startWithLoggedIn)
-  {
-    // Activate the token only after the object ConnectDBox is created
-    setTimeout(function ()
-    {
-      self.m_loginCode = localStorage.getItem(self.m_dboxLoginCodeKey);
-      if (self.m_loginCode != null)
-        self.p_verifyToken();
-    }, 0);  // Delay 0, just yield
-  };
 
   self.p_dboxSetLoginButton();
 
@@ -169,6 +169,7 @@ function p_setLoggedOut()
   self.m_loginCode = null;
   self.m_authToken = null;
   self.m_accountID = null;
+  self.m_client = null;
   localStorage.removeItem(self.m_dboxLoginCodeKey);
 }
 ConnectDBox.prototype.p_setLoggedOut = p_setLoggedOut;
@@ -266,6 +267,7 @@ function p_obtainToken()
           log.info('dropbox: p_obtainToken(), OK');
           console.log(response);
           self.m_dbxAuth.setRefreshToken(response.result.refresh_token);
+          self.m_dbxAuth.setAccessToken(response.result.access_token);
           self.m_client = new window.Dropbox.Dropbox({auth: self.m_dbxAuth});
 
           // Obtain account info as a way to confirm connection is good
@@ -278,7 +280,7 @@ function p_obtainToken()
           if (error.status !== undefined && error.status == 400)
           {
             log.info('dropbox: p_verifyToken(), error 400, now p_TransitionToLoginPage():');
-            self.p_TransitionToLoginPage(self.m_authUrl);
+            self.p_TransitionToLoginPage();
           }
           else
           {
@@ -298,7 +300,6 @@ function p_obtainToken()
             utils_ns.domError(msg);
           }
         });
-
 }
 ConnectDBox.prototype.p_obtainToken = p_obtainToken;
 
@@ -366,7 +367,6 @@ function p_verifyToken()
             utils_ns.domError(msg);
           }
         });
-
   }
   else
   {
@@ -405,11 +405,19 @@ function p_completeOAuth(self, oauthURL)
   localStorage.setItem(self.m_dboxLoginCodeKey, self.m_loginCode);
 
   // From a login code call Dropbox to obtain a token
-  log.info(`dropbox: Login OK, verify that token works`)
-  self.p_verifyToken();
+  log.info(`dropbox: Login OK, now obtain token`)
+  self.p_obtainToken();
 }
 
-function p_TransitionToLoginPage(authUrl)
+// object ConnectDBox.p_TransitionToLoginPage
+// Go to login page for Dropbox
+//
+// If user is already logged in then no pop-up window but silently
+// returns the response and proceeds with to obtain refresh token
+//
+// If first tiem login on this machine, a pop-up window for user to
+// login and grant access to Dropbox for the browser extension (app)
+function p_TransitionToLoginPage()
 {
   let self = this;
 
@@ -417,7 +425,7 @@ function p_TransitionToLoginPage(authUrl)
   {
     // Firefox
     browser.identity.launchWebAuthFlow({
-            url: authUrl,
+            url: self.m_authUrl,
             interactive: true  // TODO: set it to true if this if user clicking 'Login'
         })
         .then(function(urlDropbox) {
@@ -436,7 +444,7 @@ function p_TransitionToLoginPage(authUrl)
   {
     // Chrome
     chrome.identity.launchWebAuthFlow({
-            url: authUrl,
+            url: self.m_authUrl,
             interactive: true  // TODO: set it to true if this if user clicking 'Login'
         }, function(urlDropbox) {
             p_completeOAuth(self, urlDropbox); 
@@ -467,7 +475,7 @@ function dboxLoginLogout()
   {
     log.info("dropbox: LoginLogout => login start");
 
-    self.p_TransitionToLoginPage(self.m_authUrl);
+    self.p_TransitionToLoginPage();
   };
 }
 ConnectDBox.prototype.dboxLoginLogout = dboxLoginLogout;
