@@ -51,7 +51,7 @@ function ConnectDBox(cb, startWithLoggedIn)
     self.m_fullReceiverPath = browser.identity.getRedirectURL();
   else
     // Chrome
-    self.m_fullReceiverPath = chrome.identity.getRedirectURL();
+    self.m_fullReceiverPath = 'chrome-extension://kdjijdhlleambcpendblfhdmpmfdbcbd/qfeeds/oauth_receiver_dbox.html';
 
   self.m_authToken = null;
   self.m_accountID = null;
@@ -87,7 +87,7 @@ function ConnectDBox(cb, startWithLoggedIn)
           {
             self.m_loginCode = localStorage.getItem(self.m_dboxLoginCodeKey);
             if (self.m_loginCode != null)
-              self.p_TransitionToLoginPage();  // This will popup login only the first time
+              self.p_obtainToken();  // This will popup login only the first time
           }, 0);  // Delay 0, just yield
         };
   })
@@ -443,19 +443,19 @@ function p_TransitionToLoginPage()
   else
   {
     // Chrome
-    chrome.identity.launchWebAuthFlow({
-            url: self.m_authUrl,
-            interactive: true  // TODO: set it to true if this if user clicking 'Login'
-        }, function(urlDropbox) {
-            p_completeOAuth(self, urlDropbox); 
+    // (launchwebauthflow can't detect that we are already logged in Dropbox)
+    // chrome.identity.launchWebAuthFlow({
+    //         url: self.m_authUrl,
+    //         interactive: true  // TODO: set it to true if this if user clicking 'Login'
+    //     }, function(urlDropbox) {
+    //         p_completeOAuth(self, urlDropbox); 
+    //     });
+    chrome.tabs.create({url: self.m_authUrl}, function (newTab)
+        {
+          self.m_authenticationTab = newTab.id;
+          log.info('dropbox: New tab for authentication of Dropbox: ' + newTab.id);
         });
   }
-
-  // chrome.tabs.create({ url: authUrl}, function (newTab)
-  //     {
-  //       self.m_authenticationTab = newTab.id;
-  //       log.info('dropbox: New tab for authentication of Dropbox: ' + newTab.id);
-  //     });
 }
 ConnectDBox.prototype.p_TransitionToLoginPage = p_TransitionToLoginPage;
 
