@@ -44,7 +44,6 @@ function ConnectDBox(cb, startWithLoggedIn)
 
   self.m_client = null;
   self.m_dbxAuth = null;
-  self.m_loginCode = null;  // Short-lived, obtain an Auth token with it
 
   if (typeof browser !== 'undefined')
     // Firefox
@@ -53,12 +52,10 @@ function ConnectDBox(cb, startWithLoggedIn)
     // Chrome
     self.m_fullReceiverPath = 'chrome-extension://kdjijdhlleambcpendblfhdmpmfdbcbd/qfeeds/oauth_receiver_dbox.html';
 
-  self.m_authToken = null;
   self.m_accountID = null;
 
   // Local storage key to store the login code
-  self.m_dboxLoginCodeKey = 'dropbox.code';
-  self.m_dboxLoginToken = 'dropbox.token';
+  self.m_dboxTokenKey = 'dropbox.token';
 
   // Dropbox OAuth object
   // SDK sources: https://github.com/dropbox/dropbox-sdk-js/blob/main/src/auth.js
@@ -85,9 +82,9 @@ function ConnectDBox(cb, startWithLoggedIn)
           // Activate the token only after the object ConnectDBox is created
           setTimeout(function ()
           {
-            self.m_loginCode = localStorage.getItem(self.m_dboxLoginCodeKey);
-            if (self.m_loginCode != null)
-              self.p_obtainToken();  // This will popup login only the first time
+            let authToken = localStorage.getItem(self.m_dboxTokenKey);
+            if (authToken != null)
+              self.p_obtainToken(null);  // This will popup login only the first time
           }, 0);  // Delay 0, just yield
         };
   })
@@ -166,11 +163,9 @@ function p_setLoggedOut()
   log.info('p_setLoggedOut()');
 
   self.m_authenticated = false;
-  self.m_loginCode = null;
-  self.m_authToken = null;
   self.m_accountID = null;
   self.m_client = null;
-  localStorage.removeItem(self.m_dboxLoginCodeKey);
+  localStorage.removeItem(self.m_dboxTokenKey);
 }
 ConnectDBox.prototype.p_setLoggedOut = p_setLoggedOut;
 
@@ -256,50 +251,79 @@ ConnectDBox.prototype.p_parseQueryString = p_parseQueryString
 
 // object ConnectDBox.p_obtainToken
 //
-// We have login code and we need to obtain a token
-function p_obtainToken()
+// If we have the refresh token in local storage, we use that,
+// otherwise we have login code and we need to obtain a token
+function p_obtainToken(loginCode)
 {
   let self = this;
 
-  // No token, attept to obtain token via getAccessTokenFromCode()
-  self.m_dbxAuth.getAccessTokenFromCode(self.m_fullReceiverPath, self.m_loginCode)
-      .then(function(response) {
-          log.info('dropbox: p_obtainToken(), OK');
-          console.log(response);
-          self.m_dbxAuth.setRefreshToken(response.result.refresh_token);
-          self.m_dbxAuth.setAccessToken(response.result.access_token);
-          self.m_client = new window.Dropbox.Dropbox({auth: self.m_dbxAuth});
+  log.info('dropbox: p_obtainToken()');
 
-          // Obtain account info as a way to confirm connection is good
-          self.p_displayLoginState();
-        })
-      .catch(function(error) {
-          // Here:
-          // m_logincCode is short-lived, if we get 400 then ask Dropbox to re-approve login
+  let authToken = localStorage.getItem(self.m_dboxTokenKey);
 
-          if (error.status !== undefined && error.status == 400)
-          {
-            log.info('dropbox: p_verifyToken(), error 400, now p_TransitionToLoginPage():');
-            self.p_TransitionToLoginPage();
-          }
-          else
-          {
-            let msg = 'dropbox: p_verifyToken(), ';
-            if (error.status === undefined)
+  if (authToken == null)
+  {
+    if (loginCode == null)
+    {
+      log.info('dropbox: p_obtainToken(), we need login code to obtain new token, go to login workflow');
+      self.p_TransitionToLoginPage();
+      return;
+    }
+
+    // No token, attempt to obtain token via getAccessTokenFromCode()
+    log.info(`dropbox: p_obtainToken(): use logn code to obtain token`);
+    self.m_dbxAuth.getAccessTokenFromCode(self.m_fullReceiverPath, loginCode)
+        .then(function(response) {
+            log.info('dropbox: p_obtainToken(), OK');
+            console.log(response);
+            self.m_dbxAuth.setRefreshToken(response.result.refresh_token);
+            // self.m_dbxAuth.setAccessToken(response.result.access_token);
+            self.m_client = new window.Dropbox.Dropbox({auth: self.m_dbxAuth});
+
+            // Store token in localStorage
+            // localstorage:dropbox.token=response.result.refresh_token
+            localStorage.setItem(self.m_dboxTokenKey, response.result.refresh_token);
+
+            // Obtain and display user account
+            self.p_displayLoginState();
+          })
+        .catch(function(error) {
+            // Here:
+            // m_logincCode is short-lived, if we get 400 then ask Dropbox to re-approve login
+
+            if (error.status !== undefined && error.status == 400)
             {
-              msg += 'missing field "status"';
+              log.info('dropbox: p_obtainToken(), error 400, now p_TransitionToLoginPage():');
+              self.p_TransitionToLoginPage();
             }
             else
             {
-              msg += 'error code: ' + String(error.status)
-              if (error.message !== undefined)
-                msg += ', message: ' + error.message;
-            }
+              let msg = 'dropbox: p_verifyToken(), ';
+              if (error.status === undefined)
+              {
+                msg += 'missing field "status"';
+              }
+              else
+              {
+                msg += 'error code: ' + String(error.status)
+                if (error.message !== undefined)
+                  msg += ', message: ' + error.message;
+              }
 
-            log.info(msg);
-            utils_ns.domError(msg);
-          }
-        });
+              log.info(msg);
+              utils_ns.domError(msg);
+            }
+          });
+    return;
+  }
+
+  // We have a token in local storage use it
+  log.info(`dropbox: p_obtainToken(): Use token from local storage`);
+  self.m_dbxAuth.setRefreshToken(authToken);
+  self.m_client = new window.Dropbox.Dropbox({auth: self.m_dbxAuth});
+
+  // Obtain and display user account
+  self.p_displayLoginState();
 }
 ConnectDBox.prototype.p_obtainToken = p_obtainToken;
 
@@ -307,7 +331,7 @@ ConnectDBox.prototype.p_obtainToken = p_obtainToken;
 //
 // This function is called when
 //
-// 1) We already have m_loginCode (after OAuth login)
+// 1) We already have a login
 // 2) The login code is used to obtain a token
 // 3) The login code is short lived, if we get 400, we jump to the
 //    OAuth login path (acting as if user has pressed the Login
@@ -343,7 +367,7 @@ function p_verifyToken()
           if (error.status !== undefined && error.status == 401)
           {
             log.info('dropbox: p_verifyToken(), error 401, token expired');
-            self.p_obtainToken();
+            self.p_obtainToken(null);
           }
           else
           {
@@ -371,7 +395,7 @@ function p_verifyToken()
   else
   {
     log.info('dropbox: p_verifyToken(), token is null');
-    self.p_obtainToken();
+    self.p_obtainToken(null);
   }
   return;
 }
@@ -398,15 +422,9 @@ function p_completeOAuth(self, oauthURL)
     return;
   }
 
-  self.m_loginCode = q.code;
-
-  // Store login code in localStorage
-  // localstorage:dropbox.code=self.m_LoginCode
-  localStorage.setItem(self.m_dboxLoginCodeKey, self.m_loginCode);
-
   // From a login code call Dropbox to obtain a token
   log.info(`dropbox: Login OK, now obtain token`)
-  self.p_obtainToken();
+  self.p_obtainToken(q.code);
 }
 
 // object ConnectDBox.p_TransitionToLoginPage
@@ -420,6 +438,9 @@ function p_completeOAuth(self, oauthURL)
 function p_TransitionToLoginPage()
 {
   let self = this;
+
+  // No login token if we go into login workflow
+  localStorage.removeItem(self.m_dboxTokenKey);
 
   if (typeof browser !== 'undefined')
   {
