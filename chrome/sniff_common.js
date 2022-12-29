@@ -48,6 +48,6 @@ function containsFeed(doc) {
 
 function debugMsg(loglevel, text) {
   if (loglevel <= currentLogLevel) {
-    console.log("RSS Subscription extension: " + text);
+    console.log("QFeeds: " + text);
   }
 }
