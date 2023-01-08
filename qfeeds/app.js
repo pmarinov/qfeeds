@@ -125,6 +125,7 @@ function App()
   self.m_initCnt = 0;
   self.m_initSeq.push(function()
       {
+        // Step: 0
         self.m_panelMng = new feeds_ns.PanelMng();
 
         self.m_feedDisp = new feeds_ns.FeedDisp(self.$d.feedDisp);
@@ -133,6 +134,8 @@ function App()
       });
   self.m_initSeq.push(function()
       {
+        // Step: 1
+
         // Setup object for work on IndexedDB
         self.m_feedsDB = new feeds_ns.Feeds();
         // Connect feedsDir callbacks into feedsDB so that data can be displayed via these callback
@@ -145,6 +148,8 @@ function App()
       });
   self.m_initSeq.push(function()
       {
+        // Step: 2
+
         // Load all preferences from the IndexedDB into cache
         self.m_feedsDB.prefReadAll(function ()
             {
@@ -154,6 +159,8 @@ function App()
       });
   self.m_initSeq.push(function()
       {
+        // Step: 3
+
         // Load all feeds data from the IndexedDB (object type RSSHeader)
         // Via call-backs this will also list the feeds and folders in
         // the panel for feeds navigation (left-hand-side)
@@ -170,6 +177,8 @@ function App()
       });
   self.m_initSeq.push(function()
       {
+        // Step: 4
+
         // Setup objects for the screen
         self.m_panelAbout = new feeds_ns.PanelAbout();
         self.m_panelStats = new feeds_ns.PanelStats(self.m_feedsDB);
@@ -186,6 +195,8 @@ function App()
       });
   self.m_initSeq.push(function()
       {
+        // Step: 5
+
         // Now connect to Dropbox
         var cb = self.p_getHandlersRemoteStatus();
         var startWithLoggedIn = self.m_feedsDB.prefGet("m_local.app.logged_in");
@@ -196,6 +207,8 @@ function App()
       });
   self.m_initSeq.push(function()
       {
+        // Step: 6
+
         if (subscriptionReqList.length > 0)  // Subscription requested upon startup?
           self.m_feedsDir.p_feedView(subscriptionReqList[0].href);
         Object.preventExtensions(this);
@@ -213,19 +226,21 @@ function p_initSeqNext()
 {
   var self = this;
 
-  if (self.m_initCnt > 0)
-    log.info('app: end of init step ' + (self.m_initCnt - 1));
-
   if (self.m_initCnt >= self.m_initSeq.length)
     return;  // All init steps are done
 
-  setTimeout(function ()
-  {
-      log.info('app: start of init step ' + self.m_initCnt);
-      ++self.m_initCnt;
-      var nextStep = self.m_initSeq[self.m_initCnt - 1];
-      nextStep();
-  }, 0);  // Delay 0, just yield
+  setTimeout(function (index)
+      {
+        let total = self.m_initSeq.length - 1;
+        log.info(`app: start of init step ${index} of ${total}`);
+
+        let nextStep = self.m_initSeq[index];
+        nextStep();
+
+        log.info(`app: end of init step ${index}`);
+      }, 0, self.m_initCnt);  // Delay 0, just yield
+
+  ++self.m_initCnt;
 }
 App.prototype.p_initSeqNext = p_initSeqNext;
 
