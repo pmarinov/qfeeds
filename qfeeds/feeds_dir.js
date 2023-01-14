@@ -1681,18 +1681,20 @@ function p_completeUnsubscription()
 {
   var self = this;
 
-  self.m_feedsDB.feedRemove(self.m_unsubscribedFeedUrl);
-  log.info('completed unsubscription of ' + self.m_unsubscribedFeedUrl);
-  self.m_unsubscribedFeedUrl = null;
+  self.m_feedsDB.feedRemove(self.m_unsubscribedFeedUrl, function (code)
+      {
+        log.info('completed unsubscription of ' + self.m_unsubscribedFeedUrl);
+        self.m_unsubscribedFeedUrl = null;
 
-  // Display the empty array of feed entries
-  var entries = [];
-  self.m_feedDisp.feedDisplay(entries, self.m_currentFeed.m_dispContext);
+        // Display the empty array of feed entries
+        var entries = [];
+        self.m_feedDisp.feedDisplay(entries, self.m_currentFeed.m_dispContext);
 
-  // The unsubscribed was also the current: no longer
-  self.m_currentFeed = null;
-  self.m_currentFeedName = null;
-  self.m_currentFeedEntries = null;
+        // The unsubscribed was also the current: no longer
+        self.m_currentFeed = null;
+        self.m_currentFeedName = null;
+        self.m_currentFeedEntries = null;
+      });
 }
 FeedsDir.prototype.p_completeUnsubscription = p_completeUnsubscription;
 

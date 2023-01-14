@@ -135,7 +135,7 @@ function handleEntryEvent(records, cbDone)
         // Deletion should be done when entries are expired in the local DB
         // TOOD: REMOVE from here
 
-        // Check if the entry is too old and needs to be remove from the remote table (expired)
+        // Check if the entry is too old and needs to be removed from the remote table (expired)
         if (feeds_ns.isTooOldDate(dateEntry))
         {
           log.trace('Expire entry ' + strDate);
@@ -181,7 +181,7 @@ function handleEntryEvent(records, cbDone)
             {
               // Entry with this hash doesn't exist in the local indexed DB
               // Create a pseudo entry to reflect the remote data in it
-              // (Entries expire and are deleted after some time!)
+              // (Local entries expire and are deleted after some time!)
               log.trace("db: ('rss_data') update entry (" + rss_entry_hash + '): not found: put local placeholder');
               // Create a pseudo entry -- only hash, date, m_remote_state and is_read are valid
               dbEntry.m_hash = rss_entry_hash;

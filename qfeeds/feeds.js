@@ -326,16 +326,16 @@ function RemoteEntryRead(rssEntry)
 //   return this;
 // }
 
-// object RemoteFeedUrl [constructor]
-// From an RssHeader constructs a RemoteFeedUrl record
-function RemoteFeedUrl(feed)
-{
-  if (feed == null)  // An empty object was requested?
-    return [null, null, null]
+// // object RemoteFeedUrl [constructor]
+// // From an RssHeader constructs a RemoteFeedUrl record
+// function RemoteFeedUrl(feed)
+// {
+//   if (feed == null)  // An empty object was requested?
+//     return [null, null, null]
 
-  // url, tags, user-set options for the feed
-  return [feed.m_url, feed.m_tags, ""];
-}
+//   // url, tags, user-set options for the feed
+//   return [feed.m_url, feed.m_tags, ""];
+// }
 
 // object Feeds.p_incExpireCount
 // Increment the value of preference key 'm_local.app.expired_remote_records'
@@ -739,8 +739,6 @@ Feeds.prototype.p_rtableSyncEntry = p_rtableSyncEntry;
 // Sync one RSS feed (RSSHeader) entry with the remote table
 function p_rtableSyncFeedEntry(feed)
 {
-  utils_ns.assert(false, "Invoking an OLD method");
-
   // We can't use _instanceof_ for objects that are read from the indexedDB
   // just check for some fields to confirm this is RssHeader object
   utils_ns.hasFields(feed, ['m_rss_type', 'm_rss_version'], 'p_rtableSyncFeedEntry');
@@ -748,7 +746,6 @@ function p_rtableSyncFeedEntry(feed)
   var self = this;
 
   var localFeed = null;
-  var remoteFeed = null;
   var m = 0;
 
   m = self.p_feedFindByUrl(feed.m_url);
@@ -759,14 +756,14 @@ function p_rtableSyncFeedEntry(feed)
 
   if (self.m_remote_is_connected)
   {
-    remoteFeed = new RemoteFeedUrl(feed);
-    self.m_rtGDrive.insert(self.m_remote_subscriptions_id, remoteFeed);
-    localFeed.m_remote_state = feeds_ns.RssSyncState.IS_SYNCED;
+    self.m_rtSubs.insert(feed);
+    // TODO: Verify that it is marked as SYCED when it goes to the journal
+    // localFeed.m_remote_state = feeds_ns.RssSyncState.IS_SYNCED;
 
     // Reflect in feed copy which will be recorded back into the IndexedDB
-    feed.m_remote_state = feeds_ns.RssSyncState.IS_SYNCED;
+    // feed.m_remote_state = feeds_ns.RssSyncState.IS_SYNCED;
 
-    log.trace('p_rtableSyncFeedEntry: remote OK (' + remoteFeed.m_rss_feed_url + ')');
+    log.trace('p_rtableSyncFeedEntry: insert (' + feed.m_rss_feed_url + ')');
   }
   else
   {
@@ -1093,7 +1090,7 @@ function handleRTEvent(self, event)
     // Remote entries were updated (new values or deleted)
     if (event.tableName == 'rss_subscriptions')
     {
-      log.info('feeds: Full sync of table `rss_subscriptions\'');
+      log.info('feeds: events for `rss_subscriptions\'');
       self.m_rtSubs.handleEntryEvent(event.data, function ()
           {
             // Tell the event queue to proceeed with the next event
@@ -1102,6 +1099,7 @@ function handleRTEvent(self, event)
     }
     else if (event.tableName == 'rss_entries_read')
     {
+      log.info('feeds: events for `rss_entries_read\'');
       self.m_rtEntries.handleEntryEvent(event.data, function ()
           {
             // Tell the event queue to proceeed with the next event
@@ -1187,7 +1185,9 @@ function rtableConnect(cbDisplayProgress)
 
   return;
 
+  // TODO:
   // TODO: Remove this eventually when the NEW Dropbox is completed
+  // TODO:
 
   // Delete all pending (m_is_unsubscribed = true), now that Dropbox is
   // logged in (these are entries that are in state IS_LOCAL_ONLY or
@@ -1251,7 +1251,7 @@ Feeds.prototype.p_feedReadAll = p_feedReadAll;
 
 // object Feeds.p_feedPendingDeleteDB
 // Delete permanently from IndexedDB the feeds marked as m_is_unsubscribed
-function p_feedPendingDeleteDB(needsRTableSync)
+function p_feedPendingDeleteDB(needsRTableSync, cbDone)
 {
   var self = this;
   var listToRemove = [];
@@ -1265,6 +1265,9 @@ function p_feedPendingDeleteDB(needsRTableSync)
   c.onerror = function (event)
       {
         log.error("db: ('rss_subscriptions', 'read') cursor error");
+
+        // Callback FAILURE
+        cbDone(1);
       };
   c.onsuccess = function(event)
       {
@@ -1273,7 +1276,11 @@ function p_feedPendingDeleteDB(needsRTableSync)
         {
           // `cursor' is null when `cursor.continue()' reaches end of DB index
           log.info("db: ('rss_subscriptions') " + listToRemove.length + ' subscriptions marked as unsubscribed');
-          self.p_feedRemoveList(listToRemove, needsRTableSync);
+          self.p_feedRemoveList(listToRemove, needsRTableSync, cbDone);
+
+          // Callback FAILURE
+          cbDone(0);
+
           return;  // no more entries
         }
         var hdr = cursor.value;
@@ -1334,9 +1341,14 @@ function dbOpen(cbDone)
         // (only entries that are IS_LOCAL_ONLY can be deleted, if
         // you've never logged into Dropbox all entries are
         // LOCAL_ONLY)
-        self.p_feedPendingDeleteDB(false);
-        log.info(`db: (${dbName}, 'open') Done1`);
-        cbDone();
+        //
+        // TODO: Move to an unified undo system, this syste of pending
+        // something is UNRELIABLE
+        self.p_feedPendingDeleteDB(false, function (code)
+          {
+            log.info(`db: (${dbName}, 'open') Done (${code})`);
+            cbDone();
+          });
       };
   req.onupgradeneeded = function(event)
       {
@@ -1599,10 +1611,13 @@ function p_feedNeedsUpdate(newFeed, origFeed, shouldCompareRemoteStateOnly)
 Feeds.prototype.p_feedNeedsUpdate = p_feedNeedsUpdate;
 
 // object Feeds.p_feedRecord
-// Insert a new record or update a record of a feed (RssHeader) in the indexedDB
-// Record operation will be ignored at an attempt to record a feed that is already in
-// feed -- obj: RSSHeader
-// syncRTable -- bool: true if no need to sync with remote table
+//
+// Insert a new record or update a record of a feed (RssHeader) in the
+// indexedDB Record operation will be ignored at an attempt to record
+// a feed that is already in feed
+//
+// feed: -- object RSSHeader
+// syncRTable -- bool: true if needed to sync with remote table
 // cbResult(was_update_needed) -- callback
 // was_update_needed -- int: 1 = update was needed and entry was recorded
 // was_update_needed -- int: 0 = no update was needed, record request ignored
@@ -1671,7 +1686,6 @@ function p_feedRecord(feed, syncRTable, cbResult)
         if (needsRTableSync)
         {
           self.p_rtableSyncFeedEntry(feed);  // new url or tags
-          utils_ns.assert(feed.m_remote_state != feeds_ns.RssSyncState.IS_LOCAL_ONLY, "p_feedRecord: remote state");
         }
 
         if (!needsUpdate)
@@ -1745,7 +1759,7 @@ function feedAddByUrl1()
 {
   let self = this;
 
-  self.p_feedAddByUrl('http://www.npr.org/rss/rss.php?id=1034', '', null, false);
+  self.p_feedAddByUrl('http://www.npr.org/rss/rss.php?id=1034', '', null, true);
   log.info('[Debug] Added http://www.npr.org/rss/rss.php?id=1034');
 }
 Feeds.prototype.feedAddByUrl1 = feedAddByUrl1;
@@ -1757,16 +1771,30 @@ function feedAddByUrl2()
 {
   let self = this;
 
-  self.p_feedAddByUrl('https://lareviewofbooks.org/feed/?ver=2', '', null, false);
+  self.p_feedAddByUrl('https://lareviewofbooks.org/feed/?ver=2', '', null, true);
   log.info('[Debug] Added https://lareviewofbooks.org/feed/?ver=2');
 }
 Feeds.prototype.feedAddByUrl2 = feedAddByUrl2;
 
 // object Feeds.p_feedRemoveDB
 // Deletes a feed from database table 'rss_subscriptions'
-function p_feedRemoveDB(feedUrl, needsRTableSync)
+//
+// -- needsRTableSync:
+// There are 2 sources of delete action:
+//
+// * User initiated unsubscription, in that case the flag is set to
+//   true so that this action gets reflected in the remote table
+//
+// * An event is received from a remote table that needs to be
+//   reflected locally, then the flag is set to false
+function p_feedRemoveDB(feedUrl, needsRTableSync, cbDone)
 {
   var self = this;
+
+  utils_ns.assert(cbDone !== undefined, "p_feedRemoveDB: cbDone() is undefined");
+  utils_ns.assert(cbDone != null, "p_feedRemoveDB: cbDone() is null");
+
+  log.info(`p_feedRemoveDB: needsRTableSync=${needsRTableSync}, ${feedUrl}`);
 
   // Find entry in m_dbSubscriptions
   var tran = self.m_db.transaction(['rss_subscriptions'], 'readwrite');
@@ -1785,6 +1813,9 @@ function p_feedRemoveDB(feedUrl, needsRTableSync)
         if (data === undefined)
         {
           log.error('db: delete request error, record not found for ' + feedUrl);
+
+          // Callback FAILURE
+          cbDone(1);
           return;
         }
         if (needsRTableSync)
@@ -1793,7 +1824,7 @@ function p_feedRemoveDB(feedUrl, needsRTableSync)
           if (data.m_remote_state == feeds_ns.RssSyncState.IS_SYNCED)
           {
             log.info('p_feedRemoveDB: delete from remote table, feed: ' + feedUrl);
-            self.m_rtGDrive.deleteRec(self.m_remote_subscriptions_id, data.m_hash);  // delete by hash of feed url
+            self.m_rtSubs.deleteRec(data);
           }
         }
         else
@@ -1807,6 +1838,9 @@ function p_feedRemoveDB(feedUrl, needsRTableSync)
             {
               log.info('db: delete request success, feed: ' + feedUrl);
 
+              // Callback SUCCESS
+              cbDone(0);
+
               var f = feeds_ns.emptyRssHeader();
               f.m_url = feedUrl;
               var listRemoved = [];
@@ -1816,39 +1850,73 @@ function p_feedRemoveDB(feedUrl, needsRTableSync)
         req2.onerror = function(event)
             {
               log.error('db: delete request error2 for ' + req2.result.m_url);
+
+              // Callback FAILURE
+              cbDone(1);
             }
       }
   req.onerror = function(event)
       {
         log.error('db: delete request error1 for ' + req.result.m_url);
+
+        // Callback FAILURE
+        cbDone(1);
       }
 }
 Feeds.prototype.p_feedRemoveDB = p_feedRemoveDB;
 
 // object Feeds.p_feedRemoveList
 // Deletes a list of feeds from database table 'rss_subscriptions'
-function p_feedRemoveList(listToRemove, needsRTableSync)
+function p_feedRemoveList(listToRemove, needsRTableSync, cbDone)
 {
   var self = this;
 
   var i = 0;
   var hdr = null;
+  let exitCode = 0;
+  let pendingOps = 0;
+  let requestCompleted = false;
   for (i = 0; i < listToRemove.length; ++i)
   {
     hdr = listToRemove[i];
     utils_ns.assert(hdr instanceof feeds_ns.RssHeader, "p_feedRemoveList: x instanceof feeds_ns.RssHeader");
 
     log.info('execute deferred remove: ' + hdr.m_url);
-    self.p_feedRemoveDB(hdr.m_url, needsRTableSync);
+    self.p_feedRemoveDB(hdr.m_url, needsRTableSync, function(code)
+        {
+          // Agreggate success or failure
+          if (code != 0)
+            exitCode = 1;
+
+          // If all pending deletions are completed => cbDone
+          --pendingOps;
+          if (requestCompleted && pendingOps == 0)
+          {
+            log.info(`p_feedRemoveList: exit code ${exitCode}`);
+            cbDone(exitCode);
+          }
+        });
+    ++pendingOps;
+  }
+  requestCompleted = true;
+
+  // Check if nothing was scheduled (list empty)
+  if (pendingOps == 0)
+  {
+    // Callback SUCCESS
+    cbDone(0);
   }
 }
 Feeds.prototype.p_feedRemoveList = p_feedRemoveList;
 
 // object Feeds.p_feedRemove
 // Deletes a feed from database table 'rss_subscriptions' and list of feeds
-function p_feedRemove(feedUrl, needsRTableSync)
+function p_feedRemove(feedUrl, needsRTableSync, cbDone)
 {
   var self = this;
+
+  utils_ns.assert(cbDone !== undefined, "p_feedRemove: cbDone() is undefined");
+  utils_ns.assert(cbDone != null, "p_feedRemove: cbDone() is null");
 
   // Find feed in the list of feeds
   var feed = feeds_ns.emptyRssHeader();
@@ -1866,16 +1934,16 @@ function p_feedRemove(feedUrl, needsRTableSync)
   // Delete from the database
   var kk = [];
   kk.push(feed);
-  self.p_feedRemoveList(kk, needsRTableSync);
+  self.p_feedRemoveList(kk, needsRTableSync, cbDone);
 }
 Feeds.prototype.p_feedRemove = p_feedRemove;
 
 // object Feeds.feedRemove
 // Deletes a feed from database table 'rss_subscriptions' and list of feeds
-function feedRemove(feedUrl)
+function feedRemove(feedUrl, cbDone)
 {
   var self = this;
-  self.p_feedRemove(feedUrl, true);
+  self.p_feedRemove(feedUrl, true, cbDone);
 }
 Feeds.prototype.feedRemove = feedRemove;
 

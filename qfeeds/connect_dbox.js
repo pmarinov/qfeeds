@@ -127,12 +127,13 @@ function p_dboxGetAccountInfo(cb)
         log.info('dropbox: p_dboxGetAccountInfo(), OK');
         self.m_user_name = response.result.name.given_name + ' ' + response.result.name.surname;
         self.m_user_email = response.result.email;
-        cb(1);
+        cb(0);
       })
       .catch(function(error)
       {
         log.error('dropbox: p_dboxGetAccountInfo(), failure');
-        cb(0);
+        log.info('dropbox: p_dboxGetAccountInfo(), ' + error);
+        cb(1);
       });
 }
 ConnectDBox.prototype.p_dboxGetAccountInfo = p_dboxGetAccountInfo;
@@ -178,7 +179,7 @@ function p_displayLoginState()
   log.info('dropbox: p_displayLoginState()');
   self.p_dboxGetAccountInfo(function(status)
       {
-        if (status == 1)
+        if (status == 0)
         {
           log.info('dropbox: login good.');
           self.m_authenticated = true;

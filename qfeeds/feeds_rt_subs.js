@@ -95,6 +95,8 @@ function handleEntryEvent(records, cbDone)
   let requestCompleted = false;
   let k = 0;
   let r = null;
+
+  log.info(`rtHandlerSubs.handleEntryEvent: ${records.length} events from Dropbox`)
   for (k = 0; k < records.length; ++k)
   {
     (function()  // scope
@@ -107,20 +109,44 @@ function handleEntryEvent(records, cbDone)
       let feedHash = sha1.toString();
       let x = self.m_feeds.p_feedFindByHash(feedHash);
 
-      // Skip operation if it is remote delete
-      // Local delete will take place when scheduled
-      if (r.isDeleted)  // remotely deleted?
+      ++numCompleted;  // The number of expected completion callbacks
+
+      // Remotely deleted?
+      if (r.isDeleted)
       {
         if (x == -1)
         {
-          log.warn('rtHandlerSubs.handleEntryEvent: unknown feed ' + feedHash);
-          return;
-        }
-        log.info('rtHandlerSubs.handleEntryEvent: deleted remotely -- ' + self.m_feeds.m_rssFeeds[x].m_url);
+          log.warn('rtHandlerSubs.handleEntryEvent: unknown feed ' + feedUrl);
 
-        // TODO: We need to have p_feedRemove have a call-back cbDone
-        self.m_feeds.p_feedRemove(self.m_feeds.m_rssFeeds[x].m_url, false);
-        self.m_feeds.m_feedsCB.onRemoteFeedDeleted(feedHash);
+          // Error but we still have to complete the event
+          --numCompleted;
+
+          // Everything already recorded?
+          if (requestCompleted && numCompleted == 0)
+          {
+            log.info(`rtHandlerSubs.handleEntryEvent (2): completed ${numCompleted}`);
+            cbDone();
+          }
+        }
+        else
+        {
+          log.info('rtHandlerSubs.handleEntryEvent: event \'delete\' -- ' + feedUrl);
+
+          // TODO: We need to have p_feedRemove have a call-back cbDone
+          self.m_feeds.p_feedRemove(self.m_feeds.m_rssFeeds[x].m_url, false, function (exit_code)
+              {
+                self.m_feeds.m_feedsCB.onRemoteFeedDeleted(feedHash);
+
+                --numCompleted;
+
+                // Everything already recorded?
+                if (requestCompleted && numCompleted == 0)
+                {
+                  log.info(`rtHandlerSubs.handleEntryEvent: completed ${numCompleted}`);
+                  cbDone();
+                }
+              });
+        }
         return;  // leave the anonymous scope
       }
 
@@ -143,10 +169,10 @@ function handleEntryEvent(records, cbDone)
       newFeed.m_tags = feedTags;
       newFeed.m_remote_state = feeds_ns.RssSyncState.IS_SYNCED;
 
+      log.info('rtHandlerSubs.handleEntryEvent: event \'add\' -- ' + feedUrl);
+
       // Put into local list of RSS subscriptions (self.m_feeds.m_rssFeeds)
       self.m_feeds.p_feedInsert(newFeed);
-
-      ++numCompleted;  // The number of expected completion callbacks
 
       // Put in the IndexedDB
       self.m_feeds.p_feedRecord(newFeed, false,
@@ -157,7 +183,7 @@ function handleEntryEvent(records, cbDone)
             // Everything already recorded?
             if (requestCompleted && numCompleted == 0)
             {
-              log.info(`rtHandlerSubs.handleEntryEvent: marked ${numCompleted} as IS_SYNCED`);
+              log.info(`rtHandlerSubs.handleEntryEvent: completed ${numCompleted}`);
               cbDone();
             }
 
@@ -259,8 +285,11 @@ function markAsSynced(listRemoteSubs, cbDone)
       continue;
     }
 
+    // Update the table that is in memory
+    log.info(`rtHandlerSubs.markAsSynced: entry [${cnt}] (${target.m_url}): marking as IS_SYNCED`);
     target.m_remote_state = feeds_ns.RssSyncState.IS_SYNCED;  // Ends up in m_rssFeeds[] too
 
+    // Update the record in the IndexedDB
     ++numCompleted;  // The number of expected completion callbacks
     self.m_feeds.p_feedRecord(target, false, function ()
         {
@@ -285,6 +314,31 @@ function markAsSynced(listRemoteSubs, cbDone)
   }
 }
 rtHandlerSubs.prototype.markAsSynced = markAsSynced;
+
+// object rtHandlerSubs.deleteRec
+// Schedules a row of data to be deleted in the remote table
+function insert(feed)
+{
+  let self = this;
+
+  // Check if this is a feed object
+  utils_ns.hasFields(feed, ['m_url', 'm_tags'], 'rtHandlerEntries.insert()');
+
+  let newRemoteEntry = new RemoteFeedUrl(feed);
+  self.m_feeds.m_rt.insert('rss_subscriptions', newRemoteEntry);
+}
+rtHandlerSubs.prototype.insert = insert;
+
+// object rtHandlerSubs.deleteRec
+// Schedules a row of data to be deleted in the remote table
+function deleteRec(feed)
+{
+  let self = this;
+
+  let newRemoteEntry = new RemoteFeedUrl(feed);
+  self.m_feeds.m_rt.deleteRec('rss_subscriptions', newRemoteEntry);
+}
+rtHandlerSubs.prototype.deleteRec = deleteRec;
 
 // export to feeds_rt_subs_ns namespace
 feeds_rt_subs_ns.rtHandlerSubs = rtHandlerSubs;

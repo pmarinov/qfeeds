@@ -47,6 +47,21 @@ function insert(remoteTableName, tableRow)
 }
 RTables.prototype.insert = insert;
 
+// object RTables.deleteRec()
+// Insert a delete request entry into a remote table journal
+//
+// Entries are pushed into a vector and picked up
+// writeBackHandler()
+function deleteRec(remoteTableName, tableRow)
+{
+  let self = this;
+  let ctx = self.m_rtables[remoteTableName].m_ctx;
+
+  let x = new JournalEntry(tableRow, self.TAG_ACTION_DELETE);
+  ctx.newJournal.push(x);
+}
+RTables.prototype.deleteRec = deleteRec;
+
 // object RTables.reset()
 // [Debug function]
 // Reset connection to remote table, next load will be a full re-load
@@ -736,7 +751,7 @@ function loadStateMachine(objRTables, remoteTableName)
             if (revJournal == ctx.freshRevJournal)
             {
               // Journal should alredy be in ctx.remoteJournal
-              log.info('dropbox: [' + remoteTableName + '] Use the locally stored journal');
+              log.info('dropbox: [' + remoteTableName + '] Keep the locally stored journal');
 
               // Nothin to load (remote rev is the same as last time)
               state.advance('LOAD_DATA_FULL_STATE');
@@ -995,6 +1010,9 @@ function loadStateMachine(objRTables, remoteTableName)
                     g_utilsCB.setPref(ctx.prefRevJournal, revToApply);
                 });
           }
+          else
+            log.info('dropbox: [' + remoteTableName + '] no new joural data to apply');
+
 
           ctx.revJournal = ctx.freshRevJournal;
         }
