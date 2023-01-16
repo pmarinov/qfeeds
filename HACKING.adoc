@@ -90,7 +90,7 @@ $ cat \{2df366ca-28d2-11e8-9c70-b7b0d99bd061\}
 +
 . Use full path to home folder, not `~`
 +
-. The name of the poiter file *matches* the field _id_ from _manifest.json_
+. The name of the pointer file *matches* the field _id_ from _manifest.json_
 +
 . The trailing slash is important
 +
@@ -153,4 +153,12 @@ into local IndexedDB
 
 >> feeds_ns.app.m_feedsDir.m_feedsDB.feedAddByUrl2()
 [Debug] Added https://...
+....
+
+=== Unsubscribe All ===
+
+....
+>> feeds_ns.app.m_feedsDir.m_feedsDB.feedUnsubscribeAll(true)
+[Debug] Delete all subscriptions from IndexedDB, remoteSync: true
+[Debug] Done, deleted 2 RSS subsciptions
 ....

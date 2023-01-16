@@ -1505,7 +1505,7 @@ function p_feedOnDbError1(msg, tableName, url, cbResult, r)
   var m = -1;
   var feed = null;
 
-  log.error('db: (' + tableName + ') ' + msg);
+  log.warn(`db: (${tableName}) ${msg} -- ${url}`);
 
   if (url != null)
   {
@@ -1518,7 +1518,7 @@ function p_feedOnDbError1(msg, tableName, url, cbResult, r)
   }
 
   if (cbResult != null)  // Notifier callback provided?
-    cbResult(0);  // Notify that no update was needed
+    cbResult(0);  // Notify that no update took place
 }
 Feeds.prototype.p_feedOnDbError1 = p_feedOnDbError1;
 
@@ -1661,6 +1661,7 @@ function p_feedRecord(feed, syncRTable, cbResult)
         if (m < 0)
         {
           self.p_feedOnDbError1('feed already deleted', 'rss_subscriptions', feedUrl, cbResult, 0);
+          cbResult(0);  // Notify that no update was needed
           return;
         }
         feed = self.m_rssFeeds[m];
@@ -1730,7 +1731,10 @@ function p_feedAddByUrl(feedUrl, tags, cbDone, updateRemote)
 
   // Add to IndexedDB table rss_subscriptions
   // Add to remote table 'rss_subscriptions' (if updateRemote)
-  self.p_feedRecord(newFeed, updateRemote, null);
+  self.p_feedRecord(newFeed, updateRemote, function(code)
+    {
+      log.info(`added to db ${code}, ${feedUrl}`);
+    });
 
   // First fetch of the RSS data for this URL, update the subscribed listeners
   self.p_fetchRss(feedUrl, null,
@@ -1787,6 +1791,10 @@ Feeds.prototype.feedAddByUrl2 = feedAddByUrl2;
 //
 // * An event is received from a remote table that needs to be
 //   reflected locally, then the flag is set to false
+//
+// -- cbDone(was_update_needed) -- callback
+// was_update_needed -- int: 1 = update was needed and entry was recorded
+// was_update_needed -- int: 0 = no update was needed, record request ignored
 function p_feedRemoveDB(feedUrl, needsRTableSync, cbDone)
 {
   var self = this;
@@ -1812,10 +1820,10 @@ function p_feedRemoveDB(feedUrl, needsRTableSync, cbDone)
         var data = req.result;
         if (data === undefined)
         {
-          log.error('db: delete request error, record not found for ' + feedUrl);
+          log.warn('db: delete request error, record not found for ' + feedUrl);
 
-          // Callback FAILURE
-          cbDone(1);
+          // Callback, 0 = record not updated
+          cbDone(0);
           return;
         }
         if (needsRTableSync)
@@ -1838,8 +1846,8 @@ function p_feedRemoveDB(feedUrl, needsRTableSync, cbDone)
             {
               log.info('db: delete request success, feed: ' + feedUrl);
 
-              // Callback SUCCESS
-              cbDone(0);
+              // Callback, 1 = record updated
+              cbDone(1);
 
               var f = feeds_ns.emptyRssHeader();
               f.m_url = feedUrl;
@@ -1851,28 +1859,29 @@ function p_feedRemoveDB(feedUrl, needsRTableSync, cbDone)
             {
               log.error('db: delete request error2 for ' + req2.result.m_url);
 
-              // Callback FAILURE
-              cbDone(1);
+              // Callback, 0 = record not updated
+              cbDone(0);
             }
       }
   req.onerror = function(event)
       {
         log.error('db: delete request error1 for ' + req.result.m_url);
 
-        // Callback FAILURE
-        cbDone(1);
+        // Callback, 0 = record not updated
+        cbDone(0);
       }
 }
 Feeds.prototype.p_feedRemoveDB = p_feedRemoveDB;
 
 // object Feeds.p_feedRemoveList
 // Deletes a list of feeds from database table 'rss_subscriptions'
+// BUT NOT from self.m_rssFeeds[]
 function p_feedRemoveList(listToRemove, needsRTableSync, cbDone)
 {
-  var self = this;
+  let self = this;
 
-  var i = 0;
-  var hdr = null;
+  let i = 0;
+  let hdr = null;
   let exitCode = 0;
   let pendingOps = 0;
   let requestCompleted = false;
@@ -1884,9 +1893,9 @@ function p_feedRemoveList(listToRemove, needsRTableSync, cbDone)
     log.info('execute deferred remove: ' + hdr.m_url);
     self.p_feedRemoveDB(hdr.m_url, needsRTableSync, function(code)
         {
-          // Agreggate success or failure
-          if (code != 0)
-            exitCode = 1;
+          // Agreggate record updated (code=1) or not updated (code=0)
+          if (code == 1)
+            exitCode = code;
 
           // If all pending deletions are completed => cbDone
           --pendingOps;
@@ -1903,7 +1912,7 @@ function p_feedRemoveList(listToRemove, needsRTableSync, cbDone)
   // Check if nothing was scheduled (list empty)
   if (pendingOps == 0)
   {
-    // Callback SUCCESS
+    // Callback, 0 = record not updated
     cbDone(0);
   }
 }
@@ -1913,28 +1922,40 @@ Feeds.prototype.p_feedRemoveList = p_feedRemoveList;
 // Deletes a feed from database table 'rss_subscriptions' and list of feeds
 function p_feedRemove(feedUrl, needsRTableSync, cbDone)
 {
-  var self = this;
+  let self = this;
 
   utils_ns.assert(cbDone !== undefined, "p_feedRemove: cbDone() is undefined");
   utils_ns.assert(cbDone != null, "p_feedRemove: cbDone() is null");
 
   // Find feed in the list of feeds
-  var feed = feeds_ns.emptyRssHeader();
+  let feed = feeds_ns.emptyRssHeader();
   feed.m_url = feedUrl;
-  var m = self.m_rssFeeds.binarySearch(feed, compareRssHeadersByUrl);
+  let m = self.m_rssFeeds.binarySearch(feed, compareRssHeadersByUrl);
   if (m < 0)
   {
-    log.error('rss feed ' + feedUrl + ' not found');
+    log.warning('rss feed ' + feedUrl + ' not found');
+    cbDone(1);
     return;
   }
 
-  // Remove from list of feeds
-  self.m_rssFeeds.splice(m, 1);
-
   // Delete from the database
-  var kk = [];
+  let kk = [];
   kk.push(feed);
-  self.p_feedRemoveList(kk, needsRTableSync, cbDone);
+  self.p_feedRemoveList(kk, needsRTableSync, function (code)
+    {
+      // Check if record is updated (code=1) or not updated (code=0)
+      if (code == 1)
+      {
+        // Deleted successfully in the Indexed DB, now delete from the m_rssFeeds[]
+        let m = self.m_rssFeeds.binarySearch(feed, compareRssHeadersByUrl);
+        if (m >= 0)
+          self.m_rssFeeds.splice(m, 1);
+        else
+          log.warning('rss feed ' + feedUrl + ' not found');
+      }
+
+      cbDone(code)
+    });
 }
 Feeds.prototype.p_feedRemove = p_feedRemove;
 
@@ -1953,18 +1974,20 @@ Feeds.prototype.feedRemove = feedRemove;
 //
 // To call for from the console:
 // feeds_ns.app.m_feedsDir.m_feedsDB.feedUnsubscribeAll
-function feedUnsubscribeAll()
+function feedUnsubscribeAll(remoteSync)
 {
   var self = this;
 
-  log.info('[Debug] Delete all subscriptions from IndexedDB...');
+  log.info(`[Debug] Delete all subscriptions from IndexedDB, remoteSync: ${remoteSync}`);
 
   let num_subs = self.m_rssFeeds.length;
-  // Remove local feeds, without remote sync
-  while (self.m_rssFeeds.length > 0)
-    self.p_feedRemove(self.m_rssFeeds[0].m_url, false)
+  let listFeeds = self.m_rssFeeds.copy();
+  self.m_rssFeeds = []
 
-  log.info('[Debug] Done, deleted ' + num_subs + ' RSS subsciptions');
+  self.p_feedRemoveList(listFeeds, remoteSync, function()
+    {
+      log.info('[Debug] Done, deleted ' + num_subs + ' RSS subsciptions');
+    });
 }
 Feeds.prototype.feedUnsubscribeAll = feedUnsubscribeAll;
 
