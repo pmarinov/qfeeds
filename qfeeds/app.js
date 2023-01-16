@@ -221,6 +221,17 @@ function App()
   return this;
 }
 
+function p_runNextStep(seq, index)
+{
+  let total = seq.length - 1;
+  log.info(`app: start of init step ${index} of ${total}`);
+
+  let nextStep = seq[index];
+  nextStep();
+
+  log.info(`app: end of init step ${index}`);
+}
+
 // object App.p_initSeqNext
 function p_initSeqNext()
 {
@@ -229,16 +240,8 @@ function p_initSeqNext()
   if (self.m_initCnt >= self.m_initSeq.length)
     return;  // All init steps are done
 
-  setTimeout(function (index)
-      {
-        let total = self.m_initSeq.length - 1;
-        log.info(`app: start of init step ${index} of ${total}`);
-
-        let nextStep = self.m_initSeq[index];
-        nextStep();
-
-        log.info(`app: end of init step ${index}`);
-      }, 0, self.m_initCnt);  // Delay 0, just yield
+  setTimeout(p_runNextStep, 0,          // Delay 0, just yield
+    self.m_initSeq, self.m_initCnt);  // Parameters for runNextStep
 
   ++self.m_initCnt;
 }
