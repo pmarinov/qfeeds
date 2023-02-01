@@ -24,6 +24,9 @@ let g_dbox = null;
 let g_utilsCB  = null;
 const g_journalMaxSize = 1024 * 4;
 
+const g_stateMachineIntervalSeconds = 120;
+const g_stateMachineIntervalTickSeconds = 5;
+
 function JournalEntry(tableRow, action)
 {
   this.m_row = tableRow;
@@ -534,32 +537,22 @@ function writeBackHandler(self)
   self.p_rescheduleWriteBack();
 }
 
-// object [global] p_rescheduleStateMachine
-//
-// Reschedule the state machine for another run for the given
-// remoteTableName
-function p_rescheduleStateMachine(objRTables, remoteTableName)
-{
-  let rtable = objRTables.m_rtables[remoteTableName];
-
-  // Cancel any run that was already scheduled
-  if (rtable.m_timerStateM != null)
-    clearTimeout(rtable.m_timerStateM);
-
-  // Setup the time for the next run of the state machine
-  rtable.m_timerStateM =
-      setTimeout(p_triggerStateMachine, 120 * 1000, objRTables, remoteTableName);
-}
-
 // object [global] p_triggerStateMachine
 //
 // Invoked on timer, runs the state machine for remoteTableName if it
 // is state IDLE
 function p_triggerStateMachine(objRTables, remoteTableName)
 {
-  log.info(`dropbox: p_triggerStateMachine(${remoteTableName})`);
-
   let rtable = objRTables.m_rtables[remoteTableName];
+
+  rtable.m_seconds += g_stateMachineIntervalTickSeconds;
+
+  if (rtable.m_seconds < g_stateMachineIntervalSeconds)
+    return;
+
+  rtable.m_seconds = 0;
+
+  log.info(`dropbox: p_triggerStateMachine(${remoteTableName})`);
 
   // State machine should only be started from IDLE state, verify if
   // it is in IDLE
@@ -576,15 +569,11 @@ function p_triggerStateMachine(objRTables, remoteTableName)
 
     // Skip the scheduled write
     log.info(`dropbox: p_triggerStateMachine(${remoteTableName}), skipped one state machine run (${rtable.m_delayCnt}/3)`)
-    p_rescheduleStateMachine(objRTables, remoteTableName);
-
     return;
   }
 
   // Set the state machine in motion to poll remote tables
   rtable.m_readStateM.advance('START_FULL_LOAD');
-
-  p_rescheduleStateMachine(objRTables, remoteTableName);
 }
 
 // object loadStateMachine [factory]
@@ -1283,9 +1272,10 @@ function RTables(profile, rtables, cbEvents, cbDisplayProgress)
                     self.p_eventHandler(self, entry.name, event);
                   });
 
-              // First run in 1 second
+              // First run in 5 seconds
+              rentry.m_seconds = g_stateMachineIntervalSeconds - g_stateMachineIntervalTickSeconds;
               rentry.m_timerStateM =
-                  setTimeout(p_triggerStateMachine, 1 * 1000, self, entry.name);
+                  setInterval(p_triggerStateMachine, g_stateMachineIntervalTickSeconds * 1000, self, entry.name);
             }
 
             // Setup the handler of periodic write operations
