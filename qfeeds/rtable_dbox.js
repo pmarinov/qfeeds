@@ -25,7 +25,7 @@ let g_utilsCB  = null;
 const g_journalMaxSize = 1024 * 4;
 
 const g_stateMachineIntervalSeconds = 120;
-const g_stateMachineIntervalTickSeconds = 5;
+const g_stateMachineIntervalTickSeconds = 60;
 
 function JournalEntry(tableRow, action)
 {
@@ -1272,10 +1272,20 @@ function RTables(profile, rtables, cbEvents, cbDisplayProgress)
                     self.p_eventHandler(self, entry.name, event);
                   });
 
-              // First run in 5 seconds
-              rentry.m_seconds = g_stateMachineIntervalSeconds - g_stateMachineIntervalTickSeconds;
+              // Setup the state machine to run on an interval of time
+              rentry.m_seconds = 0;
               rentry.m_timerStateM =
                   setInterval(p_triggerStateMachine, g_stateMachineIntervalTickSeconds * 1000, self, entry.name);
+
+              // Run it the first time in 2 seconds from now
+              //
+              // (The clock tick IntervalTickSeconds and the total
+              // time of 2 minutes is too slow for first load)
+              setTimeout(function ()
+                  {
+                      log.info(`dropbox: [${entry.name}] first run`)
+                      rentry.m_readStateM.advance('START_FULL_LOAD');
+                  }, 2 * 1000);
             }
 
             // Setup the handler of periodic write operations
