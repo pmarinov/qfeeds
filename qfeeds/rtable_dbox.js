@@ -595,14 +595,19 @@ function loadStateMachine(objRTables, remoteTableName)
             cbCompletion: null
         });
 
-        log.info('dropbox: [' + remoteTableName + '] state ' + state.stringify());
+        let now = new Date();
+        log.info('dropbox: [' + remoteTableName + '] state ' + state.stringify() + ', ' +
+            utils_ns.dateToStr(now));
       });
 
   state.add('START_FULL_LOAD', function ()
       {
         //
         // FULL_LOAD: Start sequence for loading updated state from Dropbox
-        log.info('dropbox: [' + remoteTableName + '] state ' + state.stringify());
+        let now = new Date();
+        log.info('dropbox: [' + remoteTableName + '] state ' + state.stringify() + ', ' +
+            utils_ns.dateToStr(now));
+
         let ctx = objRTables.m_rtables[remoteTableName].m_ctx;
 
         // Reset fresh revisions
@@ -651,13 +656,15 @@ function loadStateMachine(objRTables, remoteTableName)
                     // Data file doesn't exist on Dropbox
                     log.info('dropbox: NOT FOUND detected for "' + baseName  + '"');
                     ctx.freshRevJournal = 'empty';
+                    state.advance('GET_REV_FSTATE');
                   }
                   else
                   {
                     log.error('dropbox: getMetadata for journal "' + baseName + '"');
                     log.error(response);
+                    log.error('dropbox: Network error, can\'t continue going back to IDLE')
+                    state.advance('IDLE');
                   }
-                  state.advance('GET_REV_FSTATE');
                 });
       });
 
@@ -695,14 +702,15 @@ function loadStateMachine(objRTables, remoteTableName)
                     log.info('dropbox: NOT FOUND detected for "' + baseName  + '"');
                     g_utilsCB.setPref(ctx.prefRevFState, 'empty');
                     ctx.freshRevFState = null;
+                    state.advance('LOAD_DATA_JOURNAL');
                   }
                   else
                   {
                     log.error('dropbox: getMetadata for fstate "' + baseName + '"');
                     log.error(response);
+                    log.error('dropbox: Network error, can\'t continue going back to IDLE')
+                    state.advance('IDLE');
                   }
-
-                  state.advance('LOAD_DATA_JOURNAL');
                 });
       });
 
