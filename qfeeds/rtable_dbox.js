@@ -47,6 +47,9 @@ function insert(remoteTableName, tableRow)
 
   let x = new JournalEntry(tableRow, self.TAG_ACTION_SET);
   ctx.newJournal.push(x);
+
+  // Schedule the writeBackHandler() if not already scheduled
+  self.p_rescheduleWriteBack(remoteTableName);
 }
 RTables.prototype.insert = insert;
 
@@ -62,6 +65,9 @@ function deleteRec(remoteTableName, tableRow)
 
   let x = new JournalEntry(tableRow, self.TAG_ACTION_DELETE);
   ctx.newJournal.push(x);
+
+  // Schedule the writeBackHandler() if not already scheduled
+  self.p_rescheduleWriteBack(remoteTableName);
 }
 RTables.prototype.deleteRec = deleteRec;
 
@@ -253,18 +259,45 @@ function p_applyJournal(remoteTableName, journal, cbDone)
 RTables.prototype.p_applyJournal = p_applyJournal;
 
 // object RTables.p_rescheduleWriteBack
-function p_rescheduleWriteBack()
+function p_rescheduleWriteBack(remoteTableName)
 {
   let self = this;
+  let ctx = self.m_rtables[remoteTableName].m_ctx;
 
-  // Cancel any outstanding scheduled runs
-  if (self.m_writeBack != null)
-    clearTimeout(self.m_writeBack);
-
-  // Setup the time for the next run of the write operations
-  self.m_writeBack = setTimeout(writeBackHandler, 5 * 1000, self);
+  // Schedule the writeBackHandler() if not already scheduled
+  //
+  // It is an interval -- it will try every 5 seconds until it
+  // manages to complete the write-back operation
+  if (ctx.m_writeBack == null)
+  {
+    log.info(`dropbox: [${remoteTableName}] Activate writeBack() timer`);
+    ctx.m_writeBack = setInterval(p_writeBackHandler, 5 * 1000, self, remoteTableName);
+  }
 }
 RTables.prototype.p_rescheduleWriteBack = p_rescheduleWriteBack;
+
+// object RTables.p_deactivateWriteBack
+//
+// Deactvate the timer for writeBack() when no more entries are
+// waiting in the journal
+function p_deactivateWriteBack(remoteTableName)
+{
+  let self = this;
+  let ctx = self.m_rtables[remoteTableName].m_ctx;
+
+  // No pending entries, no need for timer
+  if (ctx.newJournal.length > 0)
+    return;
+
+  if (ctx.m_writeBack != null)
+  {
+    log.info(`dropbox: [${remoteTableName}] Deactivate writeBack() timer`);
+    clearInterval(ctx.m_writeBack);
+    ctx.m_writeBack = null;
+  }
+}
+RTables.prototype.p_deactivateWriteBack = p_deactivateWriteBack;
+
 
 // object RTables.p_eventHandler
 function p_eventHandler(self, tableName, event)
@@ -276,265 +309,258 @@ function p_eventHandler(self, tableName, event)
 }
 RTables.prototype.p_eventHandler = p_eventHandler;
 
-// object [global] writeBackHandler()
+
+// object [global] p_writeBackHandler()
 //
 // Set to be invoked periodically by a timer, checks if local journals
 // are dirty and sends them to Dropbox
-function writeBackHandler(self)
+function p_writeBackHandler(self, remoteTableName)
 {
-  // Only one operation active at a time,
-  // reschedule if still in the previous one
-  if (self.m_writeBackInProgress)
+  let ctx = self.m_rtables[remoteTableName].m_ctx;
+
+  // No new entries
+  if (ctx.newJournal.length == 0)
   {
-    ++self.m_progressCnt;
-    if (self.m_progressCnt > 3)
+    ctx.m_writeBackInProgress = false;
+    self.p_deactivateWriteBack(remoteTableName);
+    return;
+  }
+
+  // Only one operation active at a time (avoid re-entrancy),
+  // reschedule if still in the previous one
+  if (ctx.m_writeBackInProgress)
+  {
+    ++ctx.m_progressCnt;
+    if (ctx.m_progressCnt > 3)
     {
       // We waited for too long for previous to complete, sound the
       // alarm
-      utils_ns.domError('dropbox: writeBackHandler() failed to complete');
+      utils_ns.domError(`dropbox: [${remoteTableName}] writeBackHandler() failed to complete`);
       return;
     }
 
     // Skip the scheduled write
-    log.info('dropbox: writeBackHandler(), skipped one write')
-    self.p_rescheduleWriteBack();
+    log.info(`dropbox:  [${remoteTableName}] writeBackHandler(), skipped one write`);
+
+    // Wait until the next call scheduled by the setInterval() function
     return;
   }
 
-  self.m_writeBackInProgress = true;
-  self.m_progressCnt = 0;
+  // Protect against re-entrant invocation
+  ctx.m_writeBackInProgress = true;
+  ctx.m_progressCnt = 0;
 
-  // Go over all remote tables
-  let tableNames = Object.keys(self.m_rtables);
-  let scheduled = false;
-  for (let i = 0; i < tableNames.length; ++i)
+  let rtable = self.m_rtables[remoteTableName];
+  if (rtable.m_readStateM.m_curState != 'IDLE')
   {
-    let tableName = tableNames[i];
-    let rtable = self.m_rtables[tableName];
-    let ctx = rtable.m_ctx;
+    log.info(`dropbox: writeBackHandler(${remoteTableName}), readStateM not in IDLE, skipped one write`)
+    return;
+  }
 
-    // No new entries
-    if (ctx.newJournal.length == 0)
-      continue;
+  // We need the remote journal in order to append (overwrite it)
+  if (!ctx.journalAcquired)
+  {
+    log.info(`dropbox: writeBackHandler(${remoteTableName}), remote journal not acquire yet, skipped one write`)
+    return; // Acquisition of remote journal still pending
+  }
 
-    if (rtable.m_readStateM.m_curState != 'IDLE')
+  // String presentation of all journal entries
+  // (Append "new" after "remote")
+  let entries = [];
+  for (let j = 0; j < ctx.remoteJournal.length; ++j)
+    entries.push(JSON.stringify(ctx.remoteJournal[j]));
+  for (let j = 0; j < ctx.newJournal.length; ++j)
+    entries.push(JSON.stringify(ctx.newJournal[j]));
+
+  // String representation of the entire file on Dropbox
+  let strAll = '{\n' +
+      '"formatVersion": ' + ctx.formatVersion + ',\n' +
+      '"entries": [\n' + entries.join(',\n') + '\n]\n' +
+    '}\n';
+  let lenStrAll = strAll.length;
+
+  // Record up to which entry in the journal is being sent to remote
+  // journal file
+  let markRecordPoint = ctx.newJournal.length;
+
+  if (lenStrAll > g_journalMaxSize)
+  {
+    // Threshold reached:
+    //
+    // The full data representation is full state file + and journal
+    // file, it is time to move all journal entries into the full state file
+    //
+    // The journal entries are already applied in the local
+    // IndexedDB, we can write via a WRITE_FULL_STATE, and then
+    // delete the journal file
+
+    log.info(`dropbox: writeBackHandler(${remoteTableName}) journal size limit reached: ` +
+             `${lenStrAll} > ${g_journalMaxSize}`);
+    log.info(`dropbox: writeBackHandler(${remoteTableName}), ${markRecordPoint} journal entries`);
+
+    // == 1 == Enqueue event SYNC_FULL_STATE
+    // (This will produce its own MARK_AS_SYNCED)
+    scheduled = true;
+    ctx.events.runEvent({
+        event: 'WRITE_FULL_STATE',
+        tableName: ctx.tableName,
+        data: null,
+        cbCompletion: function(exit_code) {
+            if (code != 0)
+            {
+              // Ended in error
+              // Then this is the end of the callback operation
+              ctx.m_writeBackInProgress = false;
+              self.p_deactivateWriteBack(remoteTableName);
+              return;
+            }
+
+            // == 2 == Delete the entries up to markRecordPoint from ctx.newJournal[]
+            log.info(`dropbox: writeBackHandler(${remoteTableName}), Delete ${markRecordPoint} journal entries`);
+            ctx.newJournal.splice(0, markRecordPoint);
+
+            // == 3 == Delete the journal file
+            log.info(`dropbox: writeBackHandler(${remoteTableName}), delete journal file: ${ctx.fnameJournal}`);
+            log.info(`dropbox: writeBackHandler(${remoteTableName}), filesDelete(${ctx.idJournal})`);
+            g_dbox.filesDeleteV2(
+                {
+                  path: ctx.profilePath + '/' + ctx.fnameJournal,
+                })
+                .then(function(response)
+                    {
+                      // The end of the callback operation
+                      ctx.m_writeBackInProgress = false;
+                      self.p_deactivateWriteBack(remoteTableName);
+
+                      // Log it
+                      log.info(`dropbox: writeBackHandler(${remoteTableName}), filesDelete(${ctx.fnameJournal}), deleted OK`);
+                    })
+                .catch(function(response)
+                    {
+                      // The end of the callback operation
+                      ctx.m_writeBackInProgress = false;
+                      self.p_deactivateWriteBack(remoteTableName);
+
+                      log.error(response);
+
+                      // The error could have 2 sources
+                      //
+                      // 1: Dropbox error, then we have fields response.error.error_summary
+                      // 2: No-Dropbox error, then we have response.message
+                      let err_msg = '!response.message!'
+                      if (response.error !== undefined && response.error.error_summary !== undefined)
+                        err_msg = response.error.error_summary
+                      else
+                        err_msg = response.message;
+
+                      utils_ns.domError("dropbox: filesDelete('" + ctx.fnameJournal + "'), " +
+                          "error: " + err_msg);
+                    });
+        }
+    });
+  }
+  else
+  {
+    //
+    // The journal table is still under the threshold size, write it
+    // as a journal file
+
+    let writeMode = null;
+    let strPrevVer = 'none';
+    let revJournal = ctx.revJournal;
+
+    if (revJournal == 'empty')
     {
-      log.info(`dropbox: writeBackHandler(${tableName}), readStateM not in IDLE, skipped one write`)
-      continue;
-    }
-
-    // We need the remote journal in order to append (overwrite it)
-    if (!ctx.journalAcquired)
-    {
-      log.info(`dropbox: writeBackHandler(${tableName}), remote journal not acquire yet, skipped one write`)
-      continue; // Acquisition of remote journal still pending
-    }
-
-    // String presentation of all journal entries
-    // (Append "new" after "remote")
-    let entries = [];
-    for (let j = 0; j < ctx.remoteJournal.length; ++j)
-      entries.push(JSON.stringify(ctx.remoteJournal[j]));
-    for (let j = 0; j < ctx.newJournal.length; ++j)
-      entries.push(JSON.stringify(ctx.newJournal[j]));
-
-    // String representation of the entire file on Dropbox
-    let strAll = '{\n' +
-        '"formatVersion": ' + ctx.formatVersion + ',\n' +
-        '"entries": [\n' + entries.join(',\n') + '\n]\n' +
-      '}\n';
-    let lenStrAll = strAll.length;
-
-    // Record up to which entry in the journal is being sent to remote
-    // journal file
-    let markRecordPoint = ctx.newJournal.length;
-
-    if (lenStrAll > g_journalMaxSize)
-    {
-      // Threshold reached:
-      //
-      // The full data representation is full state file + and journal
-      // file, it is time to move all journal entries into the full state file
-      //
-      // The journal entries are already applied in the local
-      // IndexedDB, we can write via a WRITE_FULL_STATE, and then
-      // delete the journal file
-
-      log.info(`dropbox: writeBackHandler(${tableName}) journal size limit reached: ` +
-               `${lenStrAll} > ${g_journalMaxSize}`);
-      log.info(`dropbox: writeBackHandler(${tableName}), ${markRecordPoint} journal entries`);
-
-      // == 1 == Enqueue event SYNC_FULL_STATE
-      // (This will produce its own MARK_AS_SYNCED)
-      scheduled = true;
-      ctx.events.runEvent({
-          event: 'WRITE_FULL_STATE',
-          tableName: ctx.tableName,
-          data: null,
-          cbCompletion: function(exit_code) {
-              if (code != 0)
-              {
-                // Ended in error
-                // Then this is the end of the callback operation
-                self.m_writeBackInProgress = false;
-                return;
-              }
-
-              // == 2 == Delete the entries up to markRecordPoint from ctx.newJournal[]
-              log.info(`dropbox: writeBackHandler(${tableName}), Delete ${markRecordPoint} journal entries`);
-              ctx.newJournal.splice(0, markRecordPoint);
-
-              // == 3 == Delete the journal file
-              log.info(`dropbox: writeBackHandler(${tableName}), delete journal file: ${ctx.fnameJournal}`);
-              log.info(`dropbox: writeBackHandler(${tableName}), filesDelete(${ctx.idJournal})`);
-              g_dbox.filesDeleteV2(
-                  {
-                    path: ctx.profilePath + '/' + ctx.fnameJournal,
-                  })
-                  .then(function(response)
-                      {
-                        // The end of the callback operation
-                        self.m_writeBackInProgress = false;
-
-                        // Log it
-                        log.info(`dropbox: writeBackHandler(${tableName}), filesDelete(${ctx.fnameJournal}), deleted OK`);
-                      })
-                  .catch(function(response)
-                      {
-                        // The end of the callback operation
-                        self.m_writeBackInProgress = false;
-
-                        log.error(response);
-
-                        // The error could have 2 sources
-                        //
-                        // 1: Dropbox error, then we have fields response.error.error_summary
-                        // 2: No-Dropbox error, then we have response.message
-                        let err_msg = '!response.message!'
-                        if (response.error !== undefined && response.error.error_summary !== undefined)
-                          err_msg = response.error.error_summary
-                        else
-                          err_msg = response.message;
-
-                        utils_ns.domError("dropbox: filesDelete('" + ctx.fnameJournal + "'), " +
-                            "error: " + err_msg);
-                      });
-          }
-      });
+      // Journal file doesn't exist remotely
+      writeMode = 'overwrite';
+      log.info('dropbox: writeBackHandler() -- new journal');
     }
     else
     {
-      //
-      // The journal table is still under the threshold size, write it
-      // as a journal file
-
-      let writeMode = null;
-      let strPrevVer = 'none';
-      let revJournal = ctx.revJournal;
-
-      if (revJournal == 'empty')
-      {
-        // Journal file doesn't exist remotely
-        writeMode = 'overwrite';
-        log.info('dropbox: writeBackHandler() -- new journal');
-      }
-      else
-      {
-        // Overwrite an existing revision (revJournal)
-        // Make sure the version we have locally matches the remote one
-        log.info('dropbox: writeBackHandler() -- update journal rev: ' + revJournal);
-        writeMode =  {
-          '.tag': 'update',
-          'update': revJournal,
-        };
-        strPrevVer = String(revJournal);
-      }
-
-      scheduled = true;
-      g_dbox.filesUpload(
-          {
-            contents: strAll,
-            path: ctx.profilePath + '/' + ctx.fnameJournal,
-            mode: writeMode,
-            strict_conflict: true,
-            autorename: false,
-            mute: true
-          })
-          .then(function(response)
-              {
-                // console.log(response);
-                log.info('dropbox: RTables.writeBackHandler(' +
-                  tableName + '), total dump length: ' + strAll.length + ', ' +
-                  'prev: ' + strPrevVer + ', new: ' + response.result.rev);
-
-                // Keep track of the new revision of the file on Dropbox
-                ctx.revJournal = response.result.rev;
-
-                // Move newJournal[] at the end of remoteJournal[]
-                for (let j = 0; j < markRecordPoint; ++j)
-                  ctx.remoteJournal.push(ctx.newJournal[j]);
-
-                // Mark as saved (synced to remote)
-                // 1. Make a new table in the format of MARK_AS_SYNCED
-                let listSynced = []
-                for (let j = 0; j < markRecordPoint; ++j)
-                  listSynced.push(ctx.newJournal[j].m_row);
-
-                // 2. Delete the entries up to markRecordPoint from ctx.newJournal[]
-                ctx.newJournal.splice(0, markRecordPoint);
-
-                // 3. Queue the event
-                ctx.events.runEvent({
-                    event: 'MARK_AS_SYNCED',
-                    tableName: ctx.tableName,
-                    data: listSynced,
-                    cbCompletion: null
-                });
-
-                // Empty newJournal (everything is in remoteJournal now)
-                ctx.newJournal = [];
-
-                // The end of the callback operation
-                self.m_writeBackInProgress = false;
-              })
-          .catch(function(response)
-              {
-                // The end of the callback operation
-                self.m_writeBackInProgress = false;
-
-                if (response.status == 409 && response.error.error_summary.startsWith('path/conflict/file'))
-                {
-                  // Data file doesn't exist on Dropbox
-                  log.info('dropbox: revision conflict detected for "' + ctx.fnameJournal  + '"');
-                  ctx.revJournal = 'empty';
-                  ctx.idJournal = 'empty'
-                }
-                else
-                {
-                  log.error('dropbox: getMetadata for journal "' + ctx.fnameJournal + '"');
-                  log.error(response);
-                }
-
-                log.error('dropbox: filesUpload');
-                console.log(response);
-                // Callback FAILURE
-                // We will retry in the next iteration
-              });
+      // Overwrite an existing revision (revJournal)
+      // Make sure the version we have locally matches the remote one
+      log.info('dropbox: writeBackHandler() -- update journal rev: ' + revJournal);
+      writeMode =  {
+        '.tag': 'update',
+        'update': revJournal,
+      };
+      strPrevVer = String(revJournal);
     }
 
-    // Only one pending call-back operation at a time
-    if (scheduled)
-      break;
-  }  // for (let i = 0; i < tableNames.length; ++i)
+    g_dbox.filesUpload(
+        {
+          contents: strAll,
+          path: ctx.profilePath + '/' + ctx.fnameJournal,
+          mode: writeMode,
+          strict_conflict: true,
+          autorename: false,
+          mute: true
+        })
+        .then(function(response)
+            {
+              // console.log(response);
+              log.info('dropbox: RTables.writeBackHandler(' +
+                remoteTableName + '), total dump length: ' + strAll.length + ', ' +
+                'prev: ' + strPrevVer + ', new: ' + response.result.rev);
 
-  if (!scheduled)
-  {
-    // The loop didn't schedule any operations that will complete
-    // later in a callbacks
-    self.m_writeBackInProgress = false;
-  }
+              // Keep track of the new revision of the file on Dropbox
+              ctx.revJournal = response.result.rev;
 
-  self.p_rescheduleWriteBack();
+              // Move newJournal[] at the end of remoteJournal[]
+              for (let j = 0; j < markRecordPoint; ++j)
+                ctx.remoteJournal.push(ctx.newJournal[j]);
+
+              // Mark as saved (synced to remote)
+              // 1. Make a new table in the format of MARK_AS_SYNCED
+              let listSynced = []
+              for (let j = 0; j < markRecordPoint; ++j)
+                listSynced.push(ctx.newJournal[j].m_row);
+
+              // 2. Delete the entries up to markRecordPoint from ctx.newJournal[]
+              ctx.newJournal.splice(0, markRecordPoint);
+
+              // 3. Queue the event
+              ctx.events.runEvent({
+                  event: 'MARK_AS_SYNCED',
+                  tableName: ctx.tableName,
+                  data: listSynced,
+                  cbCompletion: null
+              });
+
+              // Empty newJournal (everything is in remoteJournal now)
+              // No new entries
+              if (ctx.newJournal.length >= 0)
+                log.info(`dropbox: writeBackHandler(${remoteTableName}) ${ctx.newJournal.length} new entries acumulated`);
+
+              // The end of the callback operation
+              ctx.m_writeBackInProgress = false;
+              self.p_deactivateWriteBack(remoteTableName);
+            })
+        .catch(function(response)
+            {
+              // The end of the callback operation
+              ctx.m_writeBackInProgress = false;
+              self.p_deactivateWriteBack(remoteTableName);
+
+              if (response.status == 409 && response.error.error_summary.startsWith('path/conflict/file'))
+              {
+                // Data file doesn't exist on Dropbox
+                log.info('dropbox: revision conflict detected for "' + ctx.fnameJournal  + '"');
+                ctx.revJournal = 'empty';
+                ctx.idJournal = 'empty'
+              }
+              else
+              {
+                log.error('dropbox: getMetadata for journal "' + ctx.fnameJournal + '"');
+                log.error(response);
+              }
+
+              log.error('dropbox: filesUpload');
+              console.log(response);
+              // Callback FAILURE
+              // We will retry in the next iteration
+            });
+  }  // Threshold no rached, write into the journal file
 }
 
 // object [global] p_triggerStateMachine
@@ -1205,17 +1231,17 @@ function RTables(profile, rtables, cbEvents, cbDisplayProgress)
 {
   let self = this;
 
+  self.m_rtables = {};
+
+  self.TAG_ACTION_INSERT = 'A';  // Add new entry
+  self.TAG_ACTION_SET = 'S';     // Set value for an entry (if it alredy exists locally)
+  self.TAG_ACTION_DELETE = 'D';  // Delete
+
   // Create folder Profiles if needed
   self.p_createFolder('Profiles/' + profile, function (folderOK)
       {
         if (folderOK)
         {
-            self.m_rtables = {};
-
-            self.TAG_ACTION_INSERT = 'A';  // Add new entry
-            self.TAG_ACTION_SET = 'S';     // Set value for an entry (if it alredy exists locally)
-            self.TAG_ACTION_DELETE = 'D';  // Delete
-
             for (let i = 0; i < rtables.length; ++i)
             {
               let entry = rtables[i];
@@ -1294,12 +1320,13 @@ function RTables(profile, rtables, cbEvents, cbDisplayProgress)
                       log.info(`dropbox: [${entry.name}] first run`)
                       rentry.m_readStateM.advance('START_FULL_LOAD');
                   }, 2 * 1000);
-            }
 
-            // Setup the handler of periodic write operations
-            self.m_writeBack = setTimeout(writeBackHandler, 5 * 1000, self);
-            self.m_writeBackInProgress = false;
-            self.m_progressCnt = 0;  // Counts the attempts that pending operation didn't complete
+              //
+              // Setup the handler of periodic write operations
+              rentry.m_writeBack = null;
+              rentry.m_writeBackInProgress = false;
+              rentry.m_progressCnt = 0;  // Counts the attempts that pending operation didn't complete
+            }
         }
         else
         {
@@ -1308,6 +1335,9 @@ function RTables(profile, rtables, cbEvents, cbDisplayProgress)
           utils_ns.domError('Failed to create Profile folder');
         }
       });
+
+  // Help strict mode detect miss-typed fields
+  Object.preventExtensions(this);
 
   return self;
 }
