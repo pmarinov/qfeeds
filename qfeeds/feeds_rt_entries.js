@@ -259,6 +259,8 @@ function markAsSynced(listRemoteEntries, cbDone)
     self.m_feeds.feedUpdateEntry(entryHash,
         function(state, dbEntry)
         {
+          let result = 0;
+
           if (state == 0)
           {
             utils_ns.assert(dbEntry.m_hash == entryHash, 'markEntriesAsSynched: bad data');
@@ -267,20 +269,21 @@ function markAsSynced(listRemoteEntries, cbDone)
             if (dbEntry.m_remote_state == feeds_ns.RssSyncState.IS_SYNCED)
             {
               log.info(`rtHandlerEntries.markAsSynced: entry (${cnt}): [${entryHash}], ALREADY marked, skipping it`);
-              return 1;  // Don't record in the DB
+              result = 1;  // Don't record in the DB
             }
             else
             {
               dbEntry.m_remote_state = feeds_ns.RssSyncState.IS_SYNCED;
-              return 0;  // Record in the DB
+              result = 0;  // Record in the DB
             }
           }
           else if (state == 1)
           {
             log.error(`db: update entry (${cnt}): [${entryHash}], error not found`);
-            return 1;  // Don't record in the DB
+            result = 1;  // Don't record in the DB
           }
 
+          utils_ns.assert(numCompleted > 0, 'markEntriesAsSynched: bad numCompleted');
           --numCompleted;
 
           // Everything already marked?
@@ -289,6 +292,8 @@ function markAsSynced(listRemoteEntries, cbDone)
             log.info(`markAsSynced: marked ${numEntries} as IS_SYNCED`);
             cbDone();
           }
+
+          return result;
         });
   }
   requestCompleted = true;
