@@ -12,6 +12,7 @@ if (typeof utils_ns === 'undefined')
 
 (function ()
 {
+"use strict";
 
 // convert seconds since jan/1970 into Date/Time
 function toDateTime(secs)
@@ -359,6 +360,7 @@ function roughSizeOfObject(object)
     {
       objectList[ objectList.length ] = value;
 
+      let i = 0;
       for(i in value)
       {
                 bytes+= 8; // an assumed existence overhead
@@ -434,7 +436,12 @@ function EventQ(handlerCb)
 
   self.m_events = [];
   self.m_cur = null;  // No event in progress
+  self.m_timeEv = new Date();  // Marks the time when m_cur was set
   self.m_handlerCb = handlerCb;
+
+  // Help strict mode detect miss-typed fields
+  Object.preventExtensions(this);
+
   return this;
 }
 
@@ -448,6 +455,21 @@ function p_eventSchedule()
 }
 EventQ.prototype.p_eventSchedule = p_eventSchedule;
 
+function p_eventToStr()
+{
+  let self = this;
+
+  let strEv = '';
+  let strTable = '';
+  if (self.m_cur.event !== undefined)
+    strEv = self.m_cur.event;
+  if (self.m_cur.tableName !== undefined)
+    strTable = self.m_cur.tableName;
+
+  return `(${strEv},${strTable})`;
+}
+EventQ.prototype.p_eventToStr = p_eventToStr;
+
 function runEvent(event)
 {
   let self = this;
@@ -458,10 +480,15 @@ function runEvent(event)
     console.log(self.m_cur);
     console.log('EventQ.runEvent(): Another event is in progress, adding to the queue');
     self.m_events.push(event);
+    let now = new Date();
+    let elapsed_ms = now - self.m_timeEv;
+    if (elapsed_ms > 1000 * 60)
+      domError('runEvent(), took too long to handle: ' + self.p_eventToStr());
     return;
-  }
+  };
 
   self.m_cur = event;
+  self.m_timeEv = new Date();
   self.p_eventSchedule();
 }
 EventQ.prototype.runEvent = runEvent;
