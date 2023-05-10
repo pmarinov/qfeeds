@@ -27,6 +27,10 @@ const g_journalMaxSize = 1024 * 4;
 const g_stateMachineIntervalSeconds = 120;
 const g_stateMachineIntervalTickSeconds = 60;
 
+// All tables
+// (Tables are created, then can be activated or go offline when connection is lost)
+let g_tables = null;
+
 function JournalEntry(tableRow, action)
 {
   this.m_row = tableRow;
@@ -323,6 +327,14 @@ function p_writeBackHandler(self, remoteTableName)
   {
     ctx.m_writeBackInProgress = false;
     self.p_deactivateWriteBack(remoteTableName);
+    return;
+  }
+
+  // Check if we are off-line
+  if (!self.m_rtables[remoteTableName].m_active)
+  {
+    // Skip the scheduled write
+    log.info(`dropbox:  [${remoteTableName}] writeBackHandler(), status offline, skipped one write`);
     return;
   }
 
@@ -1226,127 +1238,172 @@ function p_createFolder(folder, cbDone)
 }
 RTables.prototype.p_createFolder = p_createFolder;
 
+// object g_rtablesActivate
+//
+// When we have connection to Dropbox:
+// 1. Make sure the profile folders are created
+// 2. Activate the polling state machine
+function g_rtablesActivate()
+{
+  utils_ns.assert(g_tables != null, "rtable_dbox: No RTables created yet");
+
+  log.info('dropbox: g_rtablesActivate()');
+
+  let self = g_tables;
+
+  // Create folder Profiles if needed
+  self.p_createFolder('Profiles/' + self.m_profile, function (folderOK)
+      {
+        if (!folderOK)
+        {
+          // TODO: Show a dialog box for error
+          log.error('Failed to create Profile folder');
+          utils_ns.domError('Failed to create Profile folder');
+          return;
+        }
+
+        //
+        // For each table start the polling state machine
+        let tableNames = Object.keys(self.m_rtables);
+        for (let i = 0; i < tableNames.length; ++i)
+        {
+          let remoteTableName = tableNames[i];
+          let rentry = self.m_rtables[remoteTableName];
+
+          // Setup the state machine to run on an interval of time
+          rentry.m_seconds = 0;
+          rentry.m_timerStateM =
+              setInterval(p_triggerStateMachine, g_stateMachineIntervalTickSeconds * 1000, self, remoteTableName);
+
+          // Run it the first time in 2 seconds from now
+          //
+          // (The clock tick IntervalTickSeconds and the total
+          // time of 2 minutes is too slow for first load)
+          setTimeout(function ()
+              {
+                  log.info(`dropbox: [${remoteTableName}] first run`)
+                  rentry.m_readStateM.advance('START_FULL_LOAD');
+              }, 2 * 1000);
+
+          // Table is online
+          rentry.m_active = true;
+        }
+      });
+}
+
 // object RTables.RTable [constructor]
-function RTables(profile, rtables, cbEvents, cbDisplayProgress)
+//
+// The remote tables are instantiated but remain unactive until:
+// 1. A connection to Dropbox appears
+// 2. The Profile folder is created and ready for use
+function RTables(profile, rtables, cbEvents)
 {
   let self = this;
 
+  utils_ns.assert(g_tables == null, "rtable_dbox: Only a single global RTables");
+
   self.m_rtables = {};
+  self.m_profile = profile;
 
   self.TAG_ACTION_INSERT = 'A';  // Add new entry
   self.TAG_ACTION_SET = 'S';     // Set value for an entry (if it alredy exists locally)
   self.TAG_ACTION_DELETE = 'D';  // Delete
 
-  // Create folder Profiles if needed
-  self.p_createFolder('Profiles/' + profile, function (folderOK)
-      {
-        if (folderOK)
+  for (let i = 0; i < rtables.length; ++i)
+  {
+    let entry = rtables[i];
+
+    self.m_rtables[entry.name] = {};
+    let rentry = self.m_rtables[entry.name];
+
+    // Context is shared between read and write state machines
+    rentry.m_ctx =
+    {
+      tableName: entry.name,
+
+      //
+      // Names of files to keep in Dropbox
+      profilePath: '/Profiles/' + profile,
+      fnameJournal: entry.name + '.journal.json',
+      fnameFState: entry.name + '.fstate.json',
+
+      formatVersion: entry.formatVersion,
+
+      //
+      // Name of the preference fields for local storage
+      // [used with setPref()/getPref()]
+      //
+      // Store revision of file journal
+      prefRevJournal: 'm_local.dbox.' + entry.name + '.journal.rev',
+      // Store revision of file full-state
+      prefRevFState: 'm_local.dbox.' + entry.name + '.fstate.rev',
+
+      journalAcquired: false, // The first time
+      revJournal: 'empty',    // Not in yet in remote storage, only in memory
+      idJournal: 'empty',     // No file ID acquired yet
+
+      // Freshly extracted versions (revisions)
+      freshRevJournal: 'empty',
+      freshRevFState: 'empty',
+
+      // Event handler
+      cbEvents: cbEvents,
+
+      // Journals
+      remoteJournal: [],
+      newJournal: [],
+
+      // Full state
+      // (Temporary, only until applied after load)
+      tempFullState: [],
+
+      // Queue of events for the table
+      events: null
+    };
+
+    // Instantiate read and write state machines,
+    // one per remote table
+    rentry.m_readStateM = loadStateMachine(self, entry.name);
+    rentry.m_timerStateM = null;
+    rentry.m_delayCnt = 0;
+
+    // EventQ, one per remote table
+    rentry.m_ctx.events =  new utils_ns.EventQ(function (event)
         {
-            for (let i = 0; i < rtables.length; ++i)
-            {
-              let entry = rtables[i];
+          self.p_eventHandler(self, entry.name, event);
+        });
 
-              self.m_rtables[entry.name] = {};
-              let rentry = self.m_rtables[entry.name];
+    // Setup the state machine to run on an interval of time
+    rentry.m_seconds = 0;
+    rentry.m_timerStateM = null;
 
-              // Context is shared between read and write state machines
-              rentry.m_ctx =
-              {
-                tableName: entry.name,
+    //
+    // Setup the handler of periodic write operations
+    rentry.m_writeBack = null;
+    rentry.m_writeBackInProgress = false;
+    rentry.m_progressCnt = 0;  // Counts the attempts that pending operation didn't complete
 
-                //
-                // Names of files to keep in Dropbox
-                profilePath: '/Profiles/' + profile,
-                fnameJournal: entry.name + '.journal.json',
-                fnameFState: entry.name + '.fstate.json',
-
-                formatVersion: entry.formatVersion,
-
-                //
-                // Name of the preference fields for local storage
-                // [used with setPref()/getPref()]
-                //
-                // Store revision of file journal
-                prefRevJournal: 'm_local.dbox.' + entry.name + '.journal.rev',
-                // Store revision of file full-state
-                prefRevFState: 'm_local.dbox.' + entry.name + '.fstate.rev',
-
-                journalAcquired: false, // The first time
-                revJournal: 'empty',    // Not in yet in remote storage, only in memory
-                idJournal: 'empty',     // No file ID acquired yet
-
-                // Freshly extracted versions (revisions)
-                freshRevJournal: 'empty',
-                freshRevFState: 'empty',
-
-                // Event handler
-                cbEvents: cbEvents,
-
-                // Journals
-                remoteJournal: [],
-                newJournal: [],
-
-                // Full state
-                // (Temporary, only until applied after load)
-                tempFullState: [],
-
-                // Queue of events for the table
-                events: null
-              };
-
-              // Instantiate read and write state machines,
-              // one per remote table
-              rentry.m_readStateM = loadStateMachine(self, entry.name);
-              rentry.m_timerStateM = null;
-              rentry.m_delayCnt = 0;
-
-              // EventQ, one per remote table
-              rentry.m_ctx.events =  new utils_ns.EventQ(function (event)
-                  {
-                    self.p_eventHandler(self, entry.name, event);
-                  });
-
-              // Setup the state machine to run on an interval of time
-              rentry.m_seconds = 0;
-              rentry.m_timerStateM =
-                  setInterval(p_triggerStateMachine, g_stateMachineIntervalTickSeconds * 1000, self, entry.name);
-
-              // Run it the first time in 2 seconds from now
-              //
-              // (The clock tick IntervalTickSeconds and the total
-              // time of 2 minutes is too slow for first load)
-              setTimeout(function ()
-                  {
-                      log.info(`dropbox: [${entry.name}] first run`)
-                      rentry.m_readStateM.advance('START_FULL_LOAD');
-                  }, 2 * 1000);
-
-              //
-              // Setup the handler of periodic write operations
-              rentry.m_writeBack = null;
-              rentry.m_writeBackInProgress = false;
-              rentry.m_progressCnt = 0;  // Counts the attempts that pending operation didn't complete
-            }
-        }
-        else
-        {
-          // TODO: Show a dialog box for error
-          log.error('Failed to create Profile folder');
-          utils_ns.domError('Failed to create Profile folder');
-        }
-      });
+    // Status offline or online
+    rentry.m_active = false;
+  }
 
   // Help strict mode detect miss-typed fields
   Object.preventExtensions(this);
 
+  g_tables = self;
+
   return self;
 }
 
+// Invoked upon successful login into Dropbox
+//
+// Records the Dropbox connection object
 function RTablesConnect(_connectionObj, utilsCB)
 {
   g_connectionObj = _connectionObj;
   g_dbox = g_connectionObj.dbox_client;
   g_utilsCB = utilsCB;
+  g_rtablesActivate();
 }
 
 feeds_ns.RTablesConnect = RTablesConnect;

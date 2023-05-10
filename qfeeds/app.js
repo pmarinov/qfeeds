@@ -123,6 +123,7 @@ function App()
 
   self.m_initSeq = [];  // A vector of init steps executed in order
   self.m_initCnt = 0;
+  self.m_connectDBox = null;
   self.m_initSeq.push(function()
       {
         // Step: 0
@@ -197,11 +198,12 @@ function App()
       {
         // Step: 5
 
-        // Now connect to Dropbox
+        // Now connect to Dropbox if logged_in=true
         var cb = self.p_getHandlersRemoteStatus();
         var startWithLoggedIn = self.m_feedsDB.prefGet("m_local.app.logged_in");
         log.info('app: startWithLoggedIn = ' + startWithLoggedIn);
-        var dummy = new feeds_ns.ConnectDBox(cb, startWithLoggedIn);
+        // ConnectDBox() also attached to DOM to handle login/logout button
+        self.m_connectDBox = new feeds_ns.ConnectDBox(cb, startWithLoggedIn);
 
         self.p_initSeqNext();
       });
@@ -277,8 +279,12 @@ function p_getHandlersRemoteStatus()
           {
             self.m_feedsDB.prefSet("m_local.app.logged_in", true);
 
+            // Tell RTables that we have a login to Dropbox
             feeds_ns.RTablesConnect(connectionObj, remoteStatusCB);
+
+            // Notify the UI + DB, but they should mostly do nothing
             self.m_feedsDir.remoteStoreConnected(displayProgress);
+
             if (false)
             {
             feeds_ns.RTablesInit(accessToken, function()

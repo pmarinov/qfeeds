@@ -64,15 +64,30 @@ function Feeds()
   self.m_remote_read_id = -1;
 
   // (object RTables)
-  self.m_rt = null;
+  var tables =
+  [
+    // List of all of the feeds URLs
+    {name: 'rss_subscriptions', formatVersion: 1},
+
+    // All entries that were marked as read
+    {name: 'rss_entries_read', formatVersion: 1}
+  ];
 
   // Handle events for a remote table of RSS subscriptions
   // (file: rss_subscriptions.fstate.json in Dropbox/Apps/QFeeds)
-  self.m_rtSubs = null;
+  self.m_rtSubs = new feeds_rt_subs_ns.rtHandlerSubs(self, 'rss_subscriptions');
+
 
   // Handle events for a remote tale of status read of RSS feed entries
   // (file: rss_entries_read.fstate.json in Dropbox/Apps/QFeeds)
-  self.m_rtEntries = null;
+  self.m_rtEntries = new feeds_rt_entries_ns.rtHandlerEntries(self, 'rss_entries_read');
+
+  let profileName = localStorage.getItem('Profile');
+  log.info(`rtables: using profile ${profileName}`);
+  self.m_rt = new feeds_ns.RTables(profileName, tables, function (event)
+      {
+        handleRTEvent(self, event);
+      });
 
   // Setup the poll loop
   self.m_timeoutID = setTimeout(p_poll, 1, self);
@@ -958,6 +973,8 @@ function p_demoDropboxSync(self)
 // Sync one RSS entry (status read) with the remote table
 function p_rtableSyncEntryRead(rssEntry)
 {
+  utils_ns.assert(false, "feed.ns: Old code");
+
   // We can't use _instanceof_ for objects that are read from the indexedDB
   // just check for some fields to confirm this is RssEntry object
   utils_ns.hasFields(rssEntry, ['m_is_read', 'm_rssurl_date'], 'p_rtableSyncEntryRead');
@@ -1158,32 +1175,10 @@ function rtableConnect(cbDisplayProgress)
   var self = this;
 
   log.info('rtableConnect()...');
+  // p_demoDropboxSync(self);
+  return;
 
   self.m_remote_is_connected = true;
-
-  // p_demoDropboxSync(self);
-
-  var tables =
-  [
-    // List of all of the feeds URLs
-    {name: 'rss_subscriptions', formatVersion: 1},
-
-    // All entries that were marked as read
-    {name: 'rss_entries_read', formatVersion: 1}
-  ];
-
-  self.m_rtSubs = new feeds_rt_subs_ns.rtHandlerSubs(self, 'rss_subscriptions');
-  self.m_rtEntries = new feeds_rt_entries_ns.rtHandlerEntries(self, 'rss_entries_read');
-
-  // For now use profile 'Default'
-  let profileName = localStorage.getItem('Profile');
-  log.info(`rtableConnect(): using profile ${profileName}`);
-  self.m_rt = new feeds_ns.RTables(profileName, tables, function (event)
-      {
-        handleRTEvent(self, event);
-      });
-
-  return;
 
   // TODO:
   // TODO: Remove this eventually when the NEW Dropbox is completed
@@ -1216,7 +1211,7 @@ function rtableConnect(cbDisplayProgress)
 }
 Feeds.prototype.rtableConnect = rtableConnect;
 
-// object Feeds.rtableDisconnect
+// object [old] Feeds.rtableDisconnect
 // This method is invoked once when the application is logged out from Dropbox
 function rtableDisconnect()
 {
