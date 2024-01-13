@@ -478,7 +478,7 @@ function runEvent(event)
   if (self.m_cur != null)
   {
     console.log(self.m_cur);
-    console.log('EventQ.runEvent(): Another event is in progress, adding to the queue');
+    console.log(`EventQ.runEvent(${event.event}): Another event is in progress (listed above), adding to the queue`);
     self.m_events.push(event);
     let now = new Date();
     let elapsed_ms = now - self.m_timeEv;
@@ -497,7 +497,7 @@ function eventDone()
 {
   let self = this;
 
-  assert(self.m_cur != null, 'eventDone: no event in progress');
+  assert(self.m_cur != null, 'eventDone(${self.m_cur.event}): no event in progress');
 
   if (!self.p_getNext())
     return;

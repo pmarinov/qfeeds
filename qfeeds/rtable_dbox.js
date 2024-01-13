@@ -90,6 +90,7 @@ function reset(remoteTableName, tableRow)
 
   ctx.revJournal = 'empty';
   ctx.idJournal = 'empty';
+  ctx.revFState = 'empty';
   ctx.freshRevJournal = null;
   ctx.freshRevFState = null;
 
@@ -132,6 +133,11 @@ function p_syncLocalTable(remoteTableName, localTableKeys, rtFull, cbDone)
   let self = this;
   let ctx = self.m_rtables[remoteTableName].m_ctx;
 
+  let keys = Object.keys(localTableKeys);
+
+  log.info(`dropbox: [${remoteTableName}] complete FULL sync, ` +
+      `${rtFull.length} #remote entries, ${keys.length} #local entries`);
+
   // Generate event _updated_ for all remote entries
   let x = 0;
   let rtEntry = null;
@@ -162,7 +168,6 @@ function p_syncLocalTable(remoteTableName, localTableKeys, rtFull, cbDone)
 
   // Generate event _deleted_ for all that were in local but
   // not in the remote table
-  let keys = Object.keys(localTableKeys);
   let index = 0;
   for (x = 0; x < keys.length; ++x)
   {
@@ -199,6 +204,7 @@ function p_syncLocalTable(remoteTableName, localTableKeys, rtFull, cbDone)
           //
           // Store this new remote revision into local storage
           // (survives restarts)
+          utils_ns.assert(ctx.freshRevFState != null, "rtable_dbox: no revision recorded in 'ctx.freshRevFState'");
           g_utilsCB.setPref(ctx.prefRevFState, ctx.freshRevFState);
           log.info(`dropbox: [${remoteTableName}] completed ENTRY_UPDATE for rev: ${ctx.freshRevFState}`);
         }
@@ -219,6 +225,8 @@ RTables.prototype.p_syncLocalTable = p_syncLocalTable;
 function p_applyJournal(remoteTableName, journal, cbDone)
 {
   let self = this;
+
+  log.info(`dropbox: [${remoteTableName}] p_applyJournal, ${journal.length} #entries`);
 
   let rtable = self.m_rtables[remoteTableName];
   let ctx = rtable.m_ctx;
@@ -828,6 +836,8 @@ function loadStateMachine(objRTables, remoteTableName)
                           let data = JSON.parse(reader.result);
                           // Store locally new version + journal contents
                           ctx.freshRevJournal = response.result.rev;
+                          log.info(`dropbox: [${remoteTableName}] filesDownload, journal, ` +
+                                   `JSON parse OK, freshRevJournal: ${ctx.freshRevJournal}`);
                           ctx.remoteJournal = data['entries'];
                           state.advance('LOAD_DATA_FULL_STATE');
                         });
@@ -954,6 +964,9 @@ function loadStateMachine(objRTables, remoteTableName)
                         // TODO: Check that essential fields are present
                         // TODO: Check that size makes sense
                         let data = JSON.parse(reader.result);
+                        ctx.freshRevFState = response.result.rev;
+                        log.info(`dropbox: [${remoteTableName}] filesDownload, fstate, ` + 
+                                 `JSON parse OK, freshRevFState: ${ctx.freshRevJournal}`);
                         ctx.tempFullState = data['entries'];
                         state.advance('APPLY_REMOTE_STATE');
                       });
@@ -999,31 +1012,67 @@ function loadStateMachine(objRTables, remoteTableName)
         //
         // If remote data was loaded it will be reflected in tempFullState,
         // apply it to local data state
-        if (ctx.tempFullState.length > 0)
+        if (ctx.freshRevFState != ctx.revFState)
         {
           let rtFull = ctx.tempFullState;
 
-          // Experimental:
-          ctx.events.runEvent({
-            event: 'SYNC_FULL_STATE',
-            tableName: ctx.tableName,
-            data: null,
-            cbSyncLocalTable: function(remoteTableName, localTableKeys, cbDone)
-                {
-                  // This function is invoked to complete the
-                  // operation of full sync of local tableonce we
-                  // already have the keys of the local entries
-                  objRTables.p_syncLocalTable(
-                      remoteTableName, localTableKeys, rtFull, cbDone);
-                }
-          });
+          // Version of Full State that was already applied to local indexedDB
+          //
+          // (We load remote Full State at every startup, but apply only
+          // if prefRevFState indicates a change)
+          let revAppliedFState = g_utilsCB.getPref(ctx.prefRevFState);
+          log.info('dropbox: [' + remoteTableName + '] revAppliedFState: ' + revAppliedFState + ' (current)');
 
-          // Full state has been consumed => free the memory
+          if (ctx.freshRevFState != revAppliedFState)
+          {
+            log.info('dropbox: [' + remoteTableName + '] revAppliedFState != freshRevFState => apply new full state');
+
+            ctx.events.runEvent({
+              event: 'SYNC_FULL_STATE',
+              tableName: ctx.tableName,
+              data: null,
+              cbSyncLocalTable: function(remoteTableName, localTableKeys, cbDone)
+                  {
+                    // This function is invoked to complete the
+                    // operation of full sync of local table once we
+                    // already have the keys of the local entries
+                    objRTables.p_syncLocalTable(
+                        remoteTableName, localTableKeys, rtFull, function () {
+                            //
+                            // Full sync of Full State is completed
+
+                            // Remove full state applied to local tables, advance to next state
+                            state.advance('APPLY_REMOTE_JOURNAL');
+                            cbDone();
+                        });
+                  }
+            });
+          }
+
+          //
+          // Full State has been consumed => free the memory
           ctx.tempFullState = [];
+
+          // Keep track of the newly applied version (skip applying next time)
+          ctx.revFState = ctx.freshRevFState;
         }
+        else
+        {
+          // Nothing to apply, jump to APPLY_REMOTE_JOURNAL
+          log.info(`dropbox: [${remoteTableName}] state, nothing to apply`);
+          state.advance('APPLY_REMOTE_JOURNAL');
+        }
+      });
+
+  state.add('APPLY_REMOTE_JOURNAL', function ()
+      {
+        //
+        // APPLY_REMOTE_STATE: Loads full state file data (if necessary)
+        log.info('dropbox: [' + remoteTableName + '] state ' + state.stringify());
+        let ctx = objRTables.m_rtables[remoteTableName].m_ctx;
 
         //
-        // Check if a journal was loaded and apply all the entries from it
+        // Check if a Journal was loaded and apply all the entries from it
         // (all entries from ctx.remoteJournal[]
         if (ctx.freshRevJournal != ctx.revJournal)
         {
@@ -1032,7 +1081,7 @@ function loadStateMachine(objRTables, remoteTableName)
           // (We load remote journal at every startup, but apply only
           // if prefRevJournal indicates a change)
           let revAppliedJournal = g_utilsCB.getPref(ctx.prefRevJournal);
-          log.info('dropbox: [' + remoteTableName + '] revAppliedJournal: ' + revAppliedJournal);
+          log.info('dropbox: [' + remoteTableName + '] revAppliedJournal: ' + revAppliedJournal + ' (current)');
 
           if (ctx.freshRevJournal != revAppliedJournal)
           {
@@ -1043,26 +1092,27 @@ function loadStateMachine(objRTables, remoteTableName)
                 {
                     // Journal applied, make a record that local indexed DB reflects that remote version
                     g_utilsCB.setPref(ctx.prefRevJournal, revToApply);
+
+                    // Advance to next state (IDLE)
+                    state.advance('IDLE');
                 });
           }
           else
             log.info('dropbox: [' + remoteTableName + '] no new joural data to apply');
 
-
+          // Remote Journal has been consumed,
+          // keep track of the newly applied version (skip applying next time)
           ctx.revJournal = ctx.freshRevJournal;
         }
-
-        //
-        // HERE: Place operations to be run prior the end of the state machine
+        else
+        {
+          // Nothing to apply, jump to IDLE
+          log.info(`dropbox: [${remoteTableName}] journal, nothing to apply`);
+          state.advance('IDLE');
+        }
 
         // Flag that new journal entries can be written to disk
         ctx.journalAcquired = true;
-
-        // To IDLE
-        //
-        // (This should be the only place in the state machine to
-        // advance to IDLE, always the same path!)
-        state.advance('IDLE');
       });
 
   // Set the state machine at initial state 'IDLE'
@@ -1338,9 +1388,13 @@ function RTables(profile, rtables, cbEvents)
       // Store revision of file full-state
       prefRevFState: 'm_local.dbox.' + entry.name + '.fstate.rev',
 
+      // Revision of Journal
       journalAcquired: false, // The first time
       revJournal: 'empty',    // Not in yet in remote storage, only in memory
       idJournal: 'empty',     // No file ID acquired yet
+
+      // Revision of Full State
+      revFState: 'empty',
 
       // Freshly extracted versions (revisions)
       freshRevJournal: 'empty',
