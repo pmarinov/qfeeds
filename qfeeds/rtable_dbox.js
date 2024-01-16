@@ -1048,6 +1048,11 @@ function loadStateMachine(objRTables, remoteTableName)
                   }
             });
           }
+          else
+          {
+            log.info(`dropbox: [${remoteTableName}] fresh state loaded, but doesn't need applying`);
+            state.advance('APPLY_REMOTE_JOURNAL');
+          }
 
           //
           // Full State has been consumed => free the memory
@@ -1098,7 +1103,10 @@ function loadStateMachine(objRTables, remoteTableName)
                 });
           }
           else
+          {
             log.info('dropbox: [' + remoteTableName + '] no new joural data to apply');
+            state.advance('IDLE');
+          }
 
           // Remote Journal has been consumed,
           // keep track of the newly applied version (skip applying next time)
