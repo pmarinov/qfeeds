@@ -31,6 +31,37 @@ const g_stateMachineIntervalTickSeconds = 60;
 // (Tables are created, then can be activated or go offline when connection is lost)
 let g_tables = null;
 
+// object RTables.setStateActive()
+// Transitions between states on-line and off-line
+//
+// It is invoked every time there is a network error and every time
+// when there is successfull dropbox operation
+function setStateActive(remoteTableName, isActive)
+{
+  let self = this;
+  let rentry = self.m_rtables[remoteTableName];
+
+  if (isActive)
+  {
+    if (rentry.m_active)
+      return;  // Already on-line
+
+    // Transitioning from off-line to online
+    log.info(`dropbox: [${remoteTableName}] Transitioning to state on-line`);
+    rentry.m_active = true;
+  }
+  else
+  {
+    if (!rentry.m_active)
+      return;  // Already off-line
+
+    // Transitioning from off-line to online
+    log.info(`dropbox: [${remoteTableName}] Transitioning to state off-line`);
+    rentry.m_active = false;
+  }
+}
+RTables.prototype.setStateActive = setStateActive;
+
 function JournalEntry(tableRow, action)
 {
   this.m_row = tableRow;
@@ -47,7 +78,18 @@ function JournalEntry(tableRow, action)
 function insert(remoteTableName, tableRow)
 {
   let self = this;
-  let ctx = self.m_rtables[remoteTableName].m_ctx;
+  let rentry = self.m_rtables[remoteTableName];
+
+  if (!rentry.m_active)
+  {
+    // Drop the request, the data is marked as local-only,
+    // when Dropbox is connected/re-connected an event will take care
+    // to flush all of them to the remote table
+    log.debug('dropbox: insert(), status offline, request dropped');
+    return;
+  }
+
+  let ctx = rentry.m_ctx;
 
   let x = new JournalEntry(tableRow, self.TAG_ACTION_SET);
   ctx.newJournal.push(x);
@@ -65,6 +107,17 @@ RTables.prototype.insert = insert;
 function deleteRec(remoteTableName, tableRow)
 {
   let self = this;
+  let rentry = self.m_rtables[remoteTableName];
+
+  if (!rentry.m_active)
+  {
+    // Drop the request, the data is marked as local-only,
+    // when Dropbox is connected/re-connected an event will take care
+    // to flush all of them to the remote table
+    log.debug('dropbox: deleteRec(), status offline, request dropped');
+    return;
+  }
+
   let ctx = self.m_rtables[remoteTableName].m_ctx;
 
   let x = new JournalEntry(tableRow, self.TAG_ACTION_DELETE);
@@ -623,7 +676,7 @@ function p_triggerStateMachine(objRTables, remoteTableName)
 }
 
 // object loadStateMachine [factory]
-// Ceates a state machine that handles operation load
+// Creates a state machine that handles operation load
 //
 // remoteTableName -- name of a table for which to handle operation load
 function loadStateMachine(objRTables, remoteTableName)
@@ -693,6 +746,7 @@ function loadStateMachine(objRTables, remoteTableName)
 
                   ctx.freshRevJournal = response.result.rev;
                   ctx.idJournal = response.result.id;
+
                   state.advance('GET_REV_FSTATE');
                 })
             .catch(function(response)
@@ -702,6 +756,7 @@ function loadStateMachine(objRTables, remoteTableName)
                     // Data file doesn't exist on Dropbox
                     log.info('dropbox: NOT FOUND detected for "' + baseName  + '"');
                     ctx.freshRevJournal = 'empty';
+
                     state.advance('GET_REV_FSTATE');
                   }
                   else
@@ -709,6 +764,10 @@ function loadStateMachine(objRTables, remoteTableName)
                     log.error('dropbox: getMetadata for journal "' + baseName + '"');
                     log.error(response);
                     log.error('dropbox: Network error, can\'t continue going back to IDLE')
+
+                    // Mark that we are off-line
+                    objRTables.setStateActive(remoteTableName, false);
+
                     state.advance('IDLE');
                   }
                 });
@@ -720,6 +779,10 @@ function loadStateMachine(objRTables, remoteTableName)
         // GET_REV_FSTATE: Get revision of the full state file
         log.info('dropbox: [' + remoteTableName + '] state ' + state.stringify());
         let ctx = objRTables.m_rtables[remoteTableName].m_ctx;
+
+        // Mark that we are on-line
+        // (transitioned without network error from previous state)
+        objRTables.setStateActive(remoteTableName, true);
 
         // Root is the App folder on Dropbox
         let baseName = ctx.fnameFState;
@@ -1005,7 +1068,7 @@ function loadStateMachine(objRTables, remoteTableName)
   state.add('APPLY_REMOTE_STATE', function ()
       {
         //
-        // APPLY_REMOTE_STATE: Loads full state file data (if necessary)
+        // APPLY_REMOTE_STATE: Applies remote Full State (if necessary)
         log.info('dropbox: [' + remoteTableName + '] state ' + state.stringify());
         let ctx = objRTables.m_rtables[remoteTableName].m_ctx;
 
@@ -1072,7 +1135,7 @@ function loadStateMachine(objRTables, remoteTableName)
   state.add('APPLY_REMOTE_JOURNAL', function ()
       {
         //
-        // APPLY_REMOTE_STATE: Loads full state file data (if necessary)
+        // APPLY_REMOTE_JOURNAL: Applies remote Journal (if necessary)
         log.info('dropbox: [' + remoteTableName + '] state ' + state.stringify());
         let ctx = objRTables.m_rtables[remoteTableName].m_ctx;
 
