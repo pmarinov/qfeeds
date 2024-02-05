@@ -973,22 +973,12 @@ function p_demoDropboxSync(self)
 // Sync one RSS entry (status read) with the remote table
 function p_rtableSyncEntryRead(rssEntry)
 {
-  utils_ns.assert(false, "feed.ns: Old code");
-
   // We can't use _instanceof_ for objects that are read from the indexedDB
   // just check for some fields to confirm this is RssEntry object
   utils_ns.hasFields(rssEntry, ['m_is_read', 'm_rssurl_date'], 'p_rtableSyncEntryRead');
 
   var self = this;
-
-  if (!self.m_remote_is_connected)
-  {
-    rssEntry.m_remote_state = feeds_ns.RssSyncState.IS_LOCAL_ONLY;
-  }
-  else
-  {
-    self.m_rtEntries.insert(rssEntry)
-  }
+  self.m_rtEntries.insert(rssEntry)
 }
 Feeds.prototype.p_rtableSyncEntryRead = p_rtableSyncEntryRead;
 
