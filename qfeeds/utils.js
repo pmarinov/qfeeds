@@ -335,6 +335,8 @@ function hasFields(obj, arrayOfNames, message)
 {
   var i = 0;
   var f = null;
+  assert(obj != null, 'Bad object [null]; ' + message);
+  assert(obj !== undefined, 'Bad object [undefined]; ' + message);
   for (i = 0; i < arrayOfNames.length; ++i)
   {
     if (obj[arrayOfNames[i]] === undefined)

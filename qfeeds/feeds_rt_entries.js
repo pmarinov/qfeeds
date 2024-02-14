@@ -18,12 +18,13 @@ if (typeof feeds_rt_entries_ns === 'undefined')
 
 // object rtHandlerEntries [constructor]
 // Instantiate one per application
-function rtHandlerEntries(feeds, rtName)
+function rtHandlerEntries(feeds, rtName, rt)
 {
   let self = this;
 
   self.m_feeds = feeds;
   self.m_rtName = rtName;
+  self.m_rt = rt;
 
   // Help strict mode detect miss-typed fields
   Object.preventExtensions(this);
@@ -69,10 +70,11 @@ function RemoteEntryRead(rssEntry)
 //
 // Params:
 // rt -- Remote Tables Object
-function fullTableWrite(rt, cbDone)
+function fullTableWrite(event, cbDone)
 {
   let self = this;
   let all = [];
+  let rt = self.m_rt;
 
   self.m_feeds.feedReadEntriesAll(
       function(rssEntry)
@@ -102,9 +104,10 @@ rtHandlerEntries.prototype.fullTableWrite = fullTableWrite;
 // object rtHandlerSubs.handleEntryEvent
 // Handle updates from the remote tables for 'rss_subscriptions'
 // (Entries added/set or deleted)
-function handleEntryEvent(records, cbDone)
+function handleEntryEvent(event, cbDone)
 {
   let self = this;
+  let records = event.data;
 
   let numCompleted = 0;
   let requestCompleted = false;
@@ -214,10 +217,10 @@ rtHandlerEntries.prototype.handleEntryEvent = handleEntryEvent;
 // (Full Sync) Apply a full remote state locally
 //
 // Params:
-// cbSynclocaltable -- Function of rtable, invoke to complete sync of
-//                     remote table by supplying the local keys
+// event.cbSynclocaltable -- Function of rtable, invoke to complete sync of
+//     remote table by supplying the local keys
 // cbDone -- Chain in the completion callback
-function fullTableSync(cbSyncLocalTable, cbDone)
+function fullTableSync(event, cbDone)
 {
   let self = this;
 
@@ -229,7 +232,7 @@ function fullTableSync(cbSyncLocalTable, cbDone)
 
   // This operation will ONLY bring any new entries that are in the
   // remote table (there will be no deletion events)
-  cbSyncLocalTable(self.m_rtName, localEntries, cbDone);
+  event.cbSyncLocalTable(self.m_rtName, localEntries, cbDone);
 }
 rtHandlerEntries.prototype.fullTableSync = fullTableSync;
 
@@ -241,9 +244,10 @@ rtHandlerEntries.prototype.fullTableSync = fullTableSync;
 // listRemoteEntries -- an array in the format sent for remote table operations,
 //     see RemoteEntryRead() for the formation of the entry
 // cbDone -- Invoke at the end to notify operation in the DB as completed
-function markAsSynced(listRemoteEntries, cbDone)
+function markAsSynced(event, cbDone)
 {
   let self = this;
+  let listRemoteEntries = event.data
 
   let entryIndex = 0;
   let numCompleted = 0;
