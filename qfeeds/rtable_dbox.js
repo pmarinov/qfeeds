@@ -36,19 +36,22 @@ let g_tables = null;
 //
 // It is invoked every time there is a network error and every time
 // when there is successfull dropbox operation
-function setStateActive(remoteTableName, isActive)
+function p_setStateActive(remoteTableName, isActive)
 {
   let self = this;
   let rentry = self.m_rtables[remoteTableName];
+  let ctx = self.m_rtables[remoteTableName].m_ctx;
 
   if (isActive)
   {
+    if (rentry.m_pendingActivate)
+      return;  // Pending activate, can RECONNECT when reached state IDLE
+
     if (rentry.m_active)
       return;  // Already on-line
 
-    // Transitioning from off-line to online
-    log.info(`dropbox: [${remoteTableName}] Transitioning to state on-line`);
-    rentry.m_active = true;
+    // Defer RECONNECT for when in IDLE
+    rentry.m_pendingActivate = true;
   }
   else
   {
@@ -60,7 +63,7 @@ function setStateActive(remoteTableName, isActive)
     rentry.m_active = false;
   }
 }
-RTables.prototype.setStateActive = setStateActive;
+RTables.prototype.p_setStateActive = p_setStateActive;
 
 function JournalEntry(tableRow, action)
 {
@@ -166,7 +169,7 @@ function eventDone(remoteTableName, operation_exit_code)
 
   // Completion callback
   if (ctx.events.m_cur.cbCompletion != null)
-    ctx.events.m_cur.cbCompletion();
+    ctx.events.m_cur.cbCompletion(operation_exit_code);
 
   // Advance to the next event in the queue, if any
   ctx.events.eventDone();
@@ -350,10 +353,6 @@ function p_deactivateWriteBack(remoteTableName)
   let self = this;
   let ctx = self.m_rtables[remoteTableName].m_ctx;
 
-  // No pending entries, no need for timer
-  if (ctx.newJournal.length > 0)
-    return;
-
   if (ctx.m_writeBack != null)
   {
     log.info(`dropbox: [${remoteTableName}] Deactivate writeBack() timer`);
@@ -473,16 +472,16 @@ function p_writeBackHandler(self, remoteTableName)
 
     // == 1 == Enqueue event SYNC_FULL_STATE
     // (This will produce its own MARK_AS_SYNCED)
-    scheduled = true;
     ctx.events.runEvent({
         event: 'WRITE_FULL_STATE',
         tableName: ctx.tableName,
         data: null,
         cbCompletion: function(exit_code) {
-            if (code != 0)
+            if (exit_code != 0)
             {
               // Ended in error
               // Then this is the end of the callback operation
+              log.info(`dropbox: writeBackHandler(${remoteTableName}), cbCompletion(${exit_code}), re-schedule`);
               ctx.m_writeBackInProgress = false;
               self.p_deactivateWriteBack(remoteTableName);
               return;
@@ -687,6 +686,7 @@ function loadStateMachine(objRTables, remoteTableName)
       {
         // For debug purposes schedule a no-op event
         let ctx = objRTables.m_rtables[remoteTableName].m_ctx;
+
         ctx.events.runEvent({
             event: 'EMPTY_EVENT',
             tableName: ctx.tableName,
@@ -697,6 +697,31 @@ function loadStateMachine(objRTables, remoteTableName)
         let now = new Date();
         log.info('dropbox: [' + remoteTableName + '] state ' + state.stringify() + ', ' +
             utils_ns.dateToStr(now));
+
+        // Check if RECONNECT is required
+        let rentry = objRTables.m_rtables[remoteTableName];
+        if (!rentry.m_pendingActivate)
+            return;
+
+        // Transitioning from off-line to online
+        log.info(`dropbox: [${remoteTableName}] Transitioning to state on-line`);
+        rentry.m_active = true;
+        rentry.m_pendingActivate = false;  // no longer pending, we are acting on it
+
+        // Event RECONNECT
+        ctx.events.runEvent({
+          event: 'RECONNECT',
+          tableName: remoteTableName,
+          data: null,
+          cbCompletion: function (exit_code)
+              {
+                log.info(`dropbox: [${remoteTableName}] completed event RECONNECT, exit code: ${exit_code}`);
+
+                // Schedule the writeBackHandler() if not already scheduled
+                log.info(`dropbox: [${remoteTableName}] State on-line => one run of the write-back handler`);
+                objRTables.p_rescheduleWriteBack(remoteTableName);
+              }
+        });
       });
 
   state.add('START_FULL_LOAD', function ()
@@ -766,7 +791,7 @@ function loadStateMachine(objRTables, remoteTableName)
                     log.error('dropbox: Network error, can\'t continue going back to IDLE')
 
                     // Mark that we are off-line
-                    objRTables.setStateActive(remoteTableName, false);
+                    objRTables.p_setStateActive(remoteTableName, false);
 
                     state.advance('IDLE');
                   }
@@ -782,7 +807,7 @@ function loadStateMachine(objRTables, remoteTableName)
 
         // Mark that we are on-line
         // (transitioned without network error from previous state)
-        objRTables.setStateActive(remoteTableName, true);
+        objRTables.p_setStateActive(remoteTableName, true);
 
         // Root is the App folder on Dropbox
         let baseName = ctx.fnameFState;
@@ -1390,6 +1415,7 @@ function g_rtablesActivate()
         {
           let remoteTableName = tableNames[i];
           let rentry = self.m_rtables[remoteTableName];
+          let ctx = self.m_rtables[remoteTableName].m_ctx;
 
           // Setup the state machine to run on an interval of time
           rentry.m_seconds = 0;
@@ -1405,9 +1431,6 @@ function g_rtablesActivate()
                   log.info(`dropbox: [${remoteTableName}] first run`)
                   rentry.m_readStateM.advance('START_FULL_LOAD');
               }, 2 * 1000);
-
-          // Table is online
-          rentry.m_active = true;
         }
       });
 }
@@ -1510,6 +1533,7 @@ function RTables(profile, rtables, cbEvents)
 
     // Status offline or online
     rentry.m_active = false;
+    rentry.m_pendingActivate = false;  // RECONNECT only from IDLE of the State Machine
   }
 
   // Help strict mode detect miss-typed fields

@@ -86,6 +86,54 @@ function fullTableWrite(event, cbDone)
 }
 rtHandlerSubs.prototype.fullTableWrite = fullTableWrite;
 
+// object rtHandlerSubs.reconnect
+// Walk over table of all RSS subscriptions in the local DB and send
+// all that were marked IS_LOCAL_ONLY
+//
+// TODO: Reconnect needs to be A LOT more elaborate,
+// this is just a most basic placeholder
+//
+// At the moment it handles only additions in off-line mode, it needs
+// to also handle deletions. For this to happen we need to keep a
+// table of what was deleted and replicate upon reconnection.
+//
+// This is also probably not critical because RSS use in off-line mode
+// is not very useful to begin with.
+function reconnect(_event, cbDone)
+{
+  let self = this;
+  let cnt = 0;
+  let total = 0;
+
+  self.m_feeds.p_dbReadAll('rss_subscriptions',
+      function(dbCursor)  // Via dbCursor walk over all entries in the table
+      {
+        ++total;
+
+        if (dbCursor == null)  // No more entries
+        {
+          log.info(`rtHandlerSubs.reconnect: ${cnt}/${total} entries sent`);
+          cbDone();
+          return;
+        }
+
+        let feed = dbCursor.value;
+
+        if (feed.m_remote_state == feeds_ns.RssSyncState.IS_LOCAL_ONLY)
+        {
+           // Send entry to the remote table
+          self.insert(feed);
+
+          // Operation 'send' initiated here, the RssSyncState for
+          // this entry will be updated to IS_SYNCED via event
+          // MARK_AS_SYNCED back to the local table
+          log.info(`rtHandlerSubs.reconnect: send (${feed.m_url})`);
+          ++cnt;
+        }
+      });
+}
+rtHandlerSubs.prototype.reconnect = reconnect;
+
 // object rtHandlerSubs.handleEntryEvent
 // Handle updates from the remote tables for 'rss_subscriptions'
 // (Entries added/set or deleted)
@@ -325,6 +373,9 @@ function insert(feed)
 {
   let self = this;
 
+  // This new status is not yet reflected in remote table
+  feed.m_remote_state = feeds_ns.RssSyncState.IS_LOCAL_ONLY;
+
   // Check if this is a feed object
   utils_ns.hasFields(feed, ['m_url', 'm_tags'], 'rtHandlerEntries.insert()');
 
@@ -338,6 +389,9 @@ rtHandlerSubs.prototype.insert = insert;
 function deleteRec(feed)
 {
   let self = this;
+
+  // This new status is not yet reflected in remote table
+  feed.m_remote_state = feeds_ns.RssSyncState.IS_LOCAL_ONLY;
 
   let newRemoteEntry = new RemoteFeedUrl(feed);
   self.m_feeds.m_rt.deleteRec('rss_subscriptions', newRemoteEntry);

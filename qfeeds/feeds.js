@@ -1029,7 +1029,8 @@ function handleRTEvent(self, event)
     'SYNC_FULL_STATE': self.m_rtEntries.fullTableSync.bind(self.m_rtEntries),
     'ENTRY_UPDATE': self.m_rtEntries.handleEntryEvent.bind(self.m_rtEntries),
     'MARK_AS_SYNCED': self.m_rtEntries.markAsSynced.bind(self.m_rtEntries),
-    'EMPTY_EVENT': function (dummy, cb) 
+    'RECONNECT': self.m_rtEntries.reconnect.bind(self.m_rtEntries),
+    'EMPTY_EVENT': function (dummy, cb)
         {
           cb();
         },
@@ -1039,7 +1040,8 @@ function handleRTEvent(self, event)
     'SYNC_FULL_STATE': self.m_rtSubs.fullTableSync.bind(self.m_rtSubs),
     'ENTRY_UPDATE': self.m_rtSubs.handleEntryEvent.bind(self.m_rtSubs),
     'MARK_AS_SYNCED': self.m_rtSubs.markAsSynced.bind(self.m_rtSubs),
-    'EMPTY_EVENT': function (dummy, cb) 
+    'RECONNECT': self.m_rtSubs.reconnect.bind(self.m_rtSubs),
+    'EMPTY_EVENT': function (dummy, cb)
         {
           cb();
         },
@@ -1051,10 +1053,12 @@ function handleRTEvent(self, event)
 
   utils_ns.hasFields(event, ['tableName'], 'handleRTEvent');
 
+  // Extact pointer to event handler from the tables
   log.info(`feeds: DISPATCH, event: ${event.event}, table: ${event.tableName}`)
   const vtable = vtable_all[event.tableName];
   const fn_handleEvent = vtable[event.event];
 
+  // Run event handler
   fn_handleEvent(event, function ()
       {
         // Tell the event queue to proceeed with the next event

@@ -101,7 +101,48 @@ function fullTableWrite(event, cbDone)
 }
 rtHandlerEntries.prototype.fullTableWrite = fullTableWrite;
 
-// object rtHandlerSubs.handleEntryEvent
+// object rtHandlerEntries.reconnect
+// Walk over all RSS entries in the local DB and send all that were marked IS_LOCAL_ONLY
+function reconnect(_event, cbDone)
+{
+  let self = this;
+  let cnt = 0;
+  let total = 0;
+
+  self.m_feeds.feedReadEntriesAll(
+      function(rssEntry)
+      {
+        ++total;
+
+        if (rssEntry == null)  // No more entries
+        {
+          log.info(`rtHandlerEntries.reconnect: ${cnt}/${total} entries sent`);
+          cbDone();
+          // No next entry
+          return 0;
+        }
+
+        // log.info(`rtHandlerEntries.reconnect: ${rssEntry.m_hash}: ${rssEntry.m_remote_state}`);
+
+        if (rssEntry.m_remote_state == feeds_ns.RssSyncState.IS_LOCAL_ONLY)
+        {
+          // Send entry to the remote table
+          self.insert(rssEntry);
+
+          // Operation 'send' initiated here, the RssSyncState for
+          // this entry will be updated to IS_SYNCED via event
+          // MARK_AS_SYNCED back to the local table
+          log.info(`rtHandlerEntries.reconnect: send (${rssEntry.m_hash})`);
+          ++cnt;
+        }
+
+        // Continue with next
+        return 1;
+      });
+}
+rtHandlerEntries.prototype.reconnect = reconnect;
+
+// object rtHandlerEntries.handleEntryEvent
 // Handle updates from the remote tables for 'rss_subscriptions'
 // (Entries added/set or deleted)
 function handleEntryEvent(event, cbDone)
@@ -158,7 +199,7 @@ function handleEntryEvent(event, cbDone)
             // Everything already recorded?
             if (requestCompleted && numCompleted == 0)
             {
-              log.info(`rtHandlerSubs.handleEntryEvent: updated ${numCompleted} entries`);
+              log.info(`rtHandlerEntries.handleEntryEvent: updated ${numCompleted} entries`);
               cbDone();
             }
 
@@ -207,7 +248,7 @@ function handleEntryEvent(event, cbDone)
   if (numCompleted == 0)
   {
     // No changes in the IndexedDB
-    log.info(`rtHandlerSubs.handleEntryEvent: Nothing done for ENTRY_UPDATED or all was synchronous`);
+    log.info(`rtHandlerEntries.handleEntryEvent: Nothing done for ENTRY_UPDATED or all was synchronous`);
     cbDone();
   }
 }
@@ -317,6 +358,9 @@ rtHandlerEntries.prototype.markAsSynced = markAsSynced;
 function insert(rssEntry)
 {
   let self = this;
+
+  // This new status is not yet reflected in remote table
+  rssEntry.m_remote_state = feeds_ns.RssSyncState.IS_LOCAL_ONLY;
 
   let newRemoteEntry = new RemoteEntryRead(rssEntry);
   self.m_feeds.m_rt.insert('rss_entries_read', newRemoteEntry);
