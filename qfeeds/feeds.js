@@ -75,7 +75,12 @@ function Feeds()
 
 
   let profileName = localStorage.getItem('Profile');
-  log.info(`rtables: using profile ${profileName}`);
+  if (profileName == null)
+  {
+    log.info('dbOpen(): profile was never set, setting it to Default');
+    profileName = 'Default';
+  }
+  log.info(`rtables: using profile '${profileName}'`);
   self.m_rt = new feeds_ns.RTables(profileName, tables, function (event)
       {
         handleRTEvent(self, event);
