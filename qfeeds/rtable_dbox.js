@@ -418,16 +418,16 @@ function p_writeBackHandler(self, remoteTableName)
     return;
   }
 
-  // Protect against re-entrant invocation
-  ctx.m_writeBackInProgress = true;
-  ctx.m_progressCnt = 0;
-
   let rtable = self.m_rtables[remoteTableName];
   if (rtable.m_readStateM.m_curState != 'IDLE')
   {
     log.info(`dropbox: writeBackHandler(${remoteTableName}), readStateM not in IDLE, skipped one write`)
     return;
   }
+
+  // Protect against re-entrant invocation
+  ctx.m_writeBackInProgress = true;
+  ctx.m_progressCnt = 0;
 
   // We need the remote journal in order to append (overwrite it)
   if (!ctx.journalAcquired)
