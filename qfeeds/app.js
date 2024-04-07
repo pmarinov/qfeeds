@@ -75,11 +75,11 @@ function App()
               '<a href="https://github.com/pmarinov/rrss/issues" target="_blank">making a bug report</a> ' +
               'together with this information.</i><br/>' +
               '<hr>' +
-              '<span id="xerror_msg_text"></span>' +
+              '<span id="xerror_msg_text" style="font-size: 80%; text-wrap:wrap;"></span>' +
               '<br/><br/>' +
               '<b>source file:</b> ' + strippedUrl + ':' + lineNumber + ':' + column + '<br/>' +
               '<b>stack:</b> ' + '<br/>' +
-              '<pre style="font-size: 80%">' + strippedStack + '</pre>';
+              '<pre style="font-size: 80%; text-wrap:wrap;">' + strippedStack + '</pre>';
 
         $popupErrorMsg.html(errorMsgHTML);
         $('#xerror_msg_text').text(errorMsg);
