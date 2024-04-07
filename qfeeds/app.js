@@ -60,7 +60,7 @@ function App()
         }
         else
         {
-          log.info(`app: unknown message {request.msg}`)
+          log.error(`app: unknown message ${request.msg}`)
         }
       });
 
