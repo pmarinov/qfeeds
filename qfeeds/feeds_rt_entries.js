@@ -132,7 +132,7 @@ function reconnect(_event, cbDone)
           // Operation 'send' initiated here, the RssSyncState for
           // this entry will be updated to IS_SYNCED via event
           // MARK_AS_SYNCED back to the local table
-          log.info(`rtHandlerEntries.reconnect: send (${rssEntry.m_hash})`);
+          log.trace(`rtHandlerEntries.reconnect: send (${rssEntry.m_hash})`);
           ++cnt;
         }
 
@@ -292,6 +292,7 @@ function markAsSynced(event, cbDone)
 
   let entryIndex = 0;
   let numCompleted = 0;
+  let numSkipped = 0;
   let requestCompleted = false;
   let numEntries = listRemoteEntries.length;
   for (entryIndex = 0; entryIndex < listRemoteEntries.length; ++entryIndex)
@@ -313,7 +314,8 @@ function markAsSynced(event, cbDone)
             // Already in the state it needs to be?
             if (dbEntry.m_remote_state == feeds_ns.RssSyncState.IS_SYNCED)
             {
-              log.info(`rtHandlerEntries.markAsSynced: entry (${cnt}): [${entryHash}], ALREADY marked, skipping it`);
+              log.trace(`rtHandlerEntries.markAsSynced: entry (${cnt}): [${entryHash}], ALREADY marked, skipping it`);
+              ++numSkipped;
               result = 1;  // Don't record in the DB
             }
             else
@@ -334,7 +336,7 @@ function markAsSynced(event, cbDone)
           // Everything already marked?
           if (requestCompleted && numCompleted == 0)
           {
-            log.info(`markAsSynced: marked ${numEntries} as IS_SYNCED`);
+            log.info(`markAsSynced: DONE request to mark ${numEntries} as IS_SYNCED, ${numSkipped} skipped (already marked)`);
             cbDone();
           }
 

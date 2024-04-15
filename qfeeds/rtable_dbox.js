@@ -492,11 +492,12 @@ function p_writeBackHandler(self, remoteTableName)
             ctx.newJournal.splice(0, markRecordPoint);
 
             // == 3 == Delete the journal file
-            log.info(`dropbox: writeBackHandler(${remoteTableName}), delete journal file: ${ctx.fnameJournal}`);
-            log.info(`dropbox: writeBackHandler(${remoteTableName}), filesDelete(${ctx.idJournal})`);
+            let full_path = ctx.profilePath + '/' + ctx.fnameJournal;
+            let revJournal = ctx.revJournal;
+            log.info(`dropbox: writeBackHandler(${remoteTableName}), delete journal file full_path=${full_path}`);
             g_dbox.filesDeleteV2(
                 {
-                  path: ctx.profilePath + '/' + ctx.fnameJournal,
+                  path: full_path,
                 })
                 .then(function(response)
                     {
@@ -505,7 +506,7 @@ function p_writeBackHandler(self, remoteTableName)
                       self.p_deactivateWriteBack(remoteTableName);
 
                       // Log it
-                      log.info(`dropbox: writeBackHandler(${remoteTableName}), filesDelete(${ctx.fnameJournal}), deleted OK`);
+                      log.info(`dropbox: writeBackHandler(${remoteTableName}), full_path=${full_path}, deleted OK`);
                     })
                 .catch(function(response)
                     {
@@ -525,8 +526,10 @@ function p_writeBackHandler(self, remoteTableName)
                       else
                         err_msg = response.message;
 
-                      utils_ns.domError("dropbox: filesDelete('" + ctx.fnameJournal + "'), " +
-                          "error: " + err_msg);
+                      let ui_msg = `dropbox: filesDelete('${full_path}'), rev: ${revJournal}, ` +
+                          `error: ${err_msg}`
+                      log.error(ui_msg);
+                      utils_ns.domError(ui_msg);
                     });
         }
     });
