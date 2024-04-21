@@ -112,17 +112,23 @@ $ (cd ~/.local/bin/firefox; ./firefox&)
 
 * To *reload the extension* after edits, Ctrl+R
 
-* To *reload the extension* after edits of `manifest.json`, restart Firefox Developer
-Edition
+* To *reload the extension* after edits of `manifest.json`, restart
+  Firefox Developer Edition
 
 * To be able to navigate the *source files* while in the Debugger set
   the option "Enable browser and add-on debugging toolboxes" to
   ON. Restart the browser.
 
-* Alternative way to see the sources in the debugger is via the page
-  `about:debugging#/runtime/this-firefox`, button "Inspect" for QFeeds
+=== Debug background.js
 
-* Go to `about:debugging` to inspect the UUID of the extension
+* Navigate to the debugger via
+  `about:debugging#/runtime/this-firefox`, click button "Inspect" for
+  QFeeds -- this is the *only way* to debug `backgrund.js`
+
+* Use the log filter, to isolate the messages type _background_
+
+* To activate edits of `background.js`, go to `about:addons` and
+  disable and enable the extension while the debugger window is closed
 
 == Debug functions ==
 

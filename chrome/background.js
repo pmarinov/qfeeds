@@ -37,7 +37,9 @@ function resetLocalStorage()
     qfeedsTab: null,  // Integer ID of tab into which QFeeds is running
     lastActiveTab: 0
   };
-  localStorage.setItem('tabs', JSON.stringify(tabs));
+  let json_str = JSON.stringify(tabs);
+  localStorage.setItem('tabs', json_str);
+  console.log(`setTabsRec(${json_str} [reset]`);
 
   // A dictionary keyed off of tabId that keeps track of data per tab (for
   // example what feedUrl was detected in the tab).
@@ -50,6 +52,15 @@ function resetLocalStorage()
 
 console.log('On browser loaded, resetLocalStorage()');
 resetLocalStorage();
+
+// Set tabs record in local storage
+// (A convenient point to log, if required)
+function setTabsRec(tabs)
+{
+  let json_str = JSON.stringify(tabs);
+  localStorage.setItem('tabs', json_str);
+  console.log(`setTabsRec(${json_str}`);
+}
 
 // Get tabs record safely
 // (handle wiped storage)
@@ -88,7 +99,7 @@ function activateQFeeds(tabId)
         {
           tabs.qfeedsTab = newTab.id;
           console.log('QFeeds started at tab ' + tabs.qfeedsTab);
-          localStorage.setItem('tabs', JSON.stringify(tabs));
+          setTabsRec(tabs);
         });
   }
   else
@@ -121,17 +132,23 @@ chrome.tabs.onRemoved.addListener(function (removedTab, removeInfo)
       {
         console.log('QFeeds closed as tab ' + tabs.qfeedsTab);
         tabs.qfeedsTab = null;
-        localStorage.setItem('tabs', JSON.stringify(tabs));
+        setTabsRec(tabs);
       }
     });
 
 // Checks if an URL is extension's URL
 function isSelfURL(url)
 {
+  // On Chrome the extensions have a fixed URL
   if (url == 'chrome-extension://kdjijdhlleambcpendblfhdmpmfdbcbd/qfeeds/app.html')
     return true;
-  if (url == 'moz-extension://d9585aca-b726-4305-b925-743007851f14/qfeeds/app.html')
+
+  // On Firefox the ID of the extension is not fixed, compare only the
+  // constant parts
+  let urlRe = new RegExp('^moz-extension:.*\/qfeeds\/app.html$');
+  if (url.match(urlRe) != null)
     return true;
+
   return false;
 }
 
@@ -144,7 +161,7 @@ chrome.tabs.onActivated.addListener(function(activeInfo, selectInfo)
       {
         console.log('selected (active): ' + tabs.lastActiveTab);
         tabs.lastActiveTab = tabId;
-        localStorage.setItem('tabs', JSON.stringify(tabs));
+        setTabsRec(tabs);
       }
       else
       {
@@ -159,28 +176,37 @@ chrome.tabs.onUpdated.addListener(function (tabId, changeInfo, tab)
     {
       // console.log('tabs.onUpdated -- tab: ' + tabId + ' status ' + changeInfo.status);
       // console.log(tab.url);
-      if (! (changeInfo.status == 'loading' || changeInfo.status == 'complete'))
+      if (! (changeInfo.status == 'complete'))
         return;
+
       // Monitor if URL of a tab changes
       // 1. Away from QFeeds extension
       // 2. Into QFeeds extension
       var tabs = getTabsRec();
+      console.log(`tab ${tabId} ${changeInfo.status} ${tab.url}`);
       if (tabId == tabs.qfeedsTab)
       {
+        // Extension was in state loaded, check if we haven't exited
         if (!isSelfURL(tab.url))
         {
-          console.log('Extension exited by URL')
+          console.log('Extension exited by URL');
           tabs.qfeedsTab = null;
-          localStorage.setItem('tabs', JSON.stringify(tabs));
+          setTabsRec(tabs);
         }
       }
       else
       {
         if (isSelfURL(tab.url))
         {
+          // To be here we have ONE of:
+          //
+          // 1. Copy & paste of URL of the extension
+          // 2. Click on a bookmark of the URL of the extension
+          // 3. Click button "Back" on the browser to return to the
+          // extension
           console.log('Extension entered by way of URL')
           tabs.qfeedsTab = tabId;
-          localStorage.setItem('tabs', JSON.stringify(tabs));
+          setTabsRec(tabs);
         }
       }
     });
@@ -246,7 +272,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse)
     var tabs = getTabsRec();
     console.log('selected (force-active): ' + sender.tab.id);
     tabs.lastActiveTab = sender.tab.id;
-    localStorage.setItem('tabs', JSON.stringify(tabs));
+    setTabsRec(tabs);
 
     // We received word from the content script that this document
     // is an RSS feed (not just a document linking to the feed).
