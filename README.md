@@ -20,9 +20,9 @@ Features:
 
 ## Try it
 
-Version: 0.13.0 
-Status: Beta 
-Chrome webstore: https://chrome.google.com/webstore/detail/rrss/kdjijdhlleambcpendblfhdmpmfdbcbd
+* Version: 0.13.0
+* Status: Beta
+* Chrome webstore: https://chrome.google.com/webstore/detail/rrss/kdjijdhlleambcpendblfhdmpmfdbcbd
 
 
 ## Hacking
