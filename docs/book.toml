@@ -1,0 +1,6 @@
+[book]
+authors = ["Peter Marinov"]
+language = "en"
+multilingual = false
+src = "src"
+title = "Hacking QFeeds"
