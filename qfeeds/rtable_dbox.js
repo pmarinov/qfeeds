@@ -581,6 +581,10 @@ function p_writeBackHandler(self, remoteTableName)
               // Keep track of the new revision of the file on Dropbox
               ctx.revJournal = response.result.rev;
 
+              // File for remote journal was wiped, now empty the local copy
+              ctx.remoteJournal = [];
+              log.info(`dropbox: writeBackHandler(${remoteTableName}), wipe remoteJournal[] after filesUpload()`);
+
               // Move newJournal[] at the end of remoteJournal[]
               for (let j = 0; j < markRecordPoint; ++j)
                 ctx.remoteJournal.push(ctx.newJournal[j]);
@@ -791,7 +795,7 @@ function loadStateMachine(objRTables, remoteTableName)
                   {
                     log.error('dropbox: getMetadata for journal "' + baseName + '"');
                     log.error(response);
-                    log.error('dropbox: Network error, can\'t continue going back to IDLE')
+                    log.error('dropbox: Network error, can\'t continue, going back to IDLE')
 
                     // Mark that we are off-line
                     objRTables.p_setStateActive(remoteTableName, false);
@@ -845,7 +849,7 @@ function loadStateMachine(objRTables, remoteTableName)
                   {
                     log.error('dropbox: getMetadata for fstate "' + baseName + '"');
                     log.error(response);
-                    log.error('dropbox: Network error, can\'t continue going back to IDLE')
+                    log.error('dropbox: Network error, can\'t continue, going back to IDLE')
                     state.advance('IDLE');
                   }
                 });
