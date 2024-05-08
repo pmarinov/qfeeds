@@ -507,6 +507,10 @@ function p_writeBackHandler(self, remoteTableName)
 
                       // Log it
                       log.info(`dropbox: writeBackHandler(${remoteTableName}), full_path=${full_path}, deleted OK`);
+
+                      // File for remote journal was wiped, now empty the local copy
+                      ctx.remoteJournal = [];
+                      log.info(`dropbox: writeBackHandler(${remoteTableName}), wipe remoteJournal[] after filesDeleteV2()`);
                     })
                 .catch(function(response)
                     {
@@ -580,10 +584,6 @@ function p_writeBackHandler(self, remoteTableName)
 
               // Keep track of the new revision of the file on Dropbox
               ctx.revJournal = response.result.rev;
-
-              // File for remote journal was wiped, now empty the local copy
-              ctx.remoteJournal = [];
-              log.info(`dropbox: writeBackHandler(${remoteTableName}), wipe remoteJournal[] after filesUpload()`);
 
               // Move newJournal[] at the end of remoteJournal[]
               for (let j = 0; j < markRecordPoint; ++j)
