@@ -1025,7 +1025,8 @@ function p_feedRecord(feed, syncRTable, cbResult)
 
         if (needsRTableSync)
         {
-          self.p_rtableSyncFeedEntry(feed);  // new url or tags
+          // new url or tags
+          self.m_rtSubs.insert(feed);
         }
 
         if (!needsUpdate)

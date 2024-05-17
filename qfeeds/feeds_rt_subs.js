@@ -367,8 +367,8 @@ function markAsSynced(event, cbDone)
 }
 rtHandlerSubs.prototype.markAsSynced = markAsSynced;
 
-// object rtHandlerSubs.deleteRec
-// Schedules a row of data to be deleted in the remote table
+// object rtHandlerSubs.insert
+// Schedules a row of data to be inserted in the remote table
 function insert(feed)
 {
   let self = this;

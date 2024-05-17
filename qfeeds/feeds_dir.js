@@ -1581,24 +1581,26 @@ function p_handleSubscribe(ev)
   }
   else
     log.info('subscribe: url:' + self.p_newFeedUrl);
-    self.m_feedsDB.feedAddByUrl(self.m_newFeedUrl, tags,
-      function()
-      {
-        // Feed's _add_ operation is complete
-        // (feed data is in the DB)
-        log.info("RSS added to DB (completed): " + urlRss);
 
-        // This function would activate an RSS feed as a result of Add operation
-        if (self.m_newFeedUrl == null)  // User already switched away to something else?
-          return;
+  // Add to IndexedDB
+  self.m_feedsDB.feedAddByUrl(self.m_newFeedUrl, tags,
+    function()
+    {
+      // Feed's _add_ operation is complete
+      // (feed data is in the DB)
+      log.info("RSS added to DB (completed): " + urlRss);
 
-        var idx = self.p_findDirEntry(urlRss);
-        if (idx < 0)
-          return;
+      // This function would activate an RSS feed as a result of Add operation
+      if (self.m_newFeedUrl == null)  // User already switched away to something else?
+        return;
 
-        log.info('activate ' + idx);
-        self.p_activateDirEntry(idx, true);
-      });
+      var idx = self.p_findDirEntry(urlRss);
+      if (idx < 0)
+        return;
+
+      log.info('activate ' + idx);
+      self.p_activateDirEntry(idx, true);
+    });
 }
 FeedsDir.prototype.p_handleSubscribe = p_handleSubscribe;
 
