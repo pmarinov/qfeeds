@@ -68,6 +68,8 @@ first start**
   environment](https://developer.mozilla.org/en-US/docs/Archive/Add-ons/Setting_up_extension_development_environment)
   (mozilla.org), see section "Firefox extension proxy file"
 
+* Restart Firefox Developer Edition
+
 * **Activate the extension** from page `about:addons`. Toggle the
   enable/disable switch-box button for extension QFeeds.
 
