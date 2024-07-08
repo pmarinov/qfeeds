@@ -27,9 +27,8 @@ Features:
 
 ## Hacking
 
-A developer guide written in Markdown format is available in folder `docs/`
-
-See it nicely rendered as an mdBook here (TODO)
+The documentation for developers is in mdBook format:
+https://hangar118.sdf.org/p/qfeeds/docs/index.html
 
 
 ## Important
