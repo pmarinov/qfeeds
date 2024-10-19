@@ -384,9 +384,17 @@ function feedDisplay(items, dispContext)
     $d.snippet = utils_ns.domFindInside($d.bar, '.xsnippet');
     // concert snippet to text
     // ("e.m_description" is sanitized, safe to run parseHTML() on it)
-    rssDom = jQuery.parseHTML(e.m_description);
-    t = $(rssDom).text();
-    $d.snippet.text(t.substr(0, 120));
+    try
+    {
+      rssDom = jQuery.parseHTML(e.m_description);
+      t = $(rssDom).text();
+      $d.snippet.text(t.substr(0, 120));
+    }
+    catch(e)
+    {
+      log.warn('Failed to process RSS body: ' + e.m_description);
+      $d.snippet.text('Failed RSS body');
+    }
 
     $d.marked_read = utils_ns.domFindInside($d.bar, '.xmarked_read');
     $d.marked_unread = utils_ns.domFindInside($d.bar, '.xmarked_unread');
@@ -449,7 +457,14 @@ function feedDisplay(items, dispContext)
     $d.bentry = utils_ns.domFindInside($d.body, '.xbody_entry');
     // "e.m_description" is sanitized before storing into table 'rss_data', it is
     // now safe to put as HTML
-    $d.bentry.html(e.m_description);
+    try
+    {
+      $d.bentry.html(e.m_description);
+    }
+    catch (e)
+    {
+      $d.bentry.text('Bad RSS data: ' + e.m_description);
+    }
 
     links = $d.bentry.find('a');
     for (j = 0; j < links.length; ++j)
