@@ -94,8 +94,8 @@ function App()
       }
 
   // Establish compatible indexDB based on the browser
-  log.setLevel('info');
-  // log.setLevel('warn');
+  // log.setLevel('info');
+  log.setLevel('warn');
   log.info("app: Obtaining indexDB handler...");
 
   if (!window.indexedDB)

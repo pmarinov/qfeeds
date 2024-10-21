@@ -14,13 +14,13 @@ Features:
 * No server side for processing of data (it is able to read intranet
   feeds, for example)
 * Displays feeds alone or grouped into folders
-* Uses Google Drive, optionally, for synchronization between
+* Uses Dropbox, optionally, for synchronization between
   computers (list of subscriptions and what was marked as read)
 
 
 ## Try it
 
-* Version: 0.13.0
+* Version: 0.14.0
 * Status: Beta
 * Chrome webstore: https://chrome.google.com/webstore/detail/rrss/kdjijdhlleambcpendblfhdmpmfdbcbd
 
@@ -36,15 +36,13 @@ https://hangar118.sdf.org/p/qfeeds/docs/index.html
 Google announced that the Realtime API is DEPRACATED as of November 28, 2017. See:
 https://developers.google.com/google-apps/realtime/deprecation
 
-It will remain operational until December 11, 2018.
-
 The implementation plan of QFeeds has changed its emphasis towards migration to Dropbox.
 
 
 ## Implementation plan
 
-* Make it work on Firefox
-* MIGRATE to Dropbox as an alternative to the deprecated Google Drive Real Time API
+* Make it work on Firefox (DONE)
+* MIGRATE to Dropbox as an alternative to the deprecated Google Drive Real Time API (DONE)
 * Implement Mark All As Read
 * Implement display of unread counters
 
@@ -55,7 +53,7 @@ QFeeds is [free software](http://www.gnu.org/philosophy/free-sw.html)
 -- this means that everyone may use it, redistribute it, and/or modify
 it under the terms of the BSD (FreeBSD) License.
 
-Copyright (c) 2015, Peter Marinov and Contributors. All rights reserved.
+Copyright (c) 2016-2024, Peter Marinov and Contributors. All rights reserved.
 
 See LICENSE.txt, see CONTRIBUTORS.txt
 

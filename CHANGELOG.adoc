@@ -1,8 +1,10 @@
 == CHANGELOG.txt, QFeeds
 
-== 2020-04-04, vx.x.x, pmarinov
+== 2020-10-20, v0.14.0, pmarinov
 * NEW: Rename to QFeeds
 * NEW: Disable connection to GDrive
+* NEW: Make it work on Firefox
+* NEW: Make it work with Dropbox
 
 == 2018-05-30, v0.11.0, pmarinov
 
