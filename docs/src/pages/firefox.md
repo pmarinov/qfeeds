@@ -84,7 +84,7 @@ first start**
 * To **reload the extension** after edits of `manifest.json`, restart
   Firefox Developer Edition
 
-* To be able to navigate the **source files** while in the Debugger set
+* To be able to **navigate the source files** while in the Debugger set
   the option *Enable browser and add-on debugging toolboxes* to
   ON. Restart the browser.
 

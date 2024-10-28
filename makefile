@@ -29,10 +29,10 @@ lib/bootstrap-3.2.0-dist/js/bootstrap.js:
 	cd lib && unzip bootstrap-3.2.0-dist.zip
 	cd lib && rm bootstrap-3.2.0-dist.zip
 
-lib/jquery-2.0.2.js:
+lib/jquery-3.7.1.js:
 	mkdir -p lib
 	@echo "[ Downloading jquery.js ]"
-	cd lib && curl --silent --remote-name --location "https://code.jquery.com/jquery-2.0.2.js"
+	cd lib && curl --silent --remote-name --location "https://code.jquery.com/jquery-3.7.1.js"
 
 lib/components/sha1.js:
 	mkdir -p lib
@@ -76,7 +76,7 @@ lib/Dropbox-sdk.js:
 	    "https://unpkg.com/dropbox@10.12.0/dist/Dropbox-sdk.js.map"
 
 JS_LIBS = lib/bootstrap-3.2.0-dist/js/bootstrap.js \
-     lib/jquery-2.0.2.js \
+     lib/jquery-3.7.1.js \
      lib/components/sha1.js \
 	 lib/loglevel.js \
 	 lib/sanitizer.js \
