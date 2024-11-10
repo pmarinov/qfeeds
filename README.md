@@ -22,7 +22,8 @@ Features:
 
 * Version: 0.14.0
 * Status: Beta
-* Chrome webstore: https://chrome.google.com/webstore/detail/rrss/kdjijdhlleambcpendblfhdmpmfdbcbd
+* Firefox add-on: https://addons.mozilla.org/en-US/firefox/addon/qfeeds/
+* Chrome webstore: https://chrome.google.com/webstore/detail/rrss/kdjijdhlleambcpendblfhdmpmfdbcbd (note: this is one version behind because new manifest v3 is needed for the submission)
 
 
 ## Hacking
@@ -41,8 +42,9 @@ The implementation plan of QFeeds has changed its emphasis towards migration to 
 
 ## Implementation plan
 
+* Migrate to manifest v3 for Chrome
 * Make it work on Firefox (DONE)
-* MIGRATE to Dropbox as an alternative to the deprecated Google Drive Real Time API (DONE)
+* Migrate to Dropbox as an alternative to the deprecated Google Drive Real Time API (DONE)
 * Implement Mark All As Read
 * Implement display of unread counters
 
